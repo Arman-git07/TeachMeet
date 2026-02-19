@@ -24,8 +24,7 @@ import { verifyPayment } from '@/ai/flows/verify-payment-flow';
 
 const PLATFORM_FEE_AMOUNT = 10;
 const GRACE_PERIOD_DAYS = 7;
-// Unified to okicici for all regions to solve bank loading errors.
-const PLATFORM_UPI_INR = "07arman2004-1@okicici";
+const PLATFORM_UPI_INR = "07arman2004-1@oksbi";
 const PLATFORM_UPI_INTL = "07arman2004-1@okicici";
 
 export default function ClassroomDetailLayout({
@@ -87,7 +86,7 @@ export default function ClassroomDetailLayout({
     };
   }, [classroomId, user, authLoading, router, toast]);
 
-  const billingCurrency = classroom?.billingCurrency || 'INR';
+  const billingCurrency = classroom?.billingCurrency || 'USD';
   const currentUpiId = billingCurrency === 'INR' ? PLATFORM_UPI_INR : PLATFORM_UPI_INTL;
 
   const handleRenew = useCallback(async () => {
@@ -218,7 +217,8 @@ export default function ClassroomDetailLayout({
   }
 
   if (classroom.subscriptionStatus === 'blocked' && userRole === 'creator') {
-      const upiUrl = `upi://pay?pa=${currentUpiId}&pn=${encodeURIComponent("TeachMeet Maintenance")}&am=${PLATFORM_FEE_AMOUNT}&cu=${billingCurrency}&tn=Renewal_${classroom.id}`;
+      const upiParams = `pa=${currentUpiId}&pn=${encodeURIComponent("TeachMeet Maintenance")}&am=${PLATFORM_FEE_AMOUNT}&tn=Renewal_${classroom.id}`;
+      const upiUrl = billingCurrency === 'INR' ? `upi://pay?${upiParams}&cu=INR` : `upi://pay?${upiParams}`;
       const isInternational = billingCurrency !== 'INR';
 
       return (

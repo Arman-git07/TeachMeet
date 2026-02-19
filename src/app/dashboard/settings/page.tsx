@@ -271,7 +271,7 @@ export default function SettingsPage() {
   const handleSaveGeneral = async () => {
     if (!auth.currentUser) return;
     if (!location.trim()) {
-        toast({ variant: "destructive", title: "Location Required", description: "Please provide your location for classroom security." });
+        toast({ variant: "destructive", title: "Location Required", description: "Please grant location permission to secure your account." });
         return;
     }
     setIsSavingGeneral(true);
@@ -362,7 +362,7 @@ export default function SettingsPage() {
   };
   
   const videoClassNames = cn(
-    "w-full h-full object-cover rounded-xl bg-muted",
+    "w-full h-full object-cover rounded-xl bg-black",
     {
       "video-mirror": mirrorCamera,
       "video-filter-grayscale": isFilterToggleOn && appliedFilter === "grayscale",
@@ -396,7 +396,7 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                     <Label htmlFor="location" className="flex items-center justify-between">
                         <span className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1">Location <span className="text-destructive">*</span></span>
-                        <Badge variant="outline" className="text-[9px] uppercase font-bold tracking-tighter">Security Requirement</Badge>
+                        <Badge variant="outline" className="text-[9px] uppercase font-bold tracking-tighter">Verified Area</Badge>
                     </Label>
                     <div className="flex gap-2">
                         <div className="relative flex-1">
@@ -404,9 +404,9 @@ export default function SettingsPage() {
                             <Input 
                                 id="location" 
                                 value={location} 
-                                onChange={(e) => setLocation(e.target.value)} 
-                                className="pl-9 rounded-xl h-12" 
-                                placeholder="City, Country" 
+                                readOnly
+                                className="pl-9 rounded-xl h-12 bg-muted/50 cursor-not-allowed font-medium" 
+                                placeholder="Auto-detected location..." 
                                 disabled={isSavingGeneral} 
                             />
                         </div>
@@ -415,18 +415,18 @@ export default function SettingsPage() {
                             size="icon" 
                             onClick={handleGetLocation} 
                             disabled={isLocating || isSavingGeneral} 
-                            className="rounded-xl h-12 w-12 shrink-0 shadow-sm"
-                            title="Auto-detect location"
+                            className="rounded-xl h-12 w-12 shrink-0 shadow-sm border border-primary/20"
+                            title="Detect location via browser"
                         >
                             {isLocating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Locate className="h-5 w-5" />}
                         </Button>
                     </div>
                     <p className="text-[10px] text-muted-foreground leading-relaxed italic px-1">
-                        Location access is required to authenticate classroom payments and transaction history.
+                        Manual typing is disabled. Please click the locate button to verify your region for billing and classroom security.
                     </p>
                 </div>
             </div>
-            <div className="bg-muted/30 p-6 rounded-2xl border flex flex-col items-center justify-center text-center space-y-4">
+            <div className="bg-muted/30 p-6 rounded-2xl border border-dashed flex flex-col items-center justify-center text-center space-y-4">
                 <div className="relative">
                     <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center">
                         <UserCircle className="h-12 w-12 text-primary" />
@@ -436,13 +436,13 @@ export default function SettingsPage() {
                     </div>
                 </div>
                 <div className="space-y-1">
-                    <p className="font-bold text-sm">Avatar & Account</p>
-                    <p className="text-xs text-muted-foreground">Manage your avatar and email in the user menu at the top right.</p>
+                    <p className="font-bold text-sm">Identity Verification</p>
+                    <p className="text-xs text-muted-foreground">Your location and name are used to validate your classroom transactions.</p>
                 </div>
             </div>
         </div>
         <div className="flex justify-end pt-4 border-t">
-            <Button onClick={handleSaveGeneral} disabled={isSavingGeneral || authLoading} className="rounded-xl btn-gel px-8 h-12 text-base font-bold">
+            <Button onClick={handleSaveGeneral} disabled={isSavingGeneral || authLoading || !location} className="rounded-xl btn-gel px-8 h-12 text-base font-bold">
                 {isSavingGeneral ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
                 Update Profile
             </Button>
@@ -651,7 +651,7 @@ export default function SettingsPage() {
                     </div>
                 </div>
                 <div className="space-y-4 p-5 bg-muted/20 border rounded-2xl">
-                    <h4 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-primary"><Brush className="h-4 w-4"/> Drawing Defaults</h4>
+                    <h4 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-muted-foreground"><Brush className="h-4 w-4"/> Drawing Defaults</h4>
                     <div className="space-y-4">
                         <div className="space-y-2">
                             <Label className="text-[10px] font-bold">Line Color</Label>
@@ -667,7 +667,7 @@ export default function SettingsPage() {
 
             <div className="space-y-6">
                 <div className="space-y-4 p-5 bg-muted/20 border rounded-2xl">
-                    <h4 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-primary"><TypeIcon className="h-4 w-4"/> Text Tool Defaults</h4>
+                    <h4 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-muted-foreground"><TypeIcon className="h-4 w-4"/> Text Tool Defaults</h4>
                     <div className="space-y-4">
                         <div className="space-y-2">
                             <Label className="text-[10px] font-bold">Font Family</Label>

@@ -132,8 +132,7 @@ type TeacherApplicationValues = z.infer<typeof teacherApplicationSchema>;
 
 const PLATFORM_FEE_AMOUNT = 10;
 const GRACE_PERIOD_DAYS = 7;
-// Both unified to okicici as Indians can pay to it and it's the working one for international users.
-const PLATFORM_UPI_INR = "07arman2004-1@okicici";
+const PLATFORM_UPI_INR = "07arman2004-1@oksbi";
 const PLATFORM_UPI_INTL = "07arman2004-1@okicici";
 
 function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => void; classroomToEdit?: Classroom | null; }) {
@@ -168,8 +167,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
           if (loc.includes('united kingdom') || loc.includes('uk')) return 'GBP';
           if (loc.includes('europe') || loc.includes('germany') || loc.includes('france')) return 'EUR';
       }
-      const locale = typeof window !== 'undefined' ? navigator.language : 'en-IN';
-      return locale.includes('IN') ? 'INR' : 'USD';
+      return 'USD';
   }, [userLocation]);
 
   const currentUpiId = useMemo(() => {
@@ -178,7 +176,12 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
 
   const upiUrl = useMemo(() => {
       const name = encodeURIComponent("TeachMeet Platform");
-      return `upi://pay?pa=${currentUpiId}&pn=${name}&am=${PLATFORM_FEE_AMOUNT}&cu=${billingCurrency}&tn=ClassroomSubscription`;
+      let url = `upi://pay?pa=${currentUpiId}&pn=${name}&am=${PLATFORM_FEE_AMOUNT}`;
+      if (billingCurrency === 'INR') {
+          url += `&cu=INR`;
+      }
+      url += `&tn=ClassroomSubscription`;
+      return url;
   }, [billingCurrency, currentUpiId]);
 
   useEffect(() => {
@@ -332,9 +335,9 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                 {billingCurrency !== 'INR' && (
                     <Alert className="bg-amber-50 border-amber-200 text-amber-800 rounded-xl">
                         <AlertTriangle className="h-4 w-4 text-amber-600" />
-                        <AlertTitle className="text-xs font-black uppercase tracking-widest">International Payment Notice</AlertTitle>
+                        <AlertTitle className="text-xs font-black uppercase tracking-widest">International Payment Info</AlertTitle>
                         <AlertDescription className="text-[10px] leading-relaxed font-medium">
-                            UPI is an Indian payment protocol. If your bank app fails to load the details, please contact <span className="font-bold text-amber-900">07arman2004@gmail.com</span> for alternative international transfer details.
+                            UPI is an Indian protocol. If your bank app fails to load the payment screen, please contact <span className="font-bold text-amber-900">07arman2004@gmail.com</span> for international transfer support.
                         </AlertDescription>
                     </Alert>
                 )}
