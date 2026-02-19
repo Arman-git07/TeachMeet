@@ -24,7 +24,8 @@ import { verifyPayment } from '@/ai/flows/verify-payment-flow';
 
 const PLATFORM_FEE_AMOUNT = 10;
 const GRACE_PERIOD_DAYS = 7;
-const PLATFORM_UPI_ID = "07arman2004-1@oksbi";
+const PLATFORM_UPI_INR = "07arman2004-1@oksbi";
+const PLATFORM_UPI_INTL = "07arman2004-1@okicici";
 
 export default function ClassroomDetailLayout({
   children,
@@ -85,6 +86,9 @@ export default function ClassroomDetailLayout({
     };
   }, [classroomId, user, authLoading, router, toast]);
 
+  const billingCurrency = classroom?.billingCurrency || 'INR';
+  const currentUpiId = billingCurrency === 'INR' ? PLATFORM_UPI_INR : PLATFORM_UPI_INTL;
+
   const handleRenew = useCallback(async () => {
       if (!user || !classroom) return;
       try {
@@ -124,8 +128,8 @@ export default function ClassroomDetailLayout({
           const result = await verifyPayment({
               screenshotDataUri: dataUri,
               expectedAmount: PLATFORM_FEE_AMOUNT,
-              expectedCurrency: classroom.billingCurrency || 'INR',
-              expectedRecipientUpi: PLATFORM_UPI_ID
+              expectedCurrency: billingCurrency,
+              expectedRecipientUpi: currentUpiId
           });
 
           setVerificationProgress(80);
@@ -213,8 +217,8 @@ export default function ClassroomDetailLayout({
   }
 
   if (classroom.subscriptionStatus === 'blocked' && userRole === 'creator') {
-      const upiUrl = `upi://pay?pa=${PLATFORM_UPI_ID}&pn=${encodeURIComponent("TeachMeet Maintenance")}&am=${PLATFORM_FEE_AMOUNT}&cu=${classroom.billingCurrency || 'INR'}&tn=Renewal_${classroom.id}`;
-      const isInternational = classroom.billingCurrency !== 'INR';
+      const upiUrl = `upi://pay?pa=${currentUpiId}&pn=${encodeURIComponent("TeachMeet Maintenance")}&am=${PLATFORM_FEE_AMOUNT}&cu=${billingCurrency}&tn=Renewal_${classroom.id}`;
+      const isInternational = billingCurrency !== 'INR';
 
       return (
           <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 p-4">
@@ -233,7 +237,7 @@ export default function ClassroomDetailLayout({
                               <AlertTriangle className="h-4 w-4 text-amber-600" />
                               <AlertTitle className="text-[10px] font-black uppercase tracking-widest">International Payment Info</AlertTitle>
                               <AlertDescription className="text-[10px] leading-relaxed">
-                                  UPI is an Indian protocol and may not work with international bank accounts. If you cannot pay via the link below, please email <span className="font-bold text-amber-900">07arman2004@gmail.com</span> for alternative bank details.
+                                  UPI is an Indian protocol. If your bank app fails to load, please email <span className="font-bold text-amber-900">07arman2004@gmail.com</span> for alternative international transfer details.
                               </AlertDescription>
                           </Alert>
                       )}
@@ -286,7 +290,7 @@ export default function ClassroomDetailLayout({
                           <>
                             <div className="bg-muted p-4 rounded-2xl text-center border">
                                 <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Renewal Amount</p>
-                                <p className="text-3xl font-black">{PLATFORM_FEE_AMOUNT} {classroom.billingCurrency || 'INR'}</p>
+                                <p className="text-3xl font-black">{PLATFORM_FEE_AMOUNT} {billingCurrency}</p>
                             </div>
                             <div className="space-y-3">
                                 <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl" onClick={() => setPaymentInitiated(true)}>

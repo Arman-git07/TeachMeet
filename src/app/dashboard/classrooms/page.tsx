@@ -132,7 +132,8 @@ type TeacherApplicationValues = z.infer<typeof teacherApplicationSchema>;
 
 const PLATFORM_FEE_AMOUNT = 10;
 const GRACE_PERIOD_DAYS = 7;
-const PLATFORM_UPI_ID = "07arman2004-1@oksbi";
+const PLATFORM_UPI_INR = "07arman2004-1@oksbi";
+const PLATFORM_UPI_INTL = "07arman2004-1@okicici";
 
 function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => void; classroomToEdit?: Classroom | null; }) {
   const [step, setStep] = useState<'details' | 'payment'>('details');
@@ -170,10 +171,14 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
       return locale.includes('IN') ? 'INR' : 'USD';
   }, [userLocation]);
 
+  const currentUpiId = useMemo(() => {
+      return billingCurrency === 'INR' ? PLATFORM_UPI_INR : PLATFORM_UPI_INTL;
+  }, [billingCurrency]);
+
   const upiUrl = useMemo(() => {
       const name = encodeURIComponent("TeachMeet Platform");
-      return `upi://pay?pa=${PLATFORM_UPI_ID}&pn=${name}&am=${PLATFORM_FEE_AMOUNT}&cu=${billingCurrency}&tn=ClassroomSubscription`;
-  }, [billingCurrency]);
+      return `upi://pay?pa=${currentUpiId}&pn=${name}&am=${PLATFORM_FEE_AMOUNT}&cu=${billingCurrency}&tn=ClassroomSubscription`;
+  }, [billingCurrency, currentUpiId]);
 
   useEffect(() => {
     if (classroomToEdit) {
@@ -276,7 +281,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
         screenshotDataUri: dataUri,
         expectedAmount: PLATFORM_FEE_AMOUNT,
         expectedCurrency: billingCurrency,
-        expectedRecipientUpi: PLATFORM_UPI_ID
+        expectedRecipientUpi: currentUpiId
       });
 
       setVerificationProgress(80);
@@ -330,8 +335,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                         <AlertTriangle className="h-4 w-4 text-amber-600" />
                         <AlertTitle className="text-xs font-black uppercase tracking-widest">International Payment Notice</AlertTitle>
                         <AlertDescription className="text-[10px] leading-relaxed font-medium">
-                            UPI is an Indian payment protocol. Since your account is outside India, this link might not work with your local bank app. 
-                            If you encounter errors, please contact <span className="font-bold text-amber-900">07arman2004@gmail.com</span> for alternative payment options.
+                            UPI is an Indian payment protocol. If your bank app fails to load the details, please contact <span className="font-bold text-amber-900">07arman2004@gmail.com</span> for alternative international transfer details.
                         </AlertDescription>
                     </Alert>
                 )}
