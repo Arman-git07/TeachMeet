@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
@@ -8,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { UserCircle, Video, Palette, ShieldCheck, Save, Loader2, BookOpen, Users, LogOut, Trash2, Mic, Settings2, Image as ImageIcon, Camera, AlertTriangle, Bell, MessageSquare, Hand, ArrowLeft, History, Brush, Type as TypeIcon, Clapperboard, FileText, ToggleLeft, ToggleRight, Radio, FlipHorizontal } from "lucide-react";
+import { UserCircle, Video, Palette, ShieldCheck, Save, Loader2, BookOpen, Users, LogOut, Trash2, Mic, Settings2, Image as ImageIcon, Camera, AlertTriangle, Bell, MessageSquare, Hand, ArrowLeft, History, Brush, Type as TypeIcon, Clapperboard, FileText, ToggleLeft, ToggleRight, Radio, FlipHorizontal, MapPin, Locate } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
@@ -19,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { getToken } from 'firebase/messaging';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 
 const SettingsSection = React.forwardRef<
   HTMLDivElement,
@@ -59,8 +58,9 @@ export default function SettingsPage() {
 
   // General Settings
   const [displayName, setDisplayName] = useState<string>('');
-  const [isSavingName, setIsSavingName] = useState<boolean>(false);
-  const isNameChanged = user?.displayName !== displayName.trim() && displayName.trim() !== '';
+  const [location, setLocation] = useState<string>('');
+  const [isLocating, setIsLocating] = useState(false);
+  const [isSavingGeneral, setIsSavingGeneral] = useState<boolean>(false);
   
   // Audio & Video Settings
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
@@ -126,6 +126,19 @@ export default function SettingsPage() {
   useEffect(() => {
     if (user && !authLoading) {
       setDisplayName(user.displayName || '');
+      
+      // Fetch additional user data from Firestore
+      const fetchUserData = async () => {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            setLocation(userDoc.data().location || '');
+          }
+        } catch (e) {
+          console.warn("Could not fetch user profile details:", e);
+        }
+      };
+      fetchUserData();
     }
     // A/V
     setDefaultCameraOn(localStorage.getItem('teachmeet-camera-default') !== 'off');
@@ -200,16 +213,70 @@ export default function SettingsPage() {
     };
   }, [selectedVideoDevice, hasAVPermissions, toast]);
 
+  const handleGetLocation = () => {
+    if (!("geolocation" in navigator)) {
+      toast({ variant: "destructive", title: "Error", description: "Geolocation is not supported by your browser." });
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          // Use OpenStreetMap Nominatim for free reverse geocoding
+          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          const data = await response.json();
+          const city = data.address.city || data.address.town || data.address.village || data.address.state || 'Unknown City';
+          const country = data.address.country || 'Unknown Country';
+          setLocation(`${city}, ${country}`);
+          toast({ title: "Location Detected", description: `We found you in ${city}, ${country}.` });
+        } catch (error) {
+          console.error("Reverse geocoding failed:", error);
+          setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+          toast({ title: "Coordinates Saved", description: "Could not determine city name, saved raw coordinates." });
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        let msg = "Could not retrieve your location.";
+        if (error.code === error.PERMISSION_DENIED) msg = "Please allow location access in your browser to use this feature.";
+        toast({ variant: "destructive", title: "Location Access Denied", description: msg });
+        setIsLocating(false);
+      }
+    );
+  };
+
   const handleSaveGeneral = async () => {
-    if (!auth.currentUser || !isNameChanged) return;
-    setIsSavingName(true);
+    if (!auth.currentUser) return;
+    
+    if (!location.trim()) {
+        toast({ variant: "destructive", title: "Location Required", description: "Please provide your location for classroom payment verification." });
+        return;
+    }
+
+    setIsSavingGeneral(true);
     try {
-      await updateProfile(auth.currentUser, { displayName });
-      toast({ title: "Success", description: "Your display name has been updated." });
+      // 1. Update Auth Profile (Display Name)
+      const isNameChanged = user?.displayName !== displayName.trim() && displayName.trim() !== '';
+      if (isNameChanged) {
+        await updateProfile(auth.currentUser, { displayName });
+      }
+      
+      // 2. Update Firestore User Document (Location & Name)
+      await setDoc(doc(db, 'users', auth.currentUser.uid), {
+          name: displayName,
+          location: location.trim(),
+          updatedAt: serverTimestamp(),
+      }, { merge: true });
+
+      toast({ title: "General Settings Saved", description: "Your profile information has been updated." });
     } catch (error: any) {
       toast({ variant: "destructive", title: "Update Failed", description: error.message });
     } finally {
-      setIsSavingName(false);
+      setIsSavingGeneral(false);
     }
   };
 
@@ -326,23 +393,57 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="container mx-auto max-w-3xl py-8 space-y-8">
+    <div className="container mx-auto max-w-3xl py-8 space-y-8 px-4">
       <div className="text-center">
         <h1 className="text-4xl font-bold tracking-tight text-foreground">Settings</h1>
         <p className="text-lg text-muted-foreground mt-2">Customize your TeachMeet experience.</p>
       </div>
 
       <SettingsSection title="General" description="Manage your public profile information." icon={UserCircle}>
-        <div className="space-y-2">
-            <Label htmlFor="displayName">Display Name</Label>
-            <Input id="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="rounded-lg" disabled={isSavingName || authLoading} />
-        </div>
-        <div className="flex justify-between items-center">
-            <p className="text-sm text-muted-foreground">Avatar settings are in the user menu.</p>
-            <Button onClick={handleSaveGeneral} disabled={!isNameChanged || isSavingName} className="rounded-lg btn-gel">
-                {isSavingName ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Save Name
-            </Button>
+        <div className="space-y-6">
+            <div className="space-y-2">
+                <Label htmlFor="displayName">Display Name</Label>
+                <Input id="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="rounded-lg" disabled={isSavingGeneral || authLoading} />
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="location" className="flex items-center justify-between">
+                    <span className="flex items-center gap-1">Location <span className="text-destructive">*</span></span>
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Mandatory for payments</span>
+                </Label>
+                <div className="flex gap-2">
+                    <div className="relative flex-1">
+                        <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input 
+                            id="location" 
+                            value={location} 
+                            onChange={(e) => setLocation(e.target.value)} 
+                            className="pl-9 rounded-lg" 
+                            placeholder="City, Country" 
+                            disabled={isSavingGeneral || authLoading} 
+                        />
+                    </div>
+                    <Button 
+                        variant="outline" 
+                        size="icon" 
+                        onClick={handleGetLocation} 
+                        disabled={isLocating || isSavingGeneral || authLoading} 
+                        className="rounded-lg h-10 w-10 shrink-0"
+                        title="Detect my current location"
+                    >
+                        {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Locate className="h-4 w-4" />}
+                    </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground leading-relaxed italic">
+                    Location access helps us verify transaction authenticity for premium features and classroom payments.
+                </p>
+            </div>
+            <div className="flex justify-between items-center pt-4 border-t">
+                <p className="text-sm text-muted-foreground">Avatar settings are in the user menu.</p>
+                <Button onClick={handleSaveGeneral} disabled={isSavingGeneral || authLoading} className="rounded-lg btn-gel">
+                    {isSavingGeneral ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    Save Profile
+                </Button>
+            </div>
         </div>
       </SettingsSection>
 
