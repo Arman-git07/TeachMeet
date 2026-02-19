@@ -501,7 +501,7 @@ function TeacherApplicationDialog({ classroom, onSubmitted }: { classroom: Class
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto px-1">
                     <FormField control={form.control} name="fullName" render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Full Name</Label>
+                            <FormLabel>Full Name</FormLabel>
                             <FormControl><Input placeholder="Your full name" {...field} className="rounded-xl" disabled={isLoading} /></FormControl>
                             <FormMessage />
                         </FormItem>
