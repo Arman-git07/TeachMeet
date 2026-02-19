@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -68,6 +69,8 @@ import {
   CreditCard,
   Star,
   ShieldCheck,
+  ArrowRight,
+  RefreshCw,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
@@ -131,6 +134,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
   const [isPublic, setIsPublic] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [paymentInitiated, setPaymentInitiated] = useState(false);
   const [verificationProgress, setVerificationProgress] = useState(0);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -164,7 +168,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
 
   const handleSubmit = useCallback(async () => {
     if (!user) return;
-    if (isLoading) return; // Prevent double submission
+    if (isLoading) return;
     
     setIsLoading(true);
 
@@ -229,8 +233,19 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
   }, [user, title, description, isPublic, classroomToEdit, billingCurrency, toast, onSuccess, isLoading]);
 
   useEffect(() => {
+    if (paymentInitiated && !isVerifying) {
+        const handleFocus = () => {
+            setIsVerifying(true);
+            toast({ title: "Return Detected", description: "Beginning payment verification..." });
+        };
+        window.addEventListener('focus', handleFocus);
+        return () => window.removeEventListener('focus', handleFocus);
+    }
+  }, [paymentInitiated, isVerifying, toast]);
+
+  useEffect(() => {
     if (isVerifying) {
-      const duration = 8000; // 8 seconds verification period
+      const duration = 8000;
       const interval = 100;
       const step = (interval / duration) * 100;
       
@@ -245,8 +260,6 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
       }, interval);
 
       const completionTimer = setTimeout(() => {
-        // Once the simulated verification duration is complete, we call handleSubmit
-        // which physically creates the classroom in the database.
         handleSubmit();
       }, duration);
 
@@ -285,6 +298,23 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                             <p className="text-[10px] text-muted-foreground font-bold">{Math.round(verificationProgress)}% SECURED</p>
                         </div>
                     </Card>
+                ) : paymentInitiated ? (
+                    <Card className="bg-amber-50 border-amber-200 border-2 rounded-2xl p-6 text-center animate-in fade-in duration-300">
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="bg-amber-100 p-3 rounded-full">
+                                <RefreshCw className="h-8 w-8 text-amber-600 animate-spin" />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="font-black text-amber-800 uppercase tracking-widest">Waiting for Payment</p>
+                                <p className="text-xs text-amber-700/80 leading-relaxed px-4">
+                                    Please complete the transaction in your UPI app. Return to TeachMeet to automatically start the verification process.
+                                </p>
+                            </div>
+                            <Button variant="ghost" size="sm" className="text-[10px] uppercase font-bold text-amber-600" onClick={() => setIsVerifying(true)}>
+                                Stuck? Start Manually
+                            </Button>
+                        </div>
+                    </Card>
                 ) : (
                     <>
                         <Card className="bg-primary/5 border-primary/20 border-2 rounded-2xl shadow-inner">
@@ -294,26 +324,26 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                                     <span className="text-4xl font-black text-foreground">{PLATFORM_FEE_AMOUNT}</span>
                                     <Badge variant="secondary" className="font-bold">{billingCurrency}</Badge>
                                 </div>
-                                <p className="text-[10px] text-muted-foreground mt-4 italic">Class will be created automatically upon detection.</p>
+                                <p className="text-[10px] text-muted-foreground mt-4 italic">Class will be created automatically upon return detection.</p>
                             </CardContent>
                         </Card>
 
                         <div className="space-y-3">
-                            <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl hover:shadow-primary/20 transition-all flex items-center justify-center gap-2" onClick={() => setIsVerifying(true)}>
+                            <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl hover:shadow-primary/20 transition-all flex items-center justify-center gap-2" onClick={() => setPaymentInitiated(true)}>
                                 <a href={upiUrl}>
                                     <CreditCard className="h-5 w-5" />
                                     Pay via UPI
                                 </a>
                             </Button>
                             <p className="text-[10px] text-center text-muted-foreground px-4">
-                                Once you settle the payment in your preferred app, return here. The system will detect the transaction and finalize classroom creation.
+                                Once you settle the payment in your preferred app, return here. The system will detect your return and finalize classroom creation.
                             </p>
                         </div>
                     </>
                 )}
             </div>
             <DialogFooter className="gap-2">
-                <Button variant="outline" className="rounded-xl" onClick={() => { setIsVerifying(false); setStep('details'); }} disabled={isLoading || isVerifying}>Back</Button>
+                <Button variant="outline" className="rounded-xl" onClick={() => { setPaymentInitiated(false); setIsVerifying(false); setStep('details'); }} disabled={isLoading || isVerifying}>Back</Button>
             </DialogFooter>
           </>
       );
@@ -538,7 +568,6 @@ export default function ClassroomsPage() {
   const [classroomToEdit, setClassroomToEdit] = useState<Classroom | null>(null);
   const [classroomToDelete, setClassroomToDelete] = useState<Classroom | null>(null);
 
-  // Lifecycle logic to manage subscription states (Active -> Grace -> Blocked)
   useEffect(() => {
       if (!user || myClasses.length === 0) return;
 

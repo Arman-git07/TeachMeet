@@ -14,7 +14,7 @@ import { ClassroomProvider } from '@/contexts/ClassroomContext';
 import type { Classroom } from '@/app/dashboard/classrooms/[classroomId]/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Lock, Wallet, ArrowLeft, Loader2, AlertCircle, CreditCard, ShieldCheck } from 'lucide-react';
+import { Lock, Wallet, ArrowLeft, Loader2, AlertCircle, CreditCard, ShieldCheck, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -39,6 +39,7 @@ export default function ClassroomDetailLayout({
   const [isLoading, setIsLoading] = useState(true);
   const [isRenewing, setIsRenewing] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [paymentInitiated, setPaymentInitiated] = useState(false);
   const [verificationProgress, setVerificationProgress] = useState(0);
 
   useEffect(() => {
@@ -102,8 +103,20 @@ export default function ClassroomDetailLayout({
       } finally {
           setIsRenewing(false);
           setIsVerifying(false);
+          setPaymentInitiated(false);
       }
   }, [user, classroom, classroomId, toast]);
+
+  useEffect(() => {
+    if (paymentInitiated && !isVerifying) {
+        const handleFocus = () => {
+            setIsVerifying(true);
+            toast({ title: "Return Detected", description: "Verifying your renewal..." });
+        };
+        window.addEventListener('focus', handleFocus);
+        return () => window.removeEventListener('focus', handleFocus);
+    }
+  }, [paymentInitiated, isVerifying, toast]);
 
   useEffect(() => {
     if (isVerifying) {
@@ -146,7 +159,6 @@ export default function ClassroomDetailLayout({
     return <div className="container mx-auto p-4 text-center py-20">Classroom not found or unavailable.</div>;
   }
 
-  // Blocking logic for non-creators
   if (classroom.subscriptionStatus === 'blocked' && userRole !== 'creator') {
       return (
           <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 p-4">
@@ -178,7 +190,6 @@ export default function ClassroomDetailLayout({
       );
   }
 
-  // Billing interface for creator
   if (classroom.subscriptionStatus === 'blocked' && userRole === 'creator') {
       const upiUrl = `upi://pay?pa=07arman2004-1@oksbi&pn=${encodeURIComponent("TeachMeet Maintenance")}&am=${PLATFORM_FEE_AMOUNT}&cu=${classroom.billingCurrency || 'INR'}&tn=Renewal_${classroom.id}`;
       return (
@@ -205,6 +216,21 @@ export default function ClassroomDetailLayout({
                               </div>
                               <Progress value={verificationProgress} className="h-2" />
                           </div>
+                      ) : paymentInitiated ? (
+                        <div className="space-y-4 p-6 bg-amber-50 border-2 border-amber-200 rounded-3xl text-center animate-in fade-in duration-300">
+                            <div className="bg-amber-100 p-3 rounded-full inline-block mx-auto">
+                                <RefreshCw className="h-8 w-8 text-amber-600 animate-spin" />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="font-black text-amber-800 uppercase tracking-widest">Waiting for Payment</p>
+                                <p className="text-[10px] text-amber-700/80 leading-relaxed">
+                                    Please complete the transaction in your UPI app. Return here to automatically start the unblocking process.
+                                </p>
+                            </div>
+                            <Button variant="ghost" size="sm" className="text-[9px] uppercase font-bold text-amber-600" onClick={() => setIsVerifying(true)}>
+                                Stuck? Start Manually
+                            </Button>
+                        </div>
                       ) : (
                           <>
                             <div className="bg-muted p-4 rounded-2xl text-center border">
@@ -212,7 +238,7 @@ export default function ClassroomDetailLayout({
                                 <p className="text-3xl font-black">{PLATFORM_FEE_AMOUNT} {classroom.billingCurrency || 'INR'}</p>
                             </div>
                             <div className="space-y-3">
-                                <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl" onClick={() => setIsVerifying(true)}>
+                                <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl" onClick={() => setPaymentInitiated(true)}>
                                     <a href={upiUrl}><CreditCard className="mr-2 h-5 w-5" /> Pay via UPI</a>
                                 </Button>
                                 <p className="text-[10px] text-center text-muted-foreground">The system will automatically detect your payment after you return from the payment app.</p>
@@ -238,7 +264,7 @@ export default function ClassroomDetailLayout({
                     <span>SUBSCRIPTION EXPIRED: Classroom will be blocked in {GRACE_PERIOD_DAYS - Math.floor((Date.now() - classroom.nextPaymentDue.toDate().getTime()) / (1000 * 60 * 60 * 24))} days.</span>
                 </div>
                 {userRole === 'creator' && (
-                    <Button size="sm" variant="secondary" className="h-7 rounded-full text-[10px] font-black" onClick={() => setIsVerifying(true)} disabled={isRenewing || isVerifying}>
+                    <Button size="sm" variant="secondary" className="h-7 rounded-full text-[10px] font-black" onClick={() => setPaymentInitiated(true)} disabled={isRenewing || isVerifying || paymentInitiated}>
                         {isVerifying ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
                         RENEW NOW
                     </Button>
