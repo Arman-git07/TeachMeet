@@ -13,7 +13,7 @@ import { ClassroomProvider } from '@/contexts/ClassroomContext';
 import type { Classroom } from '@/app/dashboard/classrooms/[classroomId]/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Lock, Wallet, ArrowLeft, Loader2, AlertCircle, CreditCard, ShieldCheck, RefreshCw, UploadCloud, Image as ImageIcon, Info } from 'lucide-react';
+import { Lock, Wallet, ArrowLeft, Loader2, AlertCircle, CreditCard, ShieldCheck, RefreshCw, UploadCloud, Image as ImageIcon, Info, AlertTriangle, Mail } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -214,6 +214,8 @@ export default function ClassroomDetailLayout({
 
   if (classroom.subscriptionStatus === 'blocked' && userRole === 'creator') {
       const upiUrl = `upi://pay?pa=${PLATFORM_UPI_ID}&pn=${encodeURIComponent("TeachMeet Maintenance")}&am=${PLATFORM_FEE_AMOUNT}&cu=${classroom.billingCurrency || 'INR'}&tn=Renewal_${classroom.id}`;
+      const isInternational = classroom.billingCurrency !== 'INR';
+
       return (
           <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 p-4">
               <Card className="w-full max-w-md shadow-2xl rounded-3xl border-none overflow-hidden">
@@ -226,6 +228,16 @@ export default function ClassroomDetailLayout({
                       <CardDescription>Your classroom "{classroom.title}" is blocked.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
+                      {isInternational && (
+                          <Alert className="bg-amber-50 border-amber-200 text-amber-800 rounded-2xl">
+                              <AlertTriangle className="h-4 w-4 text-amber-600" />
+                              <AlertTitle className="text-[10px] font-black uppercase tracking-widest">International Payment Info</AlertTitle>
+                              <AlertDescription className="text-[10px] leading-relaxed">
+                                  UPI is an Indian protocol and may not work with international bank accounts. If you cannot pay via the link below, please email <span className="font-bold text-amber-900">07arman2004@gmail.com</span> for alternative bank details.
+                              </AlertDescription>
+                          </Alert>
+                      )}
+
                       {isVerifying ? (
                           <div className="space-y-4 p-6 bg-primary/5 border-2 border-primary/20 rounded-3xl text-center">
                               <div className="relative mx-auto w-16 h-16">
@@ -258,7 +270,7 @@ export default function ClassroomDetailLayout({
                                 </div>
                             </div>
                             <div className="relative w-full">
-                                <Input 
+                                <input 
                                     type="file" 
                                     accept="image/*" 
                                     onChange={handleScreenshotUpload}

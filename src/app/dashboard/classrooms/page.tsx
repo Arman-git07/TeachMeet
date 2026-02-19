@@ -74,6 +74,7 @@ import {
   UploadCloud,
   Image as ImageIcon,
   Info,
+  Mail,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
@@ -90,6 +91,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { verifyPayment } from '@/ai/flows/verify-payment-flow';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export interface Classroom {
   id: string;
@@ -323,6 +325,17 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                 </DialogDescription>
             </DialogHeader>
             <div className="py-6 space-y-6">
+                {billingCurrency !== 'INR' && (
+                    <Alert className="bg-amber-50 border-amber-200 text-amber-800 rounded-xl">
+                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        <AlertTitle className="text-xs font-black uppercase tracking-widest">International Payment Notice</AlertTitle>
+                        <AlertDescription className="text-[10px] leading-relaxed font-medium">
+                            UPI is an Indian payment protocol. Since your account is outside India, this link might not work with your local bank app. 
+                            If you encounter errors, please contact <span className="font-bold text-amber-900">07arman2004@gmail.com</span> for alternative payment options.
+                        </AlertDescription>
+                    </Alert>
+                )}
+
                 {isVerifying ? (
                     <Card className="bg-primary/5 border-primary/20 border-2 rounded-2xl p-6 text-center animate-in zoom-in-95 duration-300">
                         <div className="flex flex-col items-center gap-4">
@@ -361,7 +374,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                             </div>
 
                             <div className="relative w-full">
-                                <Input 
+                                <input 
                                     type="file" 
                                     accept="image/*" 
                                     onChange={handleScreenshotUpload}
