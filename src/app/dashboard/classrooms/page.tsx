@@ -46,6 +46,7 @@ import {
   where,
   writeBatch,
   getDocs,
+  getDoc,
   limit,
   Timestamp,
 } from 'firebase/firestore';
@@ -143,10 +144,29 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
   const { user } = useAuth();
   const { toast } = useToast();
 
+  const [userLocation, setUserLocation] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+        getDoc(doc(db, 'users', user.uid)).then(snap => {
+            if (snap.exists()) {
+                setUserLocation(snap.data().location);
+            }
+        });
+    }
+  }, [user]);
+
   const billingCurrency = useMemo(() => {
+      if (userLocation) {
+          const loc = userLocation.toLowerCase();
+          if (loc.includes('india')) return 'INR';
+          if (loc.includes('usa') || loc.includes('united states') || loc.includes('america')) return 'USD';
+          if (loc.includes('united kingdom') || loc.includes('uk')) return 'GBP';
+          if (loc.includes('europe') || loc.includes('germany') || loc.includes('france')) return 'EUR';
+      }
       const locale = typeof window !== 'undefined' ? navigator.language : 'en-IN';
       return locale.includes('IN') ? 'INR' : 'USD';
-  }, []);
+  }, [userLocation]);
 
   const upiUrl = useMemo(() => {
       const name = encodeURIComponent("TeachMeet Platform");
