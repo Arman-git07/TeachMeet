@@ -18,15 +18,18 @@ const VerifyPaymentInputSchema = z.object({
     ),
   expectedAmount: z.number().describe("The expected numerical amount paid."),
   expectedCurrency: z.string().describe("The expected currency code (e.g., 'INR', 'USD')."),
+  expectedRecipientUpi: z.string().describe("The specific UPI ID that should have received the payment."),
 });
 export type VerifyPaymentInput = z.infer<typeof VerifyPaymentInputSchema>;
 
 const VerifyPaymentOutputSchema = z.object({
-  isValid: z.boolean().describe("True if the payment is verified as successful and matches the expected amount and currency."),
-  reason: z.string().optional().describe("A clear explanation of why the verification failed, if applicable."),
+  isValid: z.boolean().describe("True if the payment is verified as successful, matches all expected details, and appears to be an authentic, non-doctored screenshot."),
+  reason: z.string().optional().describe("A clear explanation of why the verification failed, specifically mentioning if the recipient, amount, or authenticity was the issue."),
   detectedAmount: z.number().optional().describe("The numerical amount detected in the screenshot."),
   detectedCurrency: z.string().optional().describe("The currency code detected in the screenshot."),
+  detectedRecipient: z.string().optional().describe("The recipient address or UPI ID detected in the screenshot."),
   detectedDate: z.string().optional().describe("The date of the transaction detected in the screenshot."),
+  isDoctored: z.boolean().optional().describe("Whether the AI suspects the image has been edited or is a known fake template."),
 });
 export type VerifyPaymentOutput = z.infer<typeof VerifyPaymentOutputSchema>;
 
@@ -34,18 +37,26 @@ const verifyPaymentPrompt = ai.definePrompt({
   name: 'verifyPaymentPrompt',
   input: { schema: VerifyPaymentInputSchema },
   output: { schema: VerifyPaymentOutputSchema },
-  prompt: `You are a meticulous financial verification assistant for TeachMeet. Your task is to analyze a payment screenshot and confirm its validity.
+  prompt: `You are a meticulous financial auditor for TeachMeet. Your primary goal is to prevent fraud and ensure that users have made a legitimate payment to the platform.
+
+**Your Task:**
+Analyze the provided payment screenshot and determine if it represents a valid, successful transaction that meets all criteria.
 
 **Verification Criteria:**
-1. **Status**: The payment must show as "Success", "Completed", "Paid", or similar.
-2. **Amount**: The detected amount must match {{expectedAmount}}.
-3. **Currency**: The detected currency must match {{expectedCurrency}}.
-4. **Date**: The transaction date should be very recent (ideally today).
+1. **Authenticity Check**: Examine the image for signs of editing, doctoring, or being a fake template. Look for mismatched fonts, irregular shadows, or inconsistent UI elements common in popular payment apps (like Google Pay, PhonePe, Paytm, etc.).
+2. **Recipient Match**: The payment MUST be addressed to exactly: "{{expectedRecipientUpi}}". Check the UPI ID, handle, or name associated with this address.
+3. **Amount Match**: The detected amount must be exactly {{expectedAmount}}.
+4. **Currency Match**: The detected currency must match {{expectedCurrency}}.
+5. **Status Check**: The transaction must show as "Success", "Completed", "Paid", or similar. Pending or failed transactions are invalid.
+6. **Recent Date**: The date must be very recent (ideally today or within the last 24 hours).
 
 **Screenshot Evidence:**
 {{media url=screenshotDataUri}}
 
-Compare the evidence against the requirements. If all criteria are met, set isValid to true. Otherwise, set it to false and explain why in the reason field.`,
+**Instructions:**
+- If the screenshot looks suspicious or fake, set isDoctored to true and isValid to false.
+- If the recipient does not match {{expectedRecipientUpi}}, set isValid to false and explain that the payment was sent to the wrong address.
+- Provide a detailed reason for any failure to help the user correct their mistake.`,
 });
 
 const verifyPaymentFlow = ai.defineFlow(

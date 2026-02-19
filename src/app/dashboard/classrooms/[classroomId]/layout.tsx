@@ -24,6 +24,7 @@ import { verifyPayment } from '@/ai/flows/verify-payment-flow';
 
 const PLATFORM_FEE_AMOUNT = 10;
 const GRACE_PERIOD_DAYS = 7;
+const PLATFORM_UPI_ID = "07arman2004-1@oksbi";
 
 export default function ClassroomDetailLayout({
   children,
@@ -123,7 +124,8 @@ export default function ClassroomDetailLayout({
           const result = await verifyPayment({
               screenshotDataUri: dataUri,
               expectedAmount: PLATFORM_FEE_AMOUNT,
-              expectedCurrency: classroom.billingCurrency || 'INR'
+              expectedCurrency: classroom.billingCurrency || 'INR',
+              expectedRecipientUpi: PLATFORM_UPI_ID
           });
 
           setVerificationProgress(80);
@@ -137,14 +139,14 @@ export default function ClassroomDetailLayout({
               toast({ 
                   variant: 'destructive', 
                   title: "Verification Failed", 
-                  description: result.reason || "The AI could not verify this payment receipt. Please ensure the amount and date are clearly visible." 
+                  description: result.reason || "The AI could not verify this payment receipt. Please ensure the amount, date, and recipient UPI ID are clearly visible." 
               });
               setIsVerifying(false);
               setVerificationProgress(0);
           }
       } catch (error) {
           console.error("Renewal verification error:", error);
-          toast({ variant: 'destructive', title: "Error", description: "Verification process failed." });
+          toast({ variant: 'destructive', title: "Error", description: "Verification process failed. Please ensure the image is a clear screenshot." });
           setIsVerifying(false);
       }
   };
@@ -211,7 +213,7 @@ export default function ClassroomDetailLayout({
   }
 
   if (classroom.subscriptionStatus === 'blocked' && userRole === 'creator') {
-      const upiUrl = `upi://pay?pa=07arman2004-1@oksbi&pn=${encodeURIComponent("TeachMeet Maintenance")}&am=${PLATFORM_FEE_AMOUNT}&cu=${classroom.billingCurrency || 'INR'}&tn=Renewal_${classroom.id}`;
+      const upiUrl = `upi://pay?pa=${PLATFORM_UPI_ID}&pn=${encodeURIComponent("TeachMeet Maintenance")}&am=${PLATFORM_FEE_AMOUNT}&cu=${classroom.billingCurrency || 'INR'}&tn=Renewal_${classroom.id}`;
       return (
           <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 p-4">
               <Card className="w-full max-w-md shadow-2xl rounded-3xl border-none overflow-hidden">
@@ -231,8 +233,8 @@ export default function ClassroomDetailLayout({
                                 <ShieldCheck className="h-8 w-8 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
                               </div>
                               <div className="space-y-1">
-                                <p className="font-black text-primary uppercase tracking-widest">AI Verifying Payment</p>
-                                <p className="text-[10px] text-muted-foreground">Validating screenshot details...</p>
+                                <p className="font-black text-primary uppercase tracking-widest">AI Auditing Transaction</p>
+                                <p className="text-[10px] text-muted-foreground">Validating recipient ID and screenshot authenticity...</p>
                               </div>
                               <Progress value={verificationProgress} className="h-2" />
                           </div>
@@ -270,7 +272,7 @@ export default function ClassroomDetailLayout({
                                 <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl" onClick={() => setPaymentInitiated(true)}>
                                     <a href={upiUrl}><CreditCard className="mr-2 h-5 w-5" /> Pay via UPI</a>
                                 </Button>
-                                <p className="text-[10px] text-center text-muted-foreground">After paying, return here to upload your transaction screenshot for AI approval.</p>
+                                <p className="text-[10px] text-center text-muted-foreground">After paying to <span className="font-bold">07arman2004-1@oksbi</span>, return here to upload your transaction screenshot.</p>
                             </div>
                           </>
                       )}
