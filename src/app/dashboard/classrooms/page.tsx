@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -133,7 +132,8 @@ type TeacherApplicationValues = z.infer<typeof teacherApplicationSchema>;
 
 const PLATFORM_FEE_AMOUNT = 10;
 const GRACE_PERIOD_DAYS = 7;
-const PLATFORM_UPI_INR = "07arman2004-1@oksbi";
+// Both unified to okicici as Indians can pay to it and it's the working one for international users.
+const PLATFORM_UPI_INR = "07arman2004-1@okicici";
 const PLATFORM_UPI_INTL = "07arman2004-1@okicici";
 
 function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => void; classroomToEdit?: Classroom | null; }) {
@@ -198,9 +198,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
   };
 
   const handleSubmit = useCallback(async () => {
-    if (!user) return;
-    if (isLoading) return;
-    
+    if (!user || isLoading) return;
     setIsLoading(true);
 
     try {

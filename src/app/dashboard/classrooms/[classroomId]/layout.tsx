@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -14,7 +13,7 @@ import { ClassroomProvider } from '@/contexts/ClassroomContext';
 import type { Classroom } from '@/app/dashboard/classrooms/[classroomId]/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Lock, Wallet, ArrowLeft, Loader2, AlertCircle, CreditCard, ShieldCheck, RefreshCw, UploadCloud, Image as ImageIcon, Info, AlertTriangle, Mail } from 'lucide-react';
+import { Lock, Wallet, ArrowLeft, Loader2, AlertCircle, CreditCard, ShieldCheck, RefreshCw, UploadCloud, ImageIcon, Info, AlertTriangle, Mail } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -25,7 +24,8 @@ import { verifyPayment } from '@/ai/flows/verify-payment-flow';
 
 const PLATFORM_FEE_AMOUNT = 10;
 const GRACE_PERIOD_DAYS = 7;
-const PLATFORM_UPI_INR = "07arman2004-1@oksbi";
+// Unified to okicici for all regions to solve bank loading errors.
+const PLATFORM_UPI_INR = "07arman2004-1@okicici";
 const PLATFORM_UPI_INTL = "07arman2004-1@okicici";
 
 export default function ClassroomDetailLayout({
