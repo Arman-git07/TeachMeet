@@ -13,7 +13,7 @@ import { ClassroomProvider } from '@/contexts/ClassroomContext';
 import type { Classroom } from '@/app/dashboard/classrooms/[classroomId]/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Lock, Wallet, ArrowLeft, Loader2, AlertCircle, CreditCard, ShieldCheck, RefreshCw, UploadCloud, Image as ImageIcon } from 'lucide-react';
+import { Lock, Wallet, ArrowLeft, Loader2, AlertCircle, CreditCard, ShieldCheck, RefreshCw, UploadCloud, Image as ImageIcon, Info } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -139,14 +139,14 @@ export default function ClassroomDetailLayout({
               toast({ 
                   variant: 'destructive', 
                   title: "Verification Failed", 
-                  description: result.reason || "The AI could not verify this payment receipt. Please ensure the amount, date, and recipient UPI ID are clearly visible." 
+                  description: result.reason || "The AI could not verify this payment. Ensure the recipient and amount are visible on the receipt." 
               });
               setIsVerifying(false);
               setVerificationProgress(0);
           }
       } catch (error) {
           console.error("Renewal verification error:", error);
-          toast({ variant: 'destructive', title: "Error", description: "Verification process failed. Please ensure the image is a clear screenshot." });
+          toast({ variant: 'destructive', title: "Error", description: "Verification process failed. Please ensure the image is a clear receipt." });
           setIsVerifying(false);
       }
   };
@@ -154,7 +154,7 @@ export default function ClassroomDetailLayout({
   useEffect(() => {
     if (paymentInitiated && !isVerifying) {
         const handleFocus = () => {
-            toast({ title: "Return Detected", description: "Please upload your payment screenshot to finalize renewal." });
+            toast({ title: "Return Detected", description: "Please upload your payment receipt to finalize renewal." });
         };
         window.addEventListener('focus', handleFocus);
         return () => window.removeEventListener('focus', handleFocus);
@@ -234,7 +234,7 @@ export default function ClassroomDetailLayout({
                               </div>
                               <div className="space-y-1">
                                 <p className="font-black text-primary uppercase tracking-widest">AI Auditing Transaction</p>
-                                <p className="text-[10px] text-muted-foreground">Validating recipient ID and screenshot authenticity...</p>
+                                <p className="text-[10px] text-muted-foreground">Validating recipient ID and receipt authenticity...</p>
                               </div>
                               <Progress value={verificationProgress} className="h-2" />
                           </div>
@@ -245,9 +245,17 @@ export default function ClassroomDetailLayout({
                             </div>
                             <div className="space-y-1">
                                 <p className="font-black text-amber-800 uppercase tracking-widest">Upload Receipt</p>
-                                <p className="text-[10px] text-amber-700/80 leading-relaxed">
-                                    Please complete the transaction in your UPI app, then upload the screenshot below for AI verification.
+                                <p className="text-[10px] text-amber-700/80 leading-relaxed px-4">
+                                    Please complete the transaction, then upload the receipt image.
                                 </p>
+                            </div>
+                            <div className="bg-white/50 p-3 rounded-xl border border-amber-200 text-left space-y-2">
+                                <div className="flex items-start gap-2">
+                                    <Info className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                                    <p className="text-[10px] text-amber-900 leading-tight">
+                                        If your app blocks screenshots, use the <strong>"Share Receipt"</strong> or <strong>"Download"</strong> button in your payment app to save the image first.
+                                    </p>
+                                </div>
                             </div>
                             <div className="relative w-full">
                                 <Input 
@@ -258,7 +266,7 @@ export default function ClassroomDetailLayout({
                                 />
                                 <Button variant="outline" className="w-full rounded-xl border-amber-300 text-amber-700">
                                     <ImageIcon className="mr-2 h-4 w-4" />
-                                    Upload Screenshot
+                                    Upload Receipt / Screenshot
                                 </Button>
                             </div>
                         </div>
@@ -272,13 +280,13 @@ export default function ClassroomDetailLayout({
                                 <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl" onClick={() => setPaymentInitiated(true)}>
                                     <a href={upiUrl}><CreditCard className="mr-2 h-5 w-5" /> Pay via UPI</a>
                                 </Button>
-                                <p className="text-[10px] text-center text-muted-foreground">After paying to <span className="font-bold">07arman2004-1@oksbi</span>, return here to upload your transaction screenshot.</p>
+                                <p className="text-[10px] text-center text-muted-foreground">After paying to <span className="font-bold">07arman2004-1@oksbi</span>, return here to upload your receipt.</p>
                             </div>
                           </>
                       )}
                   </CardContent>
                   <CardFooter className="bg-muted/50 border-t p-4 text-center">
-                      <p className="text-[10px] text-muted-foreground w-full">Your students and subject teachers cannot access this class until unblocked.</p>
+                      <p className="text-[10px] text-muted-foreground w-full">Access will be restored once the transaction is verified by AI.</p>
                   </CardFooter>
               </Card>
           </div>

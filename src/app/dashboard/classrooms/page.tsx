@@ -72,6 +72,7 @@ import {
   RefreshCw,
   UploadCloud,
   Image as ImageIcon,
+  Info,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
@@ -267,14 +268,14 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
         toast({ 
           variant: "destructive", 
           title: "Verification Failed", 
-          description: result.reason || "The screenshot details don't match the required payment criteria. Ensure you paid to the correct ID." 
+          description: result.reason || "The details don't match. Ensure you paid to the correct ID and uploaded a clear receipt." 
         });
         setIsVerifying(false);
         setVerificationProgress(0);
       }
     } catch (error) {
       console.error("Verification error:", error);
-      toast({ variant: "destructive", title: "Error", description: "Verification process failed. Please ensure your screenshot is clear." });
+      toast({ variant: "destructive", title: "Error", description: "Verification process failed. Please ensure the image is clear." });
       setIsVerifying(false);
     }
   };
@@ -282,7 +283,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
   useEffect(() => {
     if (paymentInitiated && !isVerifying) {
         const handleFocus = () => {
-            toast({ title: "Welcome Back", description: "Please upload your payment screenshot to finalize." });
+            toast({ title: "Welcome Back", description: "Please upload your payment receipt to finalize." });
         };
         window.addEventListener('focus', handleFocus);
         return () => window.removeEventListener('focus', handleFocus);
@@ -311,7 +312,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                             </div>
                             <div className="space-y-1">
                                 <p className="font-black text-lg text-primary uppercase tracking-widest">AI Security Audit</p>
-                                <p className="text-xs text-muted-foreground">Checking recipient ID and transaction authenticity...</p>
+                                <p className="text-xs text-muted-foreground">Validating recipient ID and transaction authenticity...</p>
                             </div>
                             <Progress value={verificationProgress} className="h-2 w-full mt-2" />
                             <p className="text-[10px] text-muted-foreground font-bold">{Math.round(verificationProgress)}% VERIFIED</p>
@@ -326,9 +327,19 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                             <div className="space-y-1">
                                 <p className="font-black text-amber-800 uppercase tracking-widest">Verify Your Payment</p>
                                 <p className="text-xs text-amber-700/80 leading-relaxed px-4">
-                                    Please complete the transaction in your UPI app, then upload the screenshot here. Ensure the recipient ID and amount are visible.
+                                    Complete the payment in your app, then upload the receipt here.
                                 </p>
                             </div>
+                            
+                            <div className="bg-white/50 p-3 rounded-xl border border-amber-200 text-left space-y-2">
+                                <div className="flex items-start gap-2">
+                                    <Info className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                                    <p className="text-[10px] text-amber-900 leading-tight">
+                                        If your payment app blocks screenshots, use the <strong>"Share Receipt"</strong> or <strong>"Download"</strong> button in the app to save the image first.
+                                    </p>
+                                </div>
+                            </div>
+
                             <div className="relative w-full">
                                 <Input 
                                     type="file" 
@@ -338,7 +349,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                                 />
                                 <Button variant="outline" className="w-full rounded-xl border-amber-300 text-amber-700 hover:bg-amber-100 font-bold">
                                     <ImageIcon className="mr-2 h-4 w-4" />
-                                    Upload Receipt Screenshot
+                                    Upload Receipt / Screenshot
                                 </Button>
                             </div>
                         </div>
@@ -352,7 +363,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                                     <span className="text-4xl font-black text-foreground">{PLATFORM_FEE_AMOUNT}</span>
                                     <Badge variant="secondary" className="font-bold">{billingCurrency}</Badge>
                                 </div>
-                                <p className="text-[10px] text-muted-foreground mt-4 italic font-medium px-4">Our AI Auditor will check the screenshot for recipient accuracy and authenticity.</p>
+                                <p className="text-[10px] text-muted-foreground mt-4 italic font-medium px-4">AI will check the recipient address, amount, and authenticity.</p>
                             </CardContent>
                         </Card>
 
@@ -364,7 +375,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                                 </a>
                             </Button>
                             <p className="text-[10px] text-center text-muted-foreground px-4">
-                                Once paid to <span className="font-bold text-foreground">07arman2004-1@oksbi</span>, return here to upload your receipt screenshot for AI verification.
+                                Once paid to <span className="font-bold text-foreground">07arman2004-1@oksbi</span>, return here to upload your receipt.
                             </p>
                         </div>
                     </>
