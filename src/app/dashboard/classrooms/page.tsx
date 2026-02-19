@@ -408,7 +408,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                                 </a>
                             </Button>
                             <p className="text-[10px] text-center text-muted-foreground px-4">
-                                Once paid to <span className="font-bold text-foreground">07arman2004-1@oksbi</span>, return here to upload your receipt.
+                                After completing the payment through your preferred app, return here to upload your receipt.
                             </p>
                         </div>
                     </>

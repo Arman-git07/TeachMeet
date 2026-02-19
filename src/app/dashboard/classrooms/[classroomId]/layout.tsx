@@ -292,7 +292,7 @@ export default function ClassroomDetailLayout({
                                 <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl" onClick={() => setPaymentInitiated(true)}>
                                     <a href={upiUrl}><CreditCard className="mr-2 h-5 w-5" /> Pay via UPI</a>
                                 </Button>
-                                <p className="text-[10px] text-center text-muted-foreground">After paying to <span className="font-bold">07arman2004-1@oksbi</span>, return here to upload your receipt.</p>
+                                <p className="text-[10px] text-center text-muted-foreground">After completing the transaction, return here to upload your receipt.</p>
                             </div>
                           </>
                       )}
