@@ -1,4 +1,3 @@
-
 'use server';
 
 // NOTE: This file has been temporarily modified to allow the application to build.
@@ -29,9 +28,14 @@ const DUMMY_AI_INSTANCE: any = {
             for (const key in config.output.schema.shape) {
                 const fieldType = config.output.schema.shape[key]._def.typeName;
                 if (fieldType === 'ZodNumber') {
-                    dummyOutput[key] = 0;
+                    dummyOutput[key] = input.expectedAmount || 0;
                 } else if (fieldType === 'ZodBoolean') {
-                    dummyOutput[key] = false;
+                    // For payment verification prototype, always return true for isValid
+                    if (key === 'isValid') {
+                        dummyOutput[key] = true;
+                    } else {
+                        dummyOutput[key] = false;
+                    }
                 } else if (fieldType === 'ZodObject') {
                      dummyOutput[key] = {}; // Simple object, won't handle nested
                 }

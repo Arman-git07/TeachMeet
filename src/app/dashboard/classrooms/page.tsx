@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -71,12 +70,14 @@ import {
   ShieldCheck,
   ArrowRight,
   RefreshCw,
+  UploadCloud,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -86,6 +87,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
+import { verifyPayment } from '@/ai/flows/verify-payment-flow';
 
 export interface Classroom {
   id: string;
@@ -232,43 +234,59 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
     }
   }, [user, title, description, isPublic, classroomToEdit, billingCurrency, toast, onSuccess, isLoading]);
 
+  const handleScreenshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setIsVerifying(true);
+    setVerificationProgress(0);
+
+    try {
+      const reader = new FileReader();
+      const dataUri = await new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+
+      setVerificationProgress(25);
+      const result = await verifyPayment({
+        screenshotDataUri: dataUri,
+        expectedAmount: PLATFORM_FEE_AMOUNT,
+        expectedCurrency: billingCurrency
+      });
+
+      setVerificationProgress(75);
+      await new Promise(r => setTimeout(r, 1000));
+      setVerificationProgress(100);
+
+      if (result.isValid) {
+        toast({ title: "Payment Verified!", description: "Activating your classroom..." });
+        await handleSubmit();
+      } else {
+        toast({ 
+          variant: 'destructive', 
+          title: "Verification Failed", 
+          description: result.reason || "The screenshot details don't match the required payment." 
+        });
+        setIsVerifying(false);
+        setVerificationProgress(0);
+      }
+    } catch (error) {
+      console.error("Verification error:", error);
+      toast({ variant: 'destructive', title: "Error", description: "Verification process failed." });
+      setIsVerifying(false);
+    }
+  };
+
   useEffect(() => {
     if (paymentInitiated && !isVerifying) {
         const handleFocus = () => {
-            setIsVerifying(true);
-            toast({ title: "Return Detected", description: "Beginning payment verification..." });
+            toast({ title: "Welcome Back", description: "Please upload your payment screenshot to finalize." });
         };
         window.addEventListener('focus', handleFocus);
         return () => window.removeEventListener('focus', handleFocus);
     }
   }, [paymentInitiated, isVerifying, toast]);
-
-  useEffect(() => {
-    if (isVerifying) {
-      const duration = 8000;
-      const interval = 100;
-      const step = (interval / duration) * 100;
-      
-      const progressTimer = setInterval(() => {
-        setVerificationProgress(prev => {
-          if (prev >= 100) {
-            clearInterval(progressTimer);
-            return 100;
-          }
-          return prev + step;
-        });
-      }, interval);
-
-      const completionTimer = setTimeout(() => {
-        handleSubmit();
-      }, duration);
-
-      return () => {
-        clearInterval(progressTimer);
-        clearTimeout(completionTimer);
-      };
-    }
-  }, [isVerifying, handleSubmit]);
 
   if (step === 'payment' && !classroomToEdit) {
       return (
@@ -291,8 +309,8 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                                 <ShieldCheck className="h-6 w-6 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
                             </div>
                             <div className="space-y-1">
-                                <p className="font-black text-lg text-primary uppercase tracking-widest">Verifying Transaction</p>
-                                <p className="text-xs text-muted-foreground">The system is detecting your payment...</p>
+                                <p className="font-black text-lg text-primary uppercase tracking-widest">AI Checking Payment</p>
+                                <p className="text-xs text-muted-foreground">Analyzing your screenshot for amount and date...</p>
                             </div>
                             <Progress value={verificationProgress} className="h-2 w-full mt-2" />
                             <p className="text-[10px] text-muted-foreground font-bold">{Math.round(verificationProgress)}% SECURED</p>
@@ -302,17 +320,26 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                     <Card className="bg-amber-50 border-amber-200 border-2 rounded-2xl p-6 text-center animate-in fade-in duration-300">
                         <div className="flex flex-col items-center gap-4">
                             <div className="bg-amber-100 p-3 rounded-full">
-                                <RefreshCw className="h-8 w-8 text-amber-600 animate-spin" />
+                                <UploadCloud className="h-8 w-8 text-amber-600" />
                             </div>
                             <div className="space-y-1">
-                                <p className="font-black text-amber-800 uppercase tracking-widest">Waiting for Payment</p>
+                                <p className="font-black text-amber-800 uppercase tracking-widest">Verify Your Payment</p>
                                 <p className="text-xs text-amber-700/80 leading-relaxed px-4">
-                                    Please complete the transaction in your UPI app. Return to TeachMeet to automatically start the verification process.
+                                    Please complete the transaction in your UPI app, then upload the screenshot here. Our system will automatically verify the details.
                                 </p>
                             </div>
-                            <Button variant="ghost" size="sm" className="text-[10px] uppercase font-bold text-amber-600" onClick={() => setIsVerifying(true)}>
-                                Stuck? Start Manually
-                            </Button>
+                            <div className="relative w-full">
+                                <Input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    onChange={handleScreenshotUpload}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                />
+                                <Button variant="outline" className="w-full rounded-xl border-amber-300 text-amber-700 hover:bg-amber-100">
+                                    <ImageIcon className="mr-2 h-4 w-4" />
+                                    Upload Receipt Screenshot
+                                </Button>
+                            </div>
                         </div>
                     </Card>
                 ) : (
@@ -324,7 +351,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                                     <span className="text-4xl font-black text-foreground">{PLATFORM_FEE_AMOUNT}</span>
                                     <Badge variant="secondary" className="font-bold">{billingCurrency}</Badge>
                                 </div>
-                                <p className="text-[10px] text-muted-foreground mt-4 italic">Class will be created automatically upon return detection.</p>
+                                <p className="text-[10px] text-muted-foreground mt-4 italic">Verification via receipt screenshot is mandatory.</p>
                             </CardContent>
                         </Card>
 
@@ -336,7 +363,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                                 </a>
                             </Button>
                             <p className="text-[10px] text-center text-muted-foreground px-4">
-                                Once you settle the payment in your preferred app, return here. The system will detect your return and finalize classroom creation.
+                                Once paid, return here to upload your receipt screenshot. The AI system will verify your payment and activate the classroom.
                             </p>
                         </div>
                     </>
