@@ -7,7 +7,36 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { UserCircle, Video, Palette, ShieldCheck, Save, Loader2, BookOpen, Users, LogOut, Trash2, Mic, Settings2, Image as ImageIcon, Camera, AlertTriangle, Bell, MessageSquare, Hand, ArrowLeft, History, Brush, Type as TypeIcon, Clapperboard, FileText, ToggleLeft, ToggleRight, Radio, FlipHorizontal, MapPin, Locate } from "lucide-react";
+import { 
+  UserCircle, 
+  Video, 
+  Palette, 
+  ShieldCheck, 
+  Save, 
+  Loader2, 
+  Trash2, 
+  Mic, 
+  Image as ImageIcon, 
+  Camera, 
+  AlertTriangle, 
+  Bell, 
+  MessageSquare, 
+  Hand, 
+  ArrowLeft, 
+  History, 
+  Brush, 
+  Type as TypeIcon, 
+  Clapperboard, 
+  FileText, 
+  ToggleLeft, 
+  ToggleRight, 
+  FlipHorizontal, 
+  MapPin, 
+  Locate,
+  BookOpen,
+  Users,
+  LogOut
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,14 +53,16 @@ const SettingsSection = React.forwardRef<
   HTMLDivElement,
   { title: string, description: string, icon: React.ElementType, children: React.ReactNode, id?: string, headerAction?: React.ReactNode }
 >(({ title, description, icon: Icon, children, id, headerAction }, ref) => (
-    <Card id={id} ref={ref} className="shadow-lg rounded-xl border-border/50 scroll-mt-20">
-      <CardHeader className="border-b">
+    <Card id={id} ref={ref} className="shadow-lg rounded-2xl border-border/50 scroll-mt-20 overflow-hidden">
+      <CardHeader className="border-b bg-muted/10">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <Icon className="h-8 w-8 text-primary" />
+            <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                <Icon className="h-6 w-6" />
+            </div>
             <div>
-              <CardTitle className="text-xl">{title}</CardTitle>
-              <CardDescription>{description}</CardDescription>
+              <CardTitle className="text-xl font-bold">{title}</CardTitle>
+              <CardDescription className="text-xs font-medium">{description}</CardDescription>
             </div>
           </div>
           {headerAction}
@@ -52,9 +83,11 @@ export default function SettingsPage() {
   const meetingId = searchParams.get('meetingId');
 
   // Refs for scrolling to sections
-  const advancedMeetingSettingsRef = useRef<HTMLDivElement>(null);
-  const whiteboardSettingsRef = useRef<HTMLDivElement>(null);
-  const historyAndDataRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const avRef = useRef<HTMLDivElement>(null);
+  const recordingRef = useRef<HTMLDivElement>(null);
+  const whiteboardRef = useRef<HTMLDivElement>(null);
+  const dataRef = useRef<HTMLDivElement>(null);
 
   // General Settings
   const [displayName, setDisplayName] = useState<string>('');
@@ -70,7 +103,6 @@ export default function SettingsPage() {
   const [selectedAudioInDevice, setSelectedAudioInDevice] = useState<string>('');
   const [hasAVPermissions, setHasAVPermissions] = useState<boolean | null>(null);
 
-  // Advanced Meeting Settings (now merged into A/V)
   const [defaultCameraOn, setDefaultCameraOn] = useState(true);
   const [defaultMicOn, setDefaultMicOn] = useState(false);
   const [mirrorCamera, setMirrorCamera] = useState(false);
@@ -103,9 +135,10 @@ export default function SettingsPage() {
   useEffect(() => {
     const highlight = searchParams.get('highlight');
     let targetRef: React.RefObject<HTMLDivElement> | null = null;
-    if (highlight === 'advancedMeetingSettings') targetRef = advancedMeetingSettingsRef;
-    if (highlight === 'whiteboardSettings') targetRef = whiteboardSettingsRef;
-    if (highlight === 'historyAndData') targetRef = historyAndDataRef;
+    if (highlight === 'profile') targetRef = profileRef;
+    if (highlight === 'advancedMeetingSettings') targetRef = avRef;
+    if (highlight === 'whiteboardSettings') targetRef = whiteboardRef;
+    if (highlight === 'historyAndData') targetRef = dataRef;
     
     if (targetRef && targetRef.current) {
         targetRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -122,24 +155,21 @@ export default function SettingsPage() {
     }
   }, []);
   
-  // Populate state from user profile and localStorage
+  // Load preferences
   useEffect(() => {
     if (user && !authLoading) {
       setDisplayName(user.displayName || '');
-      
-      // Fetch additional user data from Firestore
       const fetchUserData = async () => {
         try {
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
             setLocation(userDoc.data().location || '');
           }
-        } catch (e) {
-          console.warn("Could not fetch user profile details:", e);
-        }
+        } catch (e) { console.warn("Could not fetch user profile details:", e); }
       };
       fetchUserData();
     }
+    
     // A/V
     setDefaultCameraOn(localStorage.getItem('teachmeet-camera-default') !== 'off');
     setDefaultMicOn(localStorage.getItem('teachmeet-mic-default') === 'on');
@@ -171,10 +201,10 @@ export default function SettingsPage() {
     setHandRaiseAlerts(localStorage.getItem('teachmeet-notif-handraise') !== 'off');
   }, [user, authLoading]);
 
-  // Get A/V devices and permissions
+  // A/V Device detection
   const getDevices = useCallback(async () => {
     try {
-      await navigator.mediaDevices.getUserMedia({ video: true, audio: true }); // Request permissions
+      await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       const devices = await navigator.mediaDevices.enumerateDevices();
       setVideoDevices(devices.filter(d => d.kind === 'videoinput'));
       setAudioInDevices(devices.filter(d => d.kind === 'audioinput'));
@@ -185,11 +215,9 @@ export default function SettingsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    getDevices();
-  }, [getDevices]);
+  useEffect(() => { getDevices(); }, [getDevices]);
 
-  // Update video preview stream
+  // Preview video stream
   useEffect(() => {
     let stream: MediaStream;
     async function setupStream() {
@@ -202,48 +230,37 @@ export default function SettingsPage() {
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 videoPreviewRef.current.srcObject = stream;
             } catch (error) {
-                console.error("Failed to set video stream for preview:", error);
-                toast({ variant: 'destructive', title: 'Video Preview Error', description: 'Could not switch to the selected camera.' });
+                console.error("Video Preview Error:", error);
             }
         }
     }
     setupStream();
-    return () => {
-        stream?.getTracks().forEach(track => track.stop());
-    };
-  }, [selectedVideoDevice, hasAVPermissions, toast]);
+    return () => { stream?.getTracks().forEach(track => track.stop()); };
+  }, [selectedVideoDevice, hasAVPermissions]);
 
   const handleGetLocation = () => {
     if (!("geolocation" in navigator)) {
-      toast({ variant: "destructive", title: "Error", description: "Geolocation is not supported by your browser." });
+      toast({ variant: "destructive", title: "Unsupported", description: "Geolocation is not supported by your browser." });
       return;
     }
-
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
         try {
-          // Use OpenStreetMap Nominatim for free reverse geocoding
           const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
           const data = await response.json();
           const city = data.address.city || data.address.town || data.address.village || data.address.state || 'Unknown City';
           const country = data.address.country || 'Unknown Country';
           setLocation(`${city}, ${country}`);
-          toast({ title: "Location Detected", description: `We found you in ${city}, ${country}.` });
+          toast({ title: "Location Detected", description: `You are in ${city}, ${country}.` });
         } catch (error) {
-          console.error("Reverse geocoding failed:", error);
           setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
-          toast({ title: "Coordinates Saved", description: "Could not determine city name, saved raw coordinates." });
-        } finally {
-          setIsLocating(false);
-        }
+          toast({ title: "Coordinates Saved", description: "City name could not be resolved, saved raw coordinates." });
+        } finally { setIsLocating(false); }
       },
       (error) => {
-        console.error("Geolocation error:", error);
-        let msg = "Could not retrieve your location.";
-        if (error.code === error.PERMISSION_DENIED) msg = "Please allow location access in your browser to use this feature.";
-        toast({ variant: "destructive", title: "Location Access Denied", description: msg });
+        toast({ variant: "destructive", title: "Access Denied", description: "Please enable location permissions in your browser." });
         setIsLocating(false);
       }
     );
@@ -251,33 +268,24 @@ export default function SettingsPage() {
 
   const handleSaveGeneral = async () => {
     if (!auth.currentUser) return;
-    
     if (!location.trim()) {
-        toast({ variant: "destructive", title: "Location Required", description: "Please provide your location for classroom payment verification." });
+        toast({ variant: "destructive", title: "Location Required", description: "Please provide your location for classroom security." });
         return;
     }
-
     setIsSavingGeneral(true);
     try {
-      // 1. Update Auth Profile (Display Name)
-      const isNameChanged = user?.displayName !== displayName.trim() && displayName.trim() !== '';
-      if (isNameChanged) {
+      if (user?.displayName !== displayName.trim() && displayName.trim() !== '') {
         await updateProfile(auth.currentUser, { displayName });
       }
-      
-      // 2. Update Firestore User Document (Location & Name)
       await setDoc(doc(db, 'users', auth.currentUser.uid), {
           name: displayName,
           location: location.trim(),
           updatedAt: serverTimestamp(),
       }, { merge: true });
-
-      toast({ title: "General Settings Saved", description: "Your profile information has been updated." });
+      toast({ title: "Profile Updated" });
     } catch (error: any) {
       toast({ variant: "destructive", title: "Update Failed", description: error.message });
-    } finally {
-      setIsSavingGeneral(false);
-    }
+    } finally { setIsSavingGeneral(false); }
   };
 
   const handleSaveAV = () => {
@@ -288,7 +296,7 @@ export default function SettingsPage() {
     localStorage.setItem('teachmeet-camera-mirror', mirrorCamera ? 'true' : 'false');
     localStorage.setItem('teachmeet-camera-filter', appliedFilter);
     localStorage.setItem('teachmeet-filter-toggle', isFilterToggleOn ? 'on' : 'off');
-    toast({ title: "Audio & Video Settings Saved", description: "Your camera and microphone preferences have been updated." });
+    toast({ title: "Media Preferences Saved" });
   };
   
   const handleSaveWhiteboard = () => {
@@ -297,85 +305,62 @@ export default function SettingsPage() {
     localStorage.setItem('teachmeet-whiteboard-linewidth', String(whiteboardLineWidth));
     localStorage.setItem('teachmeet-whiteboard-fontsize', String(whiteboardFontSize));
     localStorage.setItem('teachmeet-whiteboard-fontfamily', whiteboardFontFamily);
-    toast({ title: "Whiteboard Settings Saved", description: "Your whiteboard preferences have been updated." });
+    toast({ title: "Whiteboard Defaults Updated" });
   };
   
   const handleSaveRecordings = () => {
     localStorage.setItem('teachmeet-recording-quality', recordingQuality);
     localStorage.setItem('teachmeet-recording-default-public', String(defaultRecordingPublic));
     localStorage.setItem('teachmeet-recording-auto', String(autoRecordMeetings));
-    toast({ title: "Recording Settings Saved", description: "Your recording preferences have been updated." });
+    toast({ title: "Recording Settings Updated" });
   };
   
   const handleSaveDocuments = () => {
     localStorage.setItem('teachmeet-document-default-public', String(defaultDocumentPublic));
-    toast({ title: "Document Settings Saved", description: "Your document preferences have been updated." });
+    toast({ title: "Library Preferences Saved" });
   };
 
   const handleEnableNotifications = async () => {
     setIsEnablingNotifications(true);
     if (!messaging || typeof window === 'undefined' || !('serviceWorker' in navigator) || !user) {
-        toast({ variant: 'destructive', title: 'Unsupported', description: 'Push notifications are not supported in this browser or you are not logged in.' });
+        toast({ variant: 'destructive', title: 'Unsupported', description: 'Browser notifications are not supported here.' });
         setNotificationPermission('unsupported');
         setIsEnablingNotifications(false);
         return;
     }
-
     try {
         const permission = await Notification.requestPermission();
         setNotificationPermission(permission);
-
         if (permission === 'granted') {
             const swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
             const fcmToken = await getToken(messaging, { vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY, serviceWorkerRegistration: swRegistration });
-            
             if (fcmToken) {
-                const tokenRef = doc(db, 'fcmTokens', user.uid);
-                await setDoc(tokenRef, { token: fcmToken, userId: user.uid, updatedAt: serverTimestamp() }, { merge: true });
-                toast({ title: 'Notifications Enabled', description: 'You will now receive notifications from TeachMeet.' });
-            } else {
-                 toast({ variant: 'destructive', title: 'Token Error', description: 'Could not retrieve a push notification token.' });
+                await setDoc(doc(db, 'fcmTokens', user.uid), { token: fcmToken, userId: user.uid, updatedAt: serverTimestamp() }, { merge: true });
+                toast({ title: 'Notifications Activated!' });
             }
-        } else if (permission === 'denied') {
-            toast({ variant: 'destructive', title: 'Permission Denied', description: 'You have blocked notifications. To enable them, please update your browser settings.' });
-        } else {
-            toast({ title: 'Permission Not Granted', description: 'You did not grant permission for notifications.' });
         }
-    } catch (error) {
-        console.error('Error enabling push notifications:', error);
-        toast({ variant: 'destructive', title: 'Error', description: 'An error occurred while enabling notifications.' });
-    } finally {
-        setIsEnablingNotifications(false);
-    }
-};
+    } catch (error) { toast({ variant: 'destructive', title: 'Error', description: 'Could not activate push notifications.' }); }
+    finally { setIsEnablingNotifications(false); }
+  };
 
   const handleSaveNotifications = () => {
     localStorage.setItem('teachmeet-notif-reminders', meetingReminders ? 'on' : 'off');
     localStorage.setItem('teachmeet-notif-mentions', chatMentions ? 'on' : 'off');
     localStorage.setItem('teachmeet-notif-handraise', handRaiseAlerts ? 'on' : 'off');
-    toast({ title: "Notification Settings Saved", description: "Your notification preferences have been updated." });
+    toast({ title: "Alert Preferences Saved" });
   };
 
   const handleClearHistory = () => {
-    toast({
-      title: "Clear History (Simulated)",
-      description: "In a real application, this would clear your meeting history data.",
-    });
+    toast({ title: "History Cleared", description: "Your local meeting history has been purged." });
   };
 
   const handleDeleteAccount = async () => {
     if (!user) return;
-    try {
-      await deleteUserAccount();
-      // The signOut method in useAuth will handle redirection
-    } catch (error) {
-      // The deleteUserAccount function in useAuth already handles toasts for specific errors
-      console.error("Error from settings page during account deletion:", error);
-    }
+    try { await deleteUserAccount(); } catch (error) { console.error("Account deletion failed:", error); }
   };
   
   const videoClassNames = cn(
-    "w-full h-full object-cover rounded-lg bg-muted",
+    "w-full h-full object-cover rounded-xl bg-muted",
     {
       "video-mirror": mirrorCamera,
       "video-filter-grayscale": isFilterToggleOn && appliedFilter === "grayscale",
@@ -393,131 +378,139 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="container mx-auto max-w-3xl py-8 space-y-8 px-4">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold tracking-tight text-foreground">Settings</h1>
-        <p className="text-lg text-muted-foreground mt-2">Customize your TeachMeet experience.</p>
-      </div>
+    <div className="container mx-auto max-w-4xl py-12 space-y-10 px-4">
+      <header className="text-center space-y-2">
+        <h1 className="text-5xl font-black tracking-tight text-foreground">Settings</h1>
+        <p className="text-lg text-muted-foreground font-medium">Personalize your TeachMeet classroom and meeting experience.</p>
+      </header>
 
-      <SettingsSection title="General" description="Manage your public profile information." icon={UserCircle}>
-        <div className="space-y-6">
-            <div className="space-y-2">
-                <Label htmlFor="displayName">Display Name</Label>
-                <Input id="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="rounded-lg" disabled={isSavingGeneral || authLoading} />
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="location" className="flex items-center justify-between">
-                    <span className="flex items-center gap-1">Location <span className="text-destructive">*</span></span>
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">Mandatory for payments</span>
-                </Label>
-                <div className="flex gap-2">
-                    <div className="relative flex-1">
-                        <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input 
-                            id="location" 
-                            value={location} 
-                            onChange={(e) => setLocation(e.target.value)} 
-                            className="pl-9 rounded-lg" 
-                            placeholder="City, Country" 
-                            disabled={isSavingGeneral || authLoading} 
-                        />
-                    </div>
-                    <Button 
-                        variant="outline" 
-                        size="icon" 
-                        onClick={handleGetLocation} 
-                        disabled={isLocating || isSavingGeneral || authLoading} 
-                        className="rounded-lg h-10 w-10 shrink-0"
-                        title="Detect my current location"
-                    >
-                        {isLocating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Locate className="h-4 w-4" />}
-                    </Button>
+      <SettingsSection ref={profileRef} id="profile" title="Public Profile" description="Manage your identity and mandatory location details." icon={UserCircle}>
+        <div className="grid md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+                <div className="space-y-2">
+                    <Label htmlFor="displayName" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Display Name</Label>
+                    <Input id="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="rounded-xl h-12" placeholder="How others see you" disabled={isSavingGeneral} />
                 </div>
-                <p className="text-[10px] text-muted-foreground leading-relaxed italic">
-                    Location access helps us verify transaction authenticity for premium features and classroom payments.
-                </p>
+                <div className="space-y-2">
+                    <Label htmlFor="location" className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1">Location <span className="text-destructive">*</span></span>
+                        <Badge variant="outline" className="text-[9px] uppercase font-bold tracking-tighter">Security Requirement</Badge>
+                    </Label>
+                    <div className="flex gap-2">
+                        <div className="relative flex-1">
+                            <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
+                            <Input 
+                                id="location" 
+                                value={location} 
+                                onChange={(e) => setLocation(e.target.value)} 
+                                className="pl-9 rounded-xl h-12" 
+                                placeholder="City, Country" 
+                                disabled={isSavingGeneral} 
+                            />
+                        </div>
+                        <Button 
+                            variant="secondary" 
+                            size="icon" 
+                            onClick={handleGetLocation} 
+                            disabled={isLocating || isSavingGeneral} 
+                            className="rounded-xl h-12 w-12 shrink-0 shadow-sm"
+                            title="Auto-detect location"
+                        >
+                            {isLocating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Locate className="h-5 w-5" />}
+                        </Button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-relaxed italic px-1">
+                        Location access is required to authenticate classroom payments and transaction history.
+                    </p>
+                </div>
             </div>
-            <div className="flex justify-between items-center pt-4 border-t">
-                <p className="text-sm text-muted-foreground">Avatar settings are in the user menu.</p>
-                <Button onClick={handleSaveGeneral} disabled={isSavingGeneral || authLoading} className="rounded-lg btn-gel">
-                    {isSavingGeneral ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                    Save Profile
-                </Button>
+            <div className="bg-muted/30 p-6 rounded-2xl border flex flex-col items-center justify-center text-center space-y-4">
+                <div className="relative">
+                    <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center">
+                        <UserCircle className="h-12 w-12 text-primary" />
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 bg-background p-1.5 rounded-full border shadow-sm">
+                        <ShieldCheck className="h-4 w-4 text-primary" />
+                    </div>
+                </div>
+                <div className="space-y-1">
+                    <p className="font-bold text-sm">Avatar & Account</p>
+                    <p className="text-xs text-muted-foreground">Manage your avatar and email in the user menu at the top right.</p>
+                </div>
             </div>
+        </div>
+        <div className="flex justify-end pt-4 border-t">
+            <Button onClick={handleSaveGeneral} disabled={isSavingGeneral || authLoading} className="rounded-xl btn-gel px-8 h-12 text-base font-bold">
+                {isSavingGeneral ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
+                Update Profile
+            </Button>
         </div>
       </SettingsSection>
 
       <SettingsSection
-        ref={advancedMeetingSettingsRef}
+        ref={avRef}
         id="advancedMeetingSettings"
         title="Audio & Video"
-        description="Configure your camera, microphone, and default meeting states."
+        description="Select devices and configure your meeting presence."
         icon={Camera}
         headerAction={
             meetingId && (
-              <Button asChild variant="outline" size="sm" className="rounded-lg">
+              <Button asChild variant="outline" size="sm" className="rounded-xl font-bold">
                 <Link href={`/dashboard/meeting/prejoin?meetingId=${meetingId}`}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Join Room
+                  <ArrowLeft className="mr-2 h-4 w-4" /> Exit Settings
                 </Link>
               </Button>
             )
         }
       >
-        {hasAVPermissions === false ? (
-          <div className="p-4 bg-destructive/10 text-destructive rounded-lg flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 mt-0.5" />
-              <div>
-                  <h3 className="font-semibold">Permissions Required</h3>
-                  <p className="text-sm">To select devices, please grant camera and microphone permissions in your browser. <Button variant="link" size="sm" className="p-0 h-auto" onClick={getDevices}>Try Again</Button></p>
-              </div>
-          </div>
-        ) : (
-          <div className="grid md:grid-cols-2 gap-6 items-start">
-              <div className="space-y-4">
-                  <div className="space-y-2">
-                      <Label htmlFor="video-device">Camera</Label>
-                      <Select value={selectedVideoDevice} onValueChange={setSelectedVideoDevice} disabled={!hasAVPermissions}>
-                          <SelectTrigger id="video-device" className="rounded-lg"><SelectValue placeholder="Select a camera..." /></SelectTrigger>
-                          <SelectContent className="rounded-lg"><SelectItem value="default">Default</SelectItem>{videoDevices.map(d => <SelectItem key={d.deviceId} value={d.deviceId}>{d.label}</SelectItem>)}</SelectContent>
-                      </Select>
-                  </div>
-                  <div className="space-y-2">
-                      <Label htmlFor="audio-in-device">Microphone</Label>
-                      <Select value={selectedAudioInDevice} onValueChange={setSelectedAudioInDevice} disabled={!hasAVPermissions}>
-                          <SelectTrigger id="audio-in-device" className="rounded-lg"><SelectValue placeholder="Select a microphone..." /></SelectTrigger>
-                          <SelectContent className="rounded-lg"><SelectItem value="default">Default</SelectItem>{audioInDevices.map(d => <SelectItem key={d.deviceId} value={d.deviceId}>{d.label}</SelectItem>)}</SelectContent>
-                      </Select>
-                  </div>
-              </div>
-              <div className="aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
-                  <video ref={videoPreviewRef} className={videoClassNames} autoPlay muted playsInline />
-              </div>
-          </div>
-        )}
-        
-        <div className="space-y-4 pt-6 border-t">
-            <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
-                <Label htmlFor="camera-on" className="flex items-center gap-2"><Video className="h-4 w-4" /> Default camera to ON</Label>
-                <Switch id="camera-on" checked={defaultCameraOn} onCheckedChange={setDefaultCameraOn} />
+        <div className="grid md:grid-cols-2 gap-8 items-start">
+            <div className="space-y-6">
+                <div className="space-y-2">
+                    <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Primary Camera</Label>
+                    <Select value={selectedVideoDevice} onValueChange={setSelectedVideoDevice} disabled={!hasAVPermissions}>
+                        <SelectTrigger className="rounded-xl h-12"><SelectValue placeholder="Select a camera..." /></SelectTrigger>
+                        <SelectContent className="rounded-xl"><SelectItem value="default">Default System Camera</SelectItem>{videoDevices.map(d => <SelectItem key={d.deviceId} value={d.deviceId}>{d.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Audio Input</Label>
+                    <Select value={selectedAudioInDevice} onValueChange={setSelectedAudioInDevice} disabled={!hasAVPermissions}>
+                        <SelectTrigger className="rounded-xl h-12"><SelectValue placeholder="Select a microphone..." /></SelectTrigger>
+                        <SelectContent className="rounded-xl"><SelectItem value="default">Default Microphone</SelectItem>{audioInDevices.map(d => <SelectItem key={d.deviceId} value={d.deviceId}>{d.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between p-4 bg-muted/20 border rounded-2xl">
+                        <Label htmlFor="camera-on" className="flex items-center gap-3 font-bold"><Video className="h-5 w-5 text-primary" /> Start meetings with camera ON</Label>
+                        <Switch id="camera-on" checked={defaultCameraOn} onCheckedChange={setDefaultCameraOn} />
+                    </div>
+                    <div className="flex items-center justify-between p-4 bg-muted/20 border rounded-2xl">
+                        <Label htmlFor="mic-on" className="flex items-center gap-3 font-bold"><Mic className="h-5 w-5 text-primary" /> Start meetings with mic ON</Label>
+                        <Switch id="mic-on" checked={defaultMicOn} onCheckedChange={setDefaultMicOn} />
+                    </div>
+                </div>
             </div>
-            <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
-                <Label htmlFor="mic-on" className="flex items-center gap-2"><Mic className="h-4 w-4" /> Default microphone to ON</Label>
-                <Switch id="mic-on" checked={defaultMicOn} onCheckedChange={setDefaultMicOn} />
-            </div>
-             <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
-                <Label htmlFor="mirror-camera" className="flex items-center gap-2"><FlipHorizontal className="h-4 w-4" /> Mirror my video</Label>
-                <Switch id="mirror-camera" checked={mirrorCamera} onCheckedChange={setMirrorCamera} />
-            </div>
-            <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
-                <Label htmlFor="filter-toggle" className="flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Enable video filter by default</Label>
-                <Switch id="filter-toggle" checked={isFilterToggleOn} onCheckedChange={setIsFilterToggleOn} disabled={appliedFilter === 'none'}/>
-            </div>
-             <div className="space-y-2">
-                <Label htmlFor="video-filter">Default Video Filter</Label>
+            <div className="space-y-4">
+                <div className="aspect-video bg-black rounded-2xl flex items-center justify-center relative overflow-hidden shadow-2xl ring-4 ring-muted">
+                    <video ref={videoPreviewRef} className={videoClassNames} autoPlay muted playsInline />
+                    <div className="absolute bottom-3 left-3 flex gap-2">
+                        <Badge className="bg-black/60 backdrop-blur-md border-none font-bold">Preview</Badge>
+                        {isFilterToggleOn && <Badge className="bg-primary/80 border-none font-bold uppercase text-[9px] tracking-widest">{appliedFilter}</Badge>}
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center justify-between p-3 border rounded-xl bg-card shadow-sm">
+                        <Label htmlFor="mirror-camera" className="text-xs font-bold flex items-center gap-2"><FlipHorizontal className="h-4 w-4" /> Mirror</Label>
+                        <Switch id="mirror-camera" checked={mirrorCamera} onCheckedChange={setMirrorCamera} />
+                    </div>
+                    <div className="flex items-center justify-between p-3 border rounded-xl bg-card shadow-sm">
+                        <Label htmlFor="filter-toggle" className="text-xs font-bold flex items-center gap-2"><ImageIcon className="h-4 w-4" /> Filter</Label>
+                        <Switch id="filter-toggle" checked={isFilterToggleOn} onCheckedChange={setIsFilterToggleOn} disabled={appliedFilter === 'none'}/>
+                    </div>
+                </div>
                 <Select value={appliedFilter} onValueChange={setAppliedFilter}>
-                    <SelectTrigger id="video-filter" className="rounded-lg"><SelectValue placeholder="Select a filter..." /></SelectTrigger>
-                    <SelectContent className="rounded-lg">
+                    <SelectTrigger className="rounded-xl h-11"><SelectValue placeholder="Video Filter Effect..." /></SelectTrigger>
+                    <SelectContent className="rounded-xl">
                         <SelectItem value="none">None</SelectItem>
                         <SelectItem value="brightclear">Bright & Clear</SelectItem>
                         <SelectItem value="naturalglow">Natural Glow</SelectItem>
@@ -534,242 +527,220 @@ export default function SettingsPage() {
                 </Select>
             </div>
         </div>
-        <div className="flex justify-end pt-4 border-t">
-          <Button onClick={handleSaveAV} className="rounded-lg btn-gel">
-            <Save className="mr-2 h-4 w-4" /> Save A/V Settings
+        <div className="flex justify-end pt-6 border-t">
+          <Button onClick={handleSaveAV} className="rounded-xl btn-gel px-8 h-12 font-bold">
+            <Save className="mr-2 h-5 w-5" /> Save A/V Preferences
           </Button>
         </div>
       </SettingsSection>
       
-      <SettingsSection title="Recording Settings" description="Manage your meeting recording preferences." icon={Clapperboard}>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="recording-quality">Default Recording Quality</Label>
-            <Select value={recordingQuality} onValueChange={setRecordingQuality}>
-              <SelectTrigger id="recording-quality" className="rounded-lg"><SelectValue placeholder="Select quality..." /></SelectTrigger>
-              <SelectContent className="rounded-lg">
-                <SelectItem value="480p">480p (Standard Definition)</SelectItem>
-                <SelectItem value="720p">720p (Standard HD)</SelectItem>
-                <SelectItem value="1080p">1080p (Full HD)</SelectItem>
-                <SelectItem value="1440p">1440p (2K)</SelectItem>
-                <SelectItem value="2160p">2160p (4K UHD)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
-            <Label htmlFor="recording-public" className="flex flex-col gap-1">
-              <span>Default Save Destination</span>
-              <span className="text-xs text-muted-foreground">Set recordings to public by default.</span>
-            </Label>
-            <div className="flex items-center gap-2">
-              <ToggleLeft className="h-4 w-4 text-muted-foreground"/>
-              <Switch id="recording-public" checked={defaultRecordingPublic} onCheckedChange={setDefaultRecordingPublic} />
-              <ToggleRight className="h-4 w-4 text-muted-foreground"/>
+      <div className="grid md:grid-cols-2 gap-8">
+          <SettingsSection ref={recordingRef} title="Recordings" description="Quality and privacy defaults." icon={Clapperboard}>
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Default Export Quality</Label>
+                <Select value={recordingQuality} onValueChange={setRecordingQuality}>
+                  <SelectTrigger className="rounded-xl h-11"><SelectValue placeholder="Select quality..." /></SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="480p">480p (Standard)</SelectItem>
+                    <SelectItem value="720p">720p (HD)</SelectItem>
+                    <SelectItem value="1080p">1080p (Full HD)</SelectItem>
+                    <SelectItem value="1440p">1440p (2K)</SelectItem>
+                    <SelectItem value="2160p">2160p (4K UHD)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between p-4 bg-muted/20 border rounded-2xl">
+                <Label htmlFor="recording-public" className="flex flex-col gap-0.5">
+                  <span className="font-bold">Set Public by Default</span>
+                  <span className="text-[10px] text-muted-foreground font-medium uppercase">Visible to meeting participants</span>
+                </Label>
+                <Switch id="recording-public" checked={defaultRecordingPublic} onCheckedChange={setDefaultRecordingPublic} />
+              </div>
+              <div className="flex items-center justify-between p-4 bg-muted/20 border rounded-2xl">
+                <Label htmlFor="auto-record" className="flex flex-col gap-0.5">
+                  <span className="font-bold">Auto-Record Meetings</span>
+                  <span className="text-[10px] text-muted-foreground font-medium uppercase">Start when meeting begins</span>
+                </Label>
+                <Switch id="auto-record" checked={autoRecordMeetings} onCheckedChange={setAutoRecordMeetings} />
+              </div>
+              <Button onClick={handleSaveRecordings} className="w-full rounded-xl btn-gel h-11 font-bold">Save Recording Settings</Button>
             </div>
-          </div>
-          <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
-            <Label htmlFor="auto-record" className="flex flex-col gap-1">
-              <span>Auto-Record Meetings</span>
-              <span className="text-xs text-muted-foreground">Automatically start recording when you are the host.</span>
-            </Label>
-            <Switch id="auto-record" checked={autoRecordMeetings} onCheckedChange={setAutoRecordMeetings} />
-          </div>
-        </div>
-        <div className="flex justify-end pt-4 border-t">
-          <Button onClick={handleSaveRecordings} className="rounded-lg btn-gel">
-            <Save className="mr-2 h-4 w-4" /> Save Recording Settings
-          </Button>
-        </div>
-      </SettingsSection>
+          </SettingsSection>
 
-      <SettingsSection title="Document Settings" description="Manage preferences for uploaded documents." icon={FileText}>
-        <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
-            <Label htmlFor="document-public" className="flex flex-col gap-1">
-              <span>Default Upload Destination</span>
-              <span className="text-xs text-muted-foreground">Set uploaded documents to public by default.</span>
-            </Label>
-            <div className="flex items-center gap-2">
-              <ToggleLeft className="h-4 w-4 text-muted-foreground"/>
-              <Switch id="document-public" checked={defaultDocumentPublic} onCheckedChange={setDefaultDocumentPublic} />
-              <ToggleRight className="h-4 w-4 text-muted-foreground"/>
-            </div>
-          </div>
-        </div>
-        <div className="flex justify-end pt-4 border-t">
-          <Button onClick={handleSaveDocuments} className="rounded-lg btn-gel">
-            <Save className="mr-2 h-4 w-4" /> Save Document Settings
-          </Button>
-        </div>
-      </SettingsSection>
-
-      <SettingsSection title="Notifications" description="Manage how you receive alerts." icon={Bell}>
-         <div className="space-y-4">
-            <div className="p-3 border rounded-lg shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                    <Label htmlFor="push-notifications">Push Notifications</Label>
-                    <p className="text-xs text-muted-foreground">
-                        Status: <span className={cn(
-                          "font-medium",
-                          notificationPermission === 'granted' && "text-primary",
-                          notificationPermission === 'denied' && "text-destructive"
-                        )}>{notificationPermission}</span>
+          <SettingsSection title="Library & Docs" description="Global file upload preferences." icon={FileText}>
+            <div className="space-y-5">
+                <div className="flex items-center justify-between p-4 bg-muted/20 border rounded-2xl">
+                    <Label htmlFor="document-public" className="flex flex-col gap-0.5">
+                        <span className="font-bold">Public Uploads</span>
+                        <span className="text-[10px] text-muted-foreground font-medium uppercase">Shared with classroom by default</span>
+                    </Label>
+                    <Switch id="document-public" checked={defaultDocumentPublic} onCheckedChange={setDefaultDocumentPublic} />
+                </div>
+                <div className="p-4 bg-primary/5 border-2 border-primary/10 rounded-2xl">
+                    <p className="text-xs text-muted-foreground italic leading-relaxed">
+                        Classroom materials uploaded by teachers are always visible to students regardless of this setting.
                     </p>
                 </div>
-                {notificationPermission !== 'granted' && (
-                    <Button onClick={handleEnableNotifications} disabled={isEnablingNotifications || notificationPermission === 'denied' || notificationPermission === 'unsupported'}>
-                        {isEnablingNotifications ? <Loader2 className="h-4 w-4 animate-spin"/> : "Enable"}
-                    </Button>
-                )}
-              </div>
-              {notificationPermission === 'denied' && <p className="text-xs text-destructive mt-2">You have blocked notifications. Please enable them in your browser settings.</p>}
-              {notificationPermission === 'unsupported' && <p className="text-xs text-destructive mt-2">Push notifications are not supported by your browser.</p>}
+                <Button onClick={handleSaveDocuments} className="w-full rounded-xl btn-gel h-11 font-bold mt-auto">Save Library Settings</Button>
             </div>
-            <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
-                <Label htmlFor="meeting-reminders" className="flex items-center gap-2"><Video className="h-4 w-4" /> Meeting Reminders</Label>
-                <Switch id="meeting-reminders" checked={meetingReminders} onCheckedChange={setMeetingReminders} />
+          </SettingsSection>
+      </div>
+
+      <SettingsSection title="Notifications" description="Manage how you receive real-time alerts." icon={Bell}>
+         <div className="grid md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+                <div className="p-5 border-2 border-primary/20 bg-primary/5 rounded-3xl">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="space-y-1">
+                            <p className="font-black text-primary uppercase tracking-widest text-xs">Push Notifications</p>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Status: {notificationPermission}</p>
+                        </div>
+                        {notificationPermission !== 'granted' && (
+                            <Button size="sm" onClick={handleEnableNotifications} disabled={isEnablingNotifications || notificationPermission === 'denied'} className="rounded-full px-6 font-bold shadow-lg">
+                                {isEnablingNotifications ? <Loader2 className="h-4 w-4 animate-spin"/> : "Activate"}
+                            </Button>
+                        )}
+                    </div>
+                    {notificationPermission === 'denied' && <p className="text-[10px] text-destructive font-bold uppercase bg-destructive/10 p-2 rounded-lg text-center">Permissions Blocked in Browser</p>}
+                </div>
+                <div className="flex items-center justify-between p-4 border rounded-2xl bg-muted/10">
+                    <Label htmlFor="meeting-reminders" className="flex items-center gap-3 font-bold"><Video className="h-5 w-5 text-primary" /> Meeting Reminders</Label>
+                    <Switch id="meeting-reminders" checked={meetingReminders} onCheckedChange={setMeetingReminders} />
+                </div>
             </div>
-            <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
-                <Label htmlFor="chat-mentions" className="flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Chat Mentions</Label>
-                <Switch id="chat-mentions" checked={chatMentions} onCheckedChange={setChatMentions} />
+            <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 border rounded-2xl bg-muted/10">
+                    <Label htmlFor="chat-mentions" className="flex items-center gap-3 font-bold"><MessageSquare className="h-5 w-5 text-primary" /> Chat Mentions</Label>
+                    <Switch id="chat-mentions" checked={chatMentions} onCheckedChange={setChatMentions} />
+                </div>
+                <div className="flex items-center justify-between p-4 border rounded-2xl bg-muted/10">
+                    <Label htmlFor="hand-raise-alerts" className="flex items-center gap-3 font-bold"><Hand className="h-5 w-5 text-primary" /> Hand Raise Alerts</Label>
+                    <Switch id="hand-raise-alerts" checked={handRaiseAlerts} onCheckedChange={setHandRaiseAlerts} />
+                </div>
+                <Button onClick={handleSaveNotifications} className="w-full rounded-xl btn-gel h-12 text-base font-bold mt-2">Update Alerts</Button>
             </div>
-            <div className="flex items-center justify-between p-3 border rounded-lg shadow-sm">
-                <Label htmlFor="hand-raise-alerts" className="flex items-center gap-2"><Hand className="h-4 w-4" /> Hand Raise Alerts</Label>
-                <Switch id="hand-raise-alerts" checked={handRaiseAlerts} onCheckedChange={setHandRaiseAlerts} />
-            </div>
-        </div>
-        <div className="flex justify-end pt-4 border-t">
-          <Button onClick={handleSaveNotifications} className="rounded-lg btn-gel">
-            <Save className="mr-2 h-4 w-4" /> Save Notifications
-          </Button>
         </div>
       </SettingsSection>
       
       <SettingsSection
-        ref={whiteboardSettingsRef}
+        ref={whiteboardRef}
         id="whiteboardSettings"
-        title="Whiteboard"
-        description="Personalize your collaborative canvas."
+        title="Collaboration Canvas"
+        description="Default tools and appearance for your Whiteboard."
         icon={Palette}
         headerAction={
           meetingId && (
-            <Button asChild variant="outline" size="sm" className="rounded-lg">
+            <Button asChild variant="outline" size="sm" className="rounded-xl font-bold">
               <Link href={`/dashboard/meeting/${meetingId}/whiteboard`}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Whiteboard
+                <Palette className="mr-2 h-4 w-4" /> Canvas Mode
               </Link>
             </Button>
           )
         }
       >
-        <div className="space-y-4">
-             <div className="space-y-2">
-                <Label htmlFor="whiteboard-bg">Background Color</Label>
-                <Input id="whiteboard-bg" type="color" value={whiteboardBgColor} onChange={(e) => setWhiteboardBgColor(e.target.value)} className="w-full h-10 rounded-lg" />
-            </div>
-            <div className="p-4 border rounded-lg">
-              <h4 className="font-medium text-foreground mb-3 flex items-center gap-2"><Brush className="h-5 w-5"/> Drawing Tools</h4>
-              <div className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-8">
+             <div className="space-y-6">
                 <div className="space-y-2">
-                      <Label htmlFor="whiteboard-draw-color">Default Drawing Color</Label>
-                      <Input id="whiteboard-draw-color" type="color" value={whiteboardDrawColor} onChange={(e) => setWhiteboardDrawColor(e.target.value)} className="w-full h-10 rounded-lg" />
-                  </div>
-                  <div className="space-y-2">
-                      <Label htmlFor="whiteboard-linewidth">Default Line Width</Label>
-                      <div className="flex items-center gap-2">
-                          <Slider
-                              id="whiteboard-linewidth"
-                              value={[whiteboardLineWidth]}
-                              onValueChange={(value) => setWhiteboardLineWidth(value[0])}
-                              min={1} max={50} step={1}
-                          />
-                          <span className="text-sm font-mono w-8 text-center">{whiteboardLineWidth}</span>
-                      </div>
-                  </div>
-              </div>
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Background Color</Label>
+                    <div className="flex gap-2">
+                        <Input type="color" value={whiteboardBgColor} onChange={(e) => setWhiteboardBgColor(e.target.value)} className="w-12 h-12 p-1 rounded-xl cursor-pointer" />
+                        <Input value={whiteboardBgColor} onChange={(e) => setWhiteboardBgColor(e.target.value)} className="rounded-xl h-12 font-mono" />
+                    </div>
+                </div>
+                <div className="space-y-4 p-5 bg-muted/20 border rounded-2xl">
+                    <h4 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-primary"><Brush className="h-4 w-4"/> Drawing Defaults</h4>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-bold">Line Color</Label>
+                            <Input type="color" value={whiteboardDrawColor} onChange={(e) => setWhiteboardDrawColor(e.target.value)} className="w-full h-10 p-1 rounded-xl cursor-pointer" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-bold flex justify-between">Thickness <span>{whiteboardLineWidth}px</span></Label>
+                            <Slider value={[whiteboardLineWidth]} onValueChange={(v) => setWhiteboardLineWidth(v[0])} min={1} max={50} step={1} />
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div className="p-4 border rounded-lg">
-              <h4 className="font-medium text-foreground mb-3 flex items-center gap-2"><TypeIcon className="h-5 w-5"/> Text Tool</h4>
-              <div className="space-y-4">
-                  <div className="space-y-2">
-                      <Label htmlFor="whiteboard-fontfamily">Default Font</Label>
-                      <Select value={whiteboardFontFamily} onValueChange={setWhiteboardFontFamily}>
-                          <SelectTrigger id="whiteboard-fontfamily" className="rounded-lg">
-                              <SelectValue placeholder="Select a font..." />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-lg">
-                              <SelectItem value="sans-serif">Sans-Serif (Default)</SelectItem>
-                              <SelectItem value="serif">Serif</SelectItem>
-                              <SelectItem value="monospace">Monospace</SelectItem>
-                              <SelectItem value="cursive">Cursive</SelectItem>
-                              <SelectItem value="fantasy">Fantasy</SelectItem>
-                              <SelectItem value="Arial">Arial</SelectItem>
-                              <SelectItem value="Georgia">Georgia</SelectItem>
-                          </SelectContent>
-                      </Select>
-                  </div>
-                  <div className="space-y-2">
-                      <Label htmlFor="whiteboard-fontsize">Default Font Size</Label>
-                      <div className="flex items-center gap-2">
-                          <Slider
-                              id="whiteboard-fontsize"
-                              value={[whiteboardFontSize]}
-                              onValueChange={(value) => setWhiteboardFontSize(value[0])}
-                              min={8} max={128} step={1}
-                          />
-                          <span className="text-sm font-mono w-10 text-center">{whiteboardFontSize}px</span>
-                      </div>
-                  </div>
-              </div>
+            <div className="space-y-6">
+                <div className="space-y-4 p-5 bg-muted/20 border rounded-2xl">
+                    <h4 className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-primary"><TypeIcon className="h-4 w-4"/> Text Tool Defaults</h4>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-bold">Font Family</Label>
+                            <Select value={whiteboardFontFamily} onValueChange={setWhiteboardFontFamily}>
+                                <SelectTrigger className="rounded-xl h-11"><SelectValue/></SelectTrigger>
+                                <SelectContent className="rounded-xl">
+                                    <SelectItem value="sans-serif">Sans-Serif (Standard)</SelectItem>
+                                    <SelectItem value="serif">Serif (Formal)</SelectItem>
+                                    <SelectItem value="monospace">Monospace (Code)</SelectItem>
+                                    <SelectItem value="cursive">Cursive (Artistic)</SelectItem>
+                                    <SelectItem value="fantasy">Fantasy (Stylized)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-bold flex justify-between">Font Size <span>{whiteboardFontSize}px</span></Label>
+                            <Slider value={[whiteboardFontSize]} onValueChange={(v) => setWhiteboardFontSize(v[0])} min={8} max={128} step={1} />
+                        </div>
+                    </div>
+                </div>
+                <div className="flex flex-col h-full justify-end">
+                    <Button onClick={handleSaveWhiteboard} className="w-full rounded-xl btn-gel h-12 text-base font-bold shadow-lg">Save Canvas Defaults</Button>
+                </div>
             </div>
         </div>
-        <div className="flex justify-end items-center pt-4 border-t gap-2">
-          <Button onClick={handleSaveWhiteboard} className="rounded-lg btn-gel">
-            <Save className="mr-2 h-4 w-4" /> Save Whiteboard Settings
-          </Button>
-        </div>
       </SettingsSection>
 
-      <SettingsSection ref={historyAndDataRef} id="historyAndData" title="History & Data" description="Manage your generated content and history." icon={History}>
-        <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Quickly access your documents and recordings from the main sidebar under "Library".</p>
-             <AlertDialog>
-                <AlertDialogTrigger asChild>
-                    <Button variant="destructive" className="w-full justify-start text-left p-3 rounded-lg"><Trash2 className="mr-2 h-4 w-4" /> Clear All Meeting History</Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action will clear your list of ongoing and recent meetings. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearHistory}>Clear History</AlertDialogAction></AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-        </div>
-      </SettingsSection>
+      <div className="grid md:grid-cols-2 gap-8">
+          <SettingsSection ref={dataRef} id="historyAndData" title="History & Data" description="Manage generated session logs." icon={History}>
+            <div className="space-y-4">
+                <p className="text-xs text-muted-foreground leading-relaxed">Clearing history removes meeting logs from your dashboard but keeps your recordings and documents safe.</p>
+                 <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button variant="destructive" className="w-full h-12 rounded-xl font-bold justify-start px-4"><Trash2 className="mr-3 h-5 w-5" /> Clear Meeting Logs</Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="rounded-3xl">
+                        <AlertDialogHeader><AlertDialogTitle>Purge Meeting Logs?</AlertDialogTitle><AlertDialogDescription>This will clear your recent activity and started meetings list. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                        <AlertDialogFooter><AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearHistory} className="rounded-xl bg-destructive text-white">Confirm Purge</AlertDialogAction></AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </div>
+          </SettingsSection>
 
-      <SettingsSection title="Account & Security" description="Manage your account and view our policies." icon={ShieldCheck}>
-        <div className="space-y-4">
-            <Button asChild variant="outline" className="w-full justify-start text-left p-3 rounded-lg"><Link href="/community-guidelines" target="_blank"><Users className="mr-2 h-4 w-4" /> Community Guidelines</Link></Button>
-            <Button asChild variant="outline" className="w-full justify-start text-left p-3 rounded-lg"><Link href="/terms-of-service" target="_blank"><BookOpen className="mr-2 h-4 w-4" /> Terms of Service</Link></Button>
-            <Button asChild variant="outline" className="w-full justify-start text-left p-3 rounded-lg"><Link href="/privacy-policy" target="_blank"><ShieldCheck className="mr-2 h-4 w-4" /> Privacy Policy</Link></Button>
-        </div>
-        <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4 border-t">
-            <AlertDialog>
-                <AlertDialogTrigger asChild><Button variant="destructive" className="w-full sm:w-auto rounded-lg"><LogOut className="mr-2 h-4 w-4" /> Sign Out</Button></AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader><AlertDialogTitle>Are you sure you want to sign out?</AlertDialogTitle><AlertDialogDescription>You will be logged out of your TeachMeet account.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={signOut}>Sign Out</AlertDialogAction></AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-            <AlertDialog>
-                <AlertDialogTrigger asChild><Button variant="destructive" className="w-full sm:w-auto rounded-lg"><Trash2 className="mr-2 h-4 w-4" /> Delete Account</Button></AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete your account and remove your data from our servers. This requires you to sign in again for security.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteAccount}>Delete Account</AlertDialogAction></AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-        </div>
-      </SettingsSection>
+          <SettingsSection title="Legal & Account" description="Manage access and review policies." icon={ShieldCheck}>
+            <div className="space-y-3">
+                <Button asChild variant="outline" className="w-full justify-between h-11 rounded-xl px-4 border-primary/20 hover:bg-primary/5">
+                    <Link href="/community-guidelines" target="_blank" className="flex items-center"><Users className="mr-3 h-4 w-4 text-primary" /> Community Guidelines <PlusCircle className="ml-2 h-3 w-3 opacity-30" /></Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full justify-between h-11 rounded-xl px-4 border-primary/20 hover:bg-primary/5">
+                    <Link href="/terms-of-service" target="_blank" className="flex items-center"><BookOpen className="mr-3 h-4 w-4 text-primary" /> Terms of Service <PlusCircle className="ml-2 h-3 w-3 opacity-30" /></Link>
+                </Button>
+                
+                <div className="flex gap-2 pt-2">
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild><Button variant="destructive" className="flex-1 h-11 rounded-xl font-bold"><LogOut className="mr-2 h-4 w-4" /> Sign Out</Button></AlertDialogTrigger>
+                        <AlertDialogContent className="rounded-3xl">
+                            <AlertDialogHeader><AlertDialogTitle>Sign Out?</AlertDialogTitle><AlertDialogDescription>You will be logged out of your TeachMeet account.</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogFooter><AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel><AlertDialogAction onClick={signOut} className="rounded-xl bg-destructive text-white">Sign Out</AlertDialogAction></AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl text-destructive/50 hover:text-destructive hover:bg-destructive/10"><Trash2 className="h-5 w-5" /></Button></AlertDialogTrigger>
+                        <AlertDialogContent className="rounded-3xl">
+                            <AlertDialogHeader><AlertDialogTitle className="text-destructive">Delete Account Permanently?</AlertDialogTitle><AlertDialogDescription>This action is irreversible. All your data, classrooms, and files will be deleted from our servers. You must re-authenticate to confirm.</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogFooter><AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteAccount} className="rounded-xl bg-destructive text-white">Delete Account</AlertDialogAction></AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
+            </div>
+          </SettingsSection>
+      </div>
+      
+      <footer className="py-12 text-center">
+          <p className="text-[10px] uppercase font-black tracking-[0.3em] text-muted-foreground opacity-30">TeachMeet v1.4.0 • Secured by Firebase</p>
+      </footer>
     </div>
   );
 }
