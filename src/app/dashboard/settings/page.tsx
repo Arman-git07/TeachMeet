@@ -32,10 +32,11 @@ import {
   ToggleRight, 
   FlipHorizontal, 
   MapPin, 
-  Locate,
-  BookOpen,
-  Users,
-  LogOut
+  Locate, 
+  BookOpen, 
+  Users, 
+  LogOut,
+  PlusCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -48,6 +49,7 @@ import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { getToken } from 'firebase/messaging';
 import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { Badge } from "@/components/ui/badge";
 
 const SettingsSection = React.forwardRef<
   HTMLDivElement,
