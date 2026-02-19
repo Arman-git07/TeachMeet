@@ -275,7 +275,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
       }
     } catch (error) {
       console.error("Verification error:", error);
-      toast({ variant: "destructive", title: "Error", description: "Verification process failed. Please ensure the image is clear." });
+      toast({ variant: "destructive", title: "Error", description: "Verification process failed. Please ensure the image is a clear receipt." });
       setIsVerifying(false);
     }
   };
