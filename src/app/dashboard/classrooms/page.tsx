@@ -265,7 +265,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
           lastPaymentAt: serverTimestamp(),
           nextPaymentDue: Timestamp.fromDate(nextDue),
           billingCurrency: billingCurrency,
-          feeAmount: 500, // Default fee
+          feeAmount: 500, 
           feeCurrency: billingCurrency,
         };
         
@@ -980,7 +980,7 @@ export default function ClassroomsPage() {
           <TabsContent value="enrolled" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-0 pt-0 pb-12">
             {filteredEnrolled.map(c => (
                 <Card key={c.id} className="shadow-lg border-border/50 rounded-2xl overflow-hidden group">
-                    <div className="h-2 bg-secondary/20 group-hover:bg-secondary/40 transition-colors" />
+                    <div className="h-2 bg-secondary/20 group-hover:secondary/40 transition-colors" />
                     <CardHeader>
                         <CardTitle className="truncate">{c.title}</CardTitle>
                         <CardDescription className="font-medium text-primary">By {c.teacherName}</CardDescription>

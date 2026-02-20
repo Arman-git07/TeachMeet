@@ -1,9 +1,8 @@
-
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { FileText, Lock, Globe, FolderOpen, Search, UploadCloud, Trash2, Loader2, FilterX } from "lucide-react";
+import { FileText, Lock, Globe, FolderOpen, Search, UploadCloud, Trash2, Loader2, FilterX, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -18,14 +17,47 @@ import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Document } from "@/hooks/useAuth";
 
+const DEMO_DOCUMENTS: Document[] = [
+  {
+    id: 'demo-private-1',
+    name: '[DEMO] Personal Lesson Plan Draft - Math.pdf',
+    lastModified: new Date().toISOString(),
+    size: '1.2MB',
+    uploaderId: 'demo-system',
+    isPrivate: true,
+    downloadURL: 'https://www.africau.edu/images/default/sample.pdf',
+    storagePath: '',
+    createdAt: null
+  },
+  {
+    id: 'demo-public-1',
+    name: '[DEMO] Physics 101 Classroom Syllabus.pdf',
+    lastModified: new Date().toISOString(),
+    size: '0.8MB',
+    uploaderId: 'demo-system',
+    isPrivate: false,
+    downloadURL: 'https://www.africau.edu/images/default/sample.pdf',
+    storagePath: '',
+    createdAt: null
+  }
+];
+
 const DocumentRow = ({ doc, onDelete, currentUserId }: { doc: Document; onDelete: (id: string, name: string, storagePath: string) => void; currentUserId: string | null }) => {
   const isOwner = currentUserId === doc.uploaderId;
+  const isDemo = doc.id.startsWith('demo-');
+
   return (
-    <div className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors group">
+    <div className={cn(
+        "flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors group",
+        isDemo && "bg-primary/5 border border-primary/10"
+    )}>
       <div className="flex items-center gap-3 min-w-0">
         {doc.isPrivate ? <Lock className="h-5 w-5 text-primary flex-shrink-0" /> : <Globe className="h-5 w-5 text-accent flex-shrink-0" />}
         <div className="flex-grow min-w-0">
-          <p className="text-sm font-medium text-foreground truncate" title={doc.name}>{doc.name}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-foreground truncate" title={doc.name}>{doc.name}</p>
+            {isDemo && <span className="text-[10px] font-black uppercase bg-primary/20 text-primary px-1.5 py-0.5 rounded">Sample</span>}
+          </div>
           <p className="text-xs text-muted-foreground">Modified: {new Date(doc.lastModified).toLocaleDateString()} | Size: {doc.size}</p>
         </div>
       </div>
@@ -33,7 +65,7 @@ const DocumentRow = ({ doc, onDelete, currentUserId }: { doc: Document; onDelete
         <Button asChild variant="ghost" size="sm" className="rounded-lg flex-shrink-0">
           <a href={doc.downloadURL} target="_blank" rel="noopener noreferrer">View</a>
         </Button>
-        {isOwner && (
+        {isOwner && !isDemo && (
           <Button
             variant="ghost"
             size="icon"
@@ -130,6 +162,7 @@ export function DocumentsClientUI() {
             (snapshot) => {
                 const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                 toastHandle.update({
+                    id: toastHandle.id,
                     description: `Uploading ${file.name}... ${Math.round(progress)}%`
                 });
             }
@@ -150,7 +183,7 @@ export function DocumentsClientUI() {
             createdAt: serverTimestamp(),
         });
         
-        toastHandle.update({ title: "Document Uploaded!", description: `${file.name} is now available.` });
+        toastHandle.update({ id: toastHandle.id, title: "Document Uploaded!", description: `${file.name} is now available.` });
     } catch (error: any) {
         console.error("Failed to upload document:", error);
         let title = "Upload Failed";
@@ -160,16 +193,13 @@ export function DocumentsClientUI() {
             if (error.code === 'storage/unauthorized') {
                 title = "Permission Denied";
                 description = "You do not have permission to upload files. Check storage security rules.";
-            } else if (error.code === 'permission-denied') { // Firestore error
+            } else if (error.code === 'permission-denied') { 
                 title = "Database Error";
                 description = "You do not have permission to save the file metadata. Check Firestore rules.";
-            } else if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
-                title = "API Key Configuration Error";
-                description = "Could not connect to Firebase. Please check your API key configuration.";
             }
         }
         
-        toastHandle.update({ variant: "destructive", title, description, duration: 9000 });
+        toastHandle.update({ id: toastHandle.id, variant: "destructive", title, description, duration: 9000 });
     } finally {
         if (event.target) event.target.value = "";
         setIsUploading(false);
@@ -194,16 +224,7 @@ export function DocumentsClientUI() {
       toast({ title: "Document Deleted", description: `"${name}" has been successfully deleted.` });
     } catch (error: any) {
       console.error("Deletion failed:", error);
-      if (error.code === 'storage/object-not-found') {
-          toast({ variant: 'destructive', title: "Deletion Warning", description: "File not found in storage, but removing database entry." });
-          try {
-             await deleteDoc(doc(db, "documents", id));
-          } catch (dbError) {
-             toast({ variant: 'destructive', title: "DB Deletion Failed", description: "Could not remove database entry." });
-          }
-      } else {
-         toast({ variant: "destructive", title: "Deletion Failed", description: "Could not delete the document. Please check console for details." });
-      }
+      toast({ variant: "destructive", title: "Deletion Failed", description: "Could not delete the document." });
     } finally {
         setIsDeleteDialogOpen(false);
         setDocumentToDelete(null); 
@@ -214,53 +235,50 @@ export function DocumentsClientUI() {
     documents.filter(doc => doc.name.toLowerCase().includes(searchQuery.toLowerCase()))
   , [documents, searchQuery]);
 
-  const privateDocs = useMemo(() => filteredDocuments.filter(d => d.isPrivate), [filteredDocuments]);
-  const publicDocs = useMemo(() => filteredDocuments.filter(d => !d.isPrivate), [filteredDocuments]);
+  const privateDocs = useMemo(() => {
+    const real = filteredDocuments.filter(d => d.isPrivate);
+    if (real.length === 0 && !searchQuery) {
+        return DEMO_DOCUMENTS.filter(d => d.isPrivate);
+    }
+    return real;
+  }, [filteredDocuments, searchQuery]);
 
-  const renderDocumentList = (docs: Document[], emptyState: React.ReactNode) => {
+  const publicDocs = useMemo(() => {
+    const real = filteredDocuments.filter(d => !d.isPrivate);
+    if (real.length === 0 && !searchQuery) {
+        return DEMO_DOCUMENTS.filter(d => !d.isPrivate);
+    }
+    return real;
+  }, [filteredDocuments, searchQuery]);
+
+  const renderDocumentList = (docs: Document[], isPrivate: boolean) => {
     if (isLoading) {
       return <div className="space-y-2"><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></div>;
     }
+    
     if (docs.length === 0) {
-      return emptyState;
+        return (
+            <div className="text-center py-12 text-muted-foreground flex-grow flex flex-col justify-center items-center border-2 border-dashed rounded-2xl">
+                <FolderOpen className="mx-auto h-12 w-12 mb-2 opacity-20" />
+                <p className="text-sm font-medium">No documents found matching your search.</p>
+            </div>
+        );
     }
+
     return (
       <div className="space-y-2">
         {docs.map(doc => <DocumentRow key={doc.id} doc={doc} onDelete={handleOpenDeleteDialog} currentUserId={currentUser?.uid || null} />)}
       </div>
     );
   };
-  
-  const emptyStatePublic = (
-    <div className="text-center py-12 text-muted-foreground flex-grow flex flex-col justify-center items-center">
-      <FolderOpen className="mx-auto h-12 w-12 mb-2" />
-      <p className="text-sm">No public documents yet.</p>
-      <p className="text-xs">Share documents publicly for them to appear here.</p>
-    </div>
-  );
-
-  const emptyStatePrivate = (
-    <div className="text-center py-12 text-muted-foreground flex-grow flex flex-col justify-center items-center">
-      <FolderOpen className="mx-auto h-12 w-12 mb-2" />
-      <p className="text-sm">You have no private documents.</p>
-      <p className="text-xs">Upload a document and select "Private" to start.</p>
-    </div>
-  );
-  
-  const noSearchResults = (
-    <div className="text-center py-12 text-muted-foreground flex-grow flex flex-col justify-center items-center">
-      <FilterX className="mx-auto h-12 w-12 mb-2" />
-      <p className="text-sm">No documents match your search.</p>
-    </div>
-  );
 
   return (
     <>
       <div className="space-y-4 flex flex-col h-full">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">My Documents</h1>
-            <p className="text-muted-foreground">Manage your private and public documents.</p>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">My Library</h1>
+            <p className="text-muted-foreground">Manage your private resources and shared classroom materials.</p>
           </div>
           <div className="flex items-center gap-2 w-full md:w-auto">
             <div className="relative flex-grow md:flex-grow-0 md:w-auto md:max-w-xs">
@@ -268,12 +286,12 @@ export function DocumentsClientUI() {
               <Input
                 type="search"
                 placeholder="Search documents..."
-                className="pl-10 rounded-lg w-full"
+                className="pl-10 rounded-xl w-full"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button className="btn-gel rounded-lg flex-shrink-0" onClick={handleUploadClick} disabled={isUploading}>
+            <Button className="btn-gel rounded-xl flex-shrink-0" onClick={handleUploadClick} disabled={isUploading}>
               {isUploading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <UploadCloud className="mr-2 h-5 w-5" />}
               {isUploading ? "Uploading..." : "Upload"}
             </Button>
@@ -289,30 +307,36 @@ export function DocumentsClientUI() {
         </div>
 
         <Tabs defaultValue="private" className="flex flex-col flex-grow">
-          <TabsList className="mb-4 self-start rounded-lg">
-            <TabsTrigger value="private" className="rounded-md">Private</TabsTrigger>
-            <TabsTrigger value="public" className="rounded-md">Public</TabsTrigger>
+          <TabsList className="mb-4 self-start rounded-xl bg-muted/50 p-1">
+            <TabsTrigger value="private" className="rounded-lg px-6">Private Docs</TabsTrigger>
+            <TabsTrigger value="public" className="rounded-lg px-6">Public Docs</TabsTrigger>
           </TabsList>
-          <div className="flex-grow overflow-auto">
-            <TabsContent value="private">
-              <Card className="shadow-lg rounded-xl border-border/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><Lock className="text-primary" /> Private Documents</CardTitle>
-                  <CardDescription>Only you can see and manage these documents.</CardDescription>
+          <div className="flex-grow overflow-auto pb-12">
+            <TabsContent value="private" className="mt-0">
+              <Card className="shadow-lg rounded-2xl border-border/50 overflow-hidden">
+                <CardHeader className="bg-muted/10 border-b">
+                  <div className="flex items-center gap-2">
+                    <Lock className="text-primary h-5 w-5" />
+                    <CardTitle className="text-lg">Private Vault</CardTitle>
+                  </div>
+                  <CardDescription>Personal documents only visible to you.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  {renderDocumentList(privateDocs, searchQuery ? noSearchResults : emptyStatePrivate)}
+                <CardContent className="pt-6">
+                  {renderDocumentList(privateDocs, true)}
                 </CardContent>
               </Card>
             </TabsContent>
-            <TabsContent value="public">
-              <Card className="shadow-lg rounded-xl border-border/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><Globe className="text-accent"/> Public Documents</CardTitle>
-                  <CardDescription>These documents are visible to other users.</CardDescription>
+            <TabsContent value="public" className="mt-0">
+              <Card className="shadow-lg rounded-2xl border-border/50 overflow-hidden">
+                <CardHeader className="bg-muted/10 border-b">
+                  <div className="flex items-center gap-2">
+                    <Globe className="text-accent h-5 w-5"/>
+                    <CardTitle className="text-lg">Shared Library</CardTitle>
+                  </div>
+                  <CardDescription>Resources visible to everyone in your classrooms.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  {renderDocumentList(publicDocs, searchQuery ? noSearchResults : emptyStatePublic)}
+                <CardContent className="pt-6">
+                  {renderDocumentList(publicDocs, false)}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -321,36 +345,44 @@ export function DocumentsClientUI() {
       </div>
 
       <Dialog open={isUploadChoiceDialogOpen} onOpenChange={setIsUploadChoiceDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-xl">
+        <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl">Choose Upload Destination</DialogTitle>
-            <DialogDescription>Where would you like to upload this document?</DialogDescription>
+            <DialogTitle className="text-xl">Upload Document</DialogTitle>
+            <DialogDescription>Choose a destination for your file.</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
-            <Button variant="outline" className="w-full rounded-lg py-6 text-base" onClick={() => initiateUpload('private')}>
-              <Lock className="mr-2 h-5 w-5" /> Upload to Private
+            <Button variant="outline" className="w-full rounded-xl py-8 text-base font-bold border-2 hover:bg-primary/5 hover:border-primary/30 transition-all flex flex-col gap-1" onClick={() => initiateUpload('private')}>
+              <div className="flex items-center gap-2">
+                <Lock className="h-5 w-5 text-primary" />
+                <span>Private Vault</span>
+              </div>
+              <span className="text-[10px] text-muted-foreground font-normal uppercase">Only you can access this file</span>
             </Button>
-            <Button variant="outline" className="w-full rounded-lg py-6 text-base" onClick={() => initiateUpload('public')}>
-              <Globe className="mr-2 h-5 w-5" /> Upload to Public
+            <Button variant="outline" className="w-full rounded-xl py-8 text-base font-bold border-2 hover:bg-accent/5 hover:border-accent/30 transition-all flex flex-col gap-1" onClick={() => initiateUpload('public')}>
+              <div className="flex items-center gap-2">
+                <Globe className="h-5 w-5 text-accent" />
+                <span>Public Library</span>
+              </div>
+              <span className="text-[10px] text-muted-foreground font-normal uppercase">Shared with meeting & class participants</span>
             </Button>
           </div>
           <DialogFooter>
-            <DialogClose asChild><Button type="button" variant="secondary" className="rounded-lg">Cancel</Button></DialogClose>
+            <DialogClose asChild><Button type="button" variant="ghost" className="rounded-xl">Cancel</Button></DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent className="rounded-xl">
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+            <AlertDialogTitle>Delete Document?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete the document "{documentToDelete?.name}"? This action cannot be undone.
+              Are you sure you want to permanently delete "{documentToDelete?.name}"?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-lg" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDeleteDocument} className={cn(buttonVariants({ variant: "destructive", className: "rounded-lg" }))}>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeleteDocument} className="bg-destructive text-white rounded-xl hover:bg-destructive/90">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

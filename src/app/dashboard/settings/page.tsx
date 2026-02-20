@@ -84,20 +84,17 @@ export default function SettingsPage() {
   const searchParams = useSearchParams();
   const meetingId = searchParams.get('meetingId');
 
-  // Refs for scrolling to sections
   const profileRef = useRef<HTMLDivElement>(null);
   const avRef = useRef<HTMLDivElement>(null);
   const recordingRef = useRef<HTMLDivElement>(null);
   const whiteboardRef = useRef<HTMLDivElement>(null);
   const dataRef = useRef<HTMLDivElement>(null);
 
-  // General Settings
   const [displayName, setDisplayName] = useState<string>('');
   const [location, setLocation] = useState<string>('');
   const [isLocating, setIsLocating] = useState(false);
   const [isSavingGeneral, setIsSavingGeneral] = useState<boolean>(false);
   
-  // Audio & Video Settings
   const videoPreviewRef = useRef<HTMLVideoElement>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [audioInDevices, setAudioInDevices] = useState<MediaDeviceInfo[]>([]);
@@ -111,29 +108,24 @@ export default function SettingsPage() {
   const [appliedFilter, setAppliedFilter] = useState<string>('none');
   const [isFilterToggleOn, setIsFilterToggleOn] = useState(false);
 
-  // Whiteboard Settings
   const [whiteboardBgColor, setWhiteboardBgColor] = useState('#FFFFFF');
   const [whiteboardDrawColor, setWhiteboardDrawColor] = useState('#000000');
   const [whiteboardLineWidth, setWhiteboardLineWidth] = useState(5);
   const [whiteboardFontSize, setWhiteboardFontSize] = useState(16);
   const [whiteboardFontFamily, setWhiteboardFontFamily] = useState('sans-serif');
   
-  // Recording Settings
   const [recordingQuality, setRecordingQuality] = useState('1080p');
   const [defaultRecordingPublic, setDefaultRecordingPublic] = useState(false);
   const [autoRecordMeetings, setAutoRecordMeetings] = useState(false);
   
-  // Document Settings
   const [defaultDocumentPublic, setDefaultDocumentPublic] = useState(false);
 
-  // Notification Settings
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>('default');
   const [isEnablingNotifications, setIsEnablingNotifications] = useState(false);
   const [meetingReminders, setMeetingReminders] = useState(true);
   const [chatMentions, setChatMentions] = useState(true);
   const [handRaiseAlerts, setHandRaiseAlerts] = useState(true);
 
-  // Highlight effect
   useEffect(() => {
     const highlight = searchParams.get('highlight');
     let targetRef: React.RefObject<HTMLDivElement> | null = null;
@@ -157,7 +149,6 @@ export default function SettingsPage() {
     }
   }, []);
   
-  // Load preferences
   useEffect(() => {
     if (user && !authLoading) {
       setDisplayName(user.displayName || '');
@@ -172,7 +163,6 @@ export default function SettingsPage() {
       fetchUserData();
     }
     
-    // A/V
     setDefaultCameraOn(localStorage.getItem('teachmeet-camera-default') !== 'off');
     setDefaultMicOn(localStorage.getItem('teachmeet-mic-default') === 'on');
     setMirrorCamera(localStorage.getItem('teachmeet-camera-mirror') === 'true');
@@ -182,28 +172,23 @@ export default function SettingsPage() {
     setSelectedVideoDevice(localStorage.getItem('teachmeet-video-device') || 'default');
     setSelectedAudioInDevice(localStorage.getItem('teachmeet-audioin-device') || 'default');
     
-    // Whiteboard
     setWhiteboardBgColor(localStorage.getItem('teachmeet-whiteboard-bg-color') || '#FFFFFF');
     setWhiteboardDrawColor(localStorage.getItem('teachmeet-whiteboard-color') || '#000000');
     setWhiteboardLineWidth(parseInt(localStorage.getItem('teachmeet-whiteboard-linewidth') || '5', 10));
     setWhiteboardFontSize(parseInt(localStorage.getItem('teachmeet-whiteboard-fontsize') || '16', 10));
     setWhiteboardFontFamily(localStorage.getItem('teachmeet-whiteboard-fontfamily') || 'sans-serif');
     
-    // Recordings
     setRecordingQuality(localStorage.getItem('teachmeet-recording-quality') || '1080p');
     setDefaultRecordingPublic(localStorage.getItem('teachmeet-recording-default-public') === 'true');
     setAutoRecordMeetings(localStorage.getItem('teachmeet-recording-auto') === 'true');
 
-    // Documents
     setDefaultDocumentPublic(localStorage.getItem('teachmeet-document-default-public') === 'true');
 
-    // Notifications
     setMeetingReminders(localStorage.getItem('teachmeet-notif-reminders') !== 'off');
     setChatMentions(localStorage.getItem('teachmeet-notif-mentions') !== 'off');
     setHandRaiseAlerts(localStorage.getItem('teachmeet-notif-handraise') !== 'off');
   }, [user, authLoading]);
 
-  // A/V Device detection
   const getDevices = useCallback(async () => {
     try {
       await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -219,7 +204,6 @@ export default function SettingsPage() {
 
   useEffect(() => { getDevices(); }, [getDevices]);
 
-  // Preview video stream
   useEffect(() => {
     let stream: MediaStream;
     async function setupStream() {
@@ -262,7 +246,7 @@ export default function SettingsPage() {
         } finally { setIsLocating(false); }
       },
       (error) => {
-        toast({ variant: "destructive", title: "Access Denied", description: "Please enable location permissions in your browser." });
+        toast({ variant: "destructive", title: "Access Denied", description: "Please enable location permissions in your browser to verify your region." });
         setIsLocating(false);
       }
     );
@@ -271,7 +255,7 @@ export default function SettingsPage() {
   const handleSaveGeneral = async () => {
     if (!auth.currentUser) return;
     if (!location.trim()) {
-        toast({ variant: "destructive", title: "Location Required", description: "Please grant location permission to secure your account." });
+        toast({ variant: "destructive", title: "Location Required", description: "Please grant location permission to secure your account and set localized billing." });
         return;
     }
     setIsSavingGeneral(true);
