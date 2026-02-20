@@ -14,7 +14,6 @@ import {
     Loader2, 
     Lock, 
     Cloud, 
-    MoreVertical 
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -119,11 +118,19 @@ export default function DocumentViewerPage() {
     const handleSaveToDrive = useCallback(async () => {
         if (!document?.downloadURL) return;
         setIsDownloading(true);
+        
+        const toastId = `drive-save-${Date.now()}`;
+        toast({ 
+            id: toastId,
+            title: "Preparing for Drive...", 
+            description: "Fetching document data. This works best on mobile devices with the Drive app installed." 
+        });
+
         try {
             const response = await fetch(document.downloadURL);
             const blob = await response.blob();
             
-            // On mobile/Chrome, Web Share provides a direct "Save to Drive" option
+            // Web Share API is the primary way to offer "Save to Drive" on mobile/Chrome
             if (navigator.share) {
                 const file = new File([blob], document.name || 'document', { type: blob.type });
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -132,22 +139,25 @@ export default function DocumentViewerPage() {
                         title: document.name,
                         text: 'Save this document to your Google Drive.',
                     });
+                    toast.update(toastId, { title: "Save Options Opened", description: "Please select 'Save to Drive' from the list." });
                 } else {
-                    toast({ 
+                    toast.update(toastId, { 
                         title: "Opening Drive", 
-                        description: "Sharing files not supported. Opening Google Drive for manual upload." 
+                        description: "Native sharing not fully supported. Opening your Google Drive for manual upload." 
                     });
                     window.open("https://drive.google.com/drive/u/0/my-drive", "_blank");
                 }
             } else {
-                toast({ 
+                // For desktop, we provide a direct link to the Drive upload area
+                toast.update(toastId, { 
                     title: "Opening Drive", 
-                    description: "Please download the file first, then upload it to your Drive." 
+                    description: "Please download the file first, then upload it to your Google Drive." 
                 });
                 window.open("https://drive.google.com/drive/u/0/my-drive", "_blank");
             }
         } catch (error) {
-            toast({ variant: "destructive", title: "Action Failed", description: "Could not open save options." });
+            console.error("Save to drive error:", error);
+            toast.update(toastId, { variant: "destructive", title: "Action Failed", description: "Could not open save options." });
         } finally {
             setIsDownloading(false);
         }
