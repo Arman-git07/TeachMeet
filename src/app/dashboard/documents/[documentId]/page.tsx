@@ -6,10 +6,25 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, FileText, Globe, Download, Loader2, Lock } from 'lucide-react';
+import { 
+    ArrowLeft, 
+    FileText, 
+    Globe, 
+    Download, 
+    Loader2, 
+    Lock, 
+    Cloud, 
+    MoreVertical 
+} from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function DocumentViewerPage() {
     const { documentId } = useParams() as { documentId: string };
@@ -73,16 +88,14 @@ export default function DocumentViewerPage() {
         fetchData();
     }, [documentId, toast, router, user]);
 
-    const handleDownload = useCallback(async () => {
+    const handleDirectDownload = useCallback(async () => {
         if (!document?.downloadURL) return;
-        
         setIsDownloading(true);
         try {
             const response = await fetch(document.downloadURL);
             const blob = await response.blob();
             const blobUrl = window.URL.createObjectURL(blob);
             
-            // 1. Download to device (standard blob download)
             const link = window.document.createElement('a');
             link.href = blobUrl;
             link.setAttribute('download', document.name || 'document');
@@ -92,31 +105,47 @@ export default function DocumentViewerPage() {
             window.document.body.removeChild(link);
             window.URL.revokeObjectURL(blobUrl);
             
-            // 2. Save to Drive / Cloud (using Web Share API)
-            if (navigator.share) {
-                try {
-                    const file = new File([blob], document.name || 'document', { type: blob.type });
-                    // Check if file sharing is supported by the browser
-                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                        await navigator.share({
-                            files: [file],
-                            title: document.name,
-                            text: 'Save this document to your Drive or share it with your network.',
-                        });
-                    }
-                } catch (shareErr) {
-                    // Fail gracefully if user cancels the share sheet
-                    console.log("System share dialog closed.");
-                }
-            } else {
-                toast({ 
-                    title: "Download Started", 
-                    description: "The file is being saved to your device. You can manually upload it to Google Drive from your files." 
-                });
-            }
+            toast({ title: "Download Started", description: "Your file is being saved to your device." });
         } catch (error) {
             console.warn("Direct download failed, opening in new tab", error);
             window.open(document.downloadURL, '_blank');
+        } finally {
+            setIsDownloading(false);
+        }
+    }, [document, toast]);
+
+    const handleSaveToDrive = useCallback(async () => {
+        if (!document?.downloadURL) return;
+        setIsDownloading(true);
+        try {
+            const response = await fetch(document.downloadURL);
+            const blob = await response.blob();
+            
+            // On mobile/Chrome, Web Share provides a direct "Save to Drive" option
+            if (navigator.share) {
+                const file = new File([blob], document.name || 'document', { type: blob.type });
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: document.name,
+                        text: 'Save this document to your Google Drive.',
+                    });
+                } else {
+                    toast({ 
+                        title: "Opening Drive", 
+                        description: "Sharing files not supported. Opening Google Drive for manual upload." 
+                    });
+                    window.open("https://drive.google.com/drive/u/0/my-drive", "_blank");
+                }
+            } else {
+                toast({ 
+                    title: "Opening Drive", 
+                    description: "Please download the file first, then upload it to your Drive." 
+                });
+                window.open("https://drive.google.com/drive/u/0/my-drive", "_blank");
+            }
+        } catch (error) {
+            toast({ variant: "destructive", title: "Action Failed", description: "Could not open save options." });
         } finally {
             setIsDownloading(false);
         }
@@ -152,16 +181,29 @@ export default function DocumentViewerPage() {
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="rounded-lg" 
-                        onClick={handleDownload}
-                        disabled={isDownloading}
-                    >
-                        {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
-                        Download & Save
-                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="rounded-lg font-bold" 
+                                disabled={isDownloading}
+                            >
+                                {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
+                                Download & Save
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="rounded-xl w-56">
+                            <DropdownMenuItem onClick={handleDirectDownload} className="cursor-pointer py-3">
+                                <Download className="mr-2 h-4 w-4" />
+                                <span>Download to Device</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleSaveToDrive} className="cursor-pointer py-3">
+                                <Cloud className="mr-2 h-4 w-4" />
+                                <span>Save to Google Drive</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </header>
 
@@ -181,11 +223,25 @@ export default function DocumentViewerPage() {
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
                                 <FileText className="h-16 w-16 text-muted-foreground opacity-20" />
-                                <p className="text-muted-foreground">This file type cannot be previewed directly.</p>
-                                <Button className="btn-gel rounded-lg" onClick={handleDownload} disabled={isDownloading}>
-                                    {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4" />}
-                                    Download & Save
-                                </Button>
+                                <p className="text-muted-foreground font-medium">This file type cannot be previewed directly.</p>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button className="btn-gel rounded-xl px-8 h-12 text-base font-bold shadow-lg" disabled={isDownloading}>
+                                            {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4" />}
+                                            Download & Save
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="center" className="rounded-xl w-56">
+                                        <DropdownMenuItem onClick={handleDirectDownload} className="cursor-pointer py-3">
+                                            <Download className="mr-2 h-4 w-4" />
+                                            <span>Download to Device</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={handleSaveToDrive} className="cursor-pointer py-3">
+                                            <Cloud className="mr-2 h-4 w-4" />
+                                            <span>Save to Google Drive</span>
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </div>
                         )}
                     </CardContent>
