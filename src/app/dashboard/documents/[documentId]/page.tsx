@@ -82,6 +82,7 @@ export default function DocumentViewerPage() {
             const blob = await response.blob();
             const blobUrl = window.URL.createObjectURL(blob);
             
+            // 1. Download to device (standard blob download)
             const link = window.document.createElement('a');
             link.href = blobUrl;
             link.setAttribute('download', document.name || 'document');
@@ -91,7 +92,28 @@ export default function DocumentViewerPage() {
             window.document.body.removeChild(link);
             window.URL.revokeObjectURL(blobUrl);
             
-            toast({ title: "Download Started" });
+            // 2. Save to Drive / Cloud (using Web Share API)
+            if (navigator.share) {
+                try {
+                    const file = new File([blob], document.name || 'document', { type: blob.type });
+                    // Check if file sharing is supported by the browser
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                            files: [file],
+                            title: document.name,
+                            text: 'Save this document to your Drive or share it with your network.',
+                        });
+                    }
+                } catch (shareErr) {
+                    // Fail gracefully if user cancels the share sheet
+                    console.log("System share dialog closed.");
+                }
+            } else {
+                toast({ 
+                    title: "Download Started", 
+                    description: "The file is being saved to your device. You can manually upload it to Google Drive from your files." 
+                });
+            }
         } catch (error) {
             console.warn("Direct download failed, opening in new tab", error);
             window.open(document.downloadURL, '_blank');
@@ -138,7 +160,7 @@ export default function DocumentViewerPage() {
                         disabled={isDownloading}
                     >
                         {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
-                        Download
+                        Download & Save
                     </Button>
                 </div>
             </header>
@@ -162,7 +184,7 @@ export default function DocumentViewerPage() {
                                 <p className="text-muted-foreground">This file type cannot be previewed directly.</p>
                                 <Button className="btn-gel rounded-lg" onClick={handleDownload} disabled={isDownloading}>
                                     {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4" />}
-                                    Download to View
+                                    Download & Save
                                 </Button>
                             </div>
                         )}
