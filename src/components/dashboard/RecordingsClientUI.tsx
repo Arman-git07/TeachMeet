@@ -1,8 +1,7 @@
-
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Video as VideoIcon, Lock, Globe, FolderOpen, Search, UploadCloud, FilterX, PlayCircle, Download, Youtube, Trash2, Loader2 } from "lucide-react";
+import { Video as VideoIcon, Lock, Globe, FolderOpen, Search, UploadCloud, FilterX, PlayCircle, Download, Youtube, Trash2, Loader2, PanelLeftOpen } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +16,7 @@ import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Recording } from "@/hooks/useAuth";
 import { useAuth } from "@/hooks/useAuth";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 
 const RecordingCard = ({ rec, onDelete, currentUserId }: { rec: Recording; onDelete: (id: string, name: string, storagePath: string) => void; currentUserId: string | null }) => {
@@ -92,22 +92,17 @@ export function RecordingsClientUI() {
 
     const q = query(
       collection(db, "recordings"),
-      or(
-        where("isPrivate", "==", false),
-        where("uploaderId", "==", currentUser.uid)
-      )
+      orderBy("createdAt", "desc")
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-        const fetchedRecs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Recording));
-
-        fetchedRecs.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
-
-        setRecordings(fetchedRecs);
+        const allRecs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Recording));
+        const relevantRecs = allRecs.filter(rec => !rec.isPrivate || rec.uploaderId === currentUser.uid);
+        setRecordings(relevantRecs);
         setIsLoading(false);
     }, (error) => {
         console.error("Error fetching recordings:", error);
-        toast({ variant: 'destructive', title: "Error", description: "Could not fetch recordings. Please check your security rules." });
+        toast({ variant: 'destructive', title: "Error", description: "Could not fetch recordings." });
         setIsLoading(false);
     });
 
@@ -128,34 +123,23 @@ export function RecordingsClientUI() {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     const destination = event.currentTarget.getAttribute('data-destination') as 'private' | 'public' | null;
 
     if (!file || !destination || !currentUser) return;
     
     setIsUploading(true);
-    const toastHandle = toast({ title: "Uploading Recording...", description: `Starting upload for ${file.name}...`, duration: Infinity });
+    const toastId = `upload-rec-${Date.now()}`;
+    toast({ id: toastId, title: "Uploading Recording...", description: `Uploading ${file.name}...`, duration: Infinity });
 
-    try {
-        const storagePath = `recordings/${currentUser.uid}/${destination}/${Date.now()}-${file.name}`;
-        const fileRef = storageRef(storage, storagePath);
-        const uploadTask = uploadBytesResumable(fileRef, file);
-
-        uploadTask.on('state_changed',
-            (snapshot) => {
-                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                toastHandle.update({
-                    description: `Uploading ${file.name}... ${Math.round(progress)}%`
-                });
-            }
-        );
-
-        await uploadTask;
-
-        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-
-        await addDoc(collection(db, "recordings"), {
+    const storagePath = `recordings/${currentUser.uid}/${destination}/${Date.now()}-${file.name}`;
+    const fileRef = storageRef(storage, storagePath);
+    
+    uploadBytes(fileRef, file).then(async (snapshot) => {
+        try {
+          const downloadURL = await getDownloadURL(snapshot.ref);
+          await addDoc(collection(db, "recordings"), {
             name: file.name,
             date: new Date().toLocaleDateString(),
             duration: "N/A", 
@@ -166,31 +150,25 @@ export function RecordingsClientUI() {
             storagePath,
             createdAt: serverTimestamp(),
             thumbnailUrl: `https://placehold.co/300x180.png?text=New`,
-        });
-
-        toastHandle.update({ title: "Recording Uploaded!", description: `${file.name} is now available.` });
-
-    } catch (error: any) {
+          });
+          toast.update(toastId, { title: "Recording Uploaded!", description: `${file.name} is now available.` });
+        } catch (dbError) {
+          toast.update(toastId, { variant: "destructive", title: "Save Failed", description: "Could not save recording details." });
+        } finally {
+            if (event.target) event.target.value = "";
+            setIsUploading(false);
+        }
+    }).catch((error) => {
         console.error("Failed to upload recording:", error);
         let title = "Upload Failed";
         let description = "Could not upload the recording. Please try again.";
-        if (error.code) {
-            if (error.code === 'storage/unauthorized') {
-                title = "Permission Denied";
-                description = "You do not have permission to upload files. Check storage security rules.";
-            } else if (error.code === 'permission-denied') { // Firestore error
-                title = "Database Error";
-                description = "You do not have permission to save the recording metadata. Check Firestore rules.";
-            } else if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
-                title = "API Key Configuration Error";
-                description = "Could not connect to Firebase. Please check your API key configuration.";
-            }
+        if (error.code && error.code.startsWith('auth/requests-to-this-api')) {
+           title = "API Key Configuration Error";
+           description = "Could not connect to Firebase. Please check your API key configuration.";
         }
-        toastHandle.update({ variant: "destructive", title, description, duration: 9000 });
-    } finally {
-        if (event.target) event.target.value = "";
+        toast.update(toastId, { variant: 'destructive', title, description, duration: 9000 });
         setIsUploading(false);
-    }
+    });
   }, [currentUser, toast]);
 
   const handleOpenDeleteDialog = (id: string, name: string, storagePath: string) => {
@@ -200,21 +178,19 @@ export function RecordingsClientUI() {
 
   const handleConfirmDeleteRecording = async () => {
     if (!recordingToDelete) return;
-    const { id, name, storagePath } = recordingToDelete;
+    setIsDeleteDialogOpen(false);
     
     try {
-      if (storagePath) {
-          const fileRef = storageRef(storage, storagePath);
-          await deleteObject(fileRef);
-      }
-      await deleteDoc(doc(db, "recordings", id));
-      toast({ title: "Recording Deleted", description: `"${name}" has been successfully deleted.` });
+      await deleteDoc(doc(db, "recordings", recordingToDelete.id));
+      const fileRef = storageRef(storage, recordingToDelete.storagePath);
+      await deleteObject(fileRef);
+      toast({ title: "Recording Deleted", description: `"${recordingToDelete.name}" has been successfully deleted.` });
     } catch (error: any) {
        console.error("Deletion failed:", error);
       if (error.code === 'storage/object-not-found') {
           toast({ variant: 'destructive', title: "Deletion Warning", description: "File not found in storage, but removing database entry." });
           try {
-             await deleteDoc(doc(db, "recordings", id));
+             await deleteDoc(doc(db, "recordings", recordingToDelete.id));
           } catch (dbError) {
              toast({ variant: 'destructive', title: "DB Deletion Failed", description: "Could not remove database entry." });
           }
@@ -222,7 +198,6 @@ export function RecordingsClientUI() {
          toast({ variant: "destructive", title: "Deletion Failed", description: "Could not delete the recording. Please check console for details." });
       }
     } finally {
-        setIsDeleteDialogOpen(false);
         setRecordingToDelete(null);
     }
   };
@@ -278,9 +253,12 @@ export function RecordingsClientUI() {
     <>
       <div className="space-y-4 flex flex-col h-full">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">My Recordings</h1>
-            <p className="text-muted-foreground">Manage your private and public recordings.</p>
+          <div className="flex items-center gap-4">
+            <SidebarTrigger className="md:hidden"><PanelLeftOpen className="h-6 w-6" /></SidebarTrigger>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">My Recordings</h1>
+              <p className="text-muted-foreground">Manage your private and public recordings.</p>
+            </div>
           </div>
           <div className="flex items-center gap-2 w-full md:w-auto">
             <div className="relative flex-grow md:flex-grow-0 md:w-auto md:max-w-xs">
