@@ -285,7 +285,7 @@ export function DocumentsClientUI() {
                 <CardHeader className="bg-muted/10 border-b">
                   <div className="flex items-center gap-2">
                     <Globe className="text-accent h-5 w-5"/>
-                    <CardTitle className="text-lg">Shared Library</CardTitle>
+                    <CardTitle className="text-lg">Public Documents</CardTitle>
                   </div>
                   <CardDescription>Resources visible to everyone in your classrooms.</CardDescription>
                 </CardHeader>
