@@ -132,8 +132,8 @@ type TeacherApplicationValues = z.infer<typeof teacherApplicationSchema>;
 
 const PLATFORM_FEE_AMOUNT = 10;
 const GRACE_PERIOD_DAYS = 7;
-// Unified to the international-ready UPI ID for better resolution across domestic and global banking providers.
-const PLATFORM_UPI_ID = "07arman2004-1@okicici";
+const PLATFORM_UPI_INR = "07arman2004-1@oksbi";
+const PLATFORM_UPI_INTL = "07arman2004-1@okicici";
 
 const GLOBAL_CURRENCIES = [
     { code: 'INR', label: 'INR (₹)', symbol: '₹' },
@@ -201,21 +201,22 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
           if (loc.includes('india')) return 'INR';
           if (loc.includes('usa') || loc.includes('united states') || loc.includes('america')) return 'USD';
           if (loc.includes('united kingdom') || loc.includes('uk')) return 'GBP';
-          if (loc.includes('europe') || loc.includes('germany') || loc.includes('france')) return 'EUR';
+          if (loc.includes('europe') || loc.includes('germany') || loc.includes('france') || loc.includes('italy') || loc.includes('spain')) return 'EUR';
       }
       return 'USD';
   }, [userLocation]);
 
+  const currentUpiId = billingCurrency === 'INR' ? PLATFORM_UPI_INR : PLATFORM_UPI_INTL;
+
   const upiUrl = useMemo(() => {
       const name = encodeURIComponent("TeachMeet Platform");
-      // Omit 'cu' for non-INR to avoid 'Invalid QR' errors in various banking apps.
-      let url = `upi://pay?pa=${PLATFORM_UPI_ID}&pn=${name}&am=${PLATFORM_FEE_AMOUNT}`;
+      let url = `upi://pay?pa=${currentUpiId}&pn=${name}&am=${PLATFORM_FEE_AMOUNT}`;
       if (billingCurrency === 'INR') {
           url += `&cu=INR`;
       }
       url += `&tn=ClassroomSubscription`;
       return url;
-  }, [billingCurrency]);
+  }, [billingCurrency, currentUpiId]);
 
   useEffect(() => {
     if (classroomToEdit) {
@@ -318,7 +319,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
         screenshotDataUri: dataUri,
         expectedAmount: PLATFORM_FEE_AMOUNT,
         expectedCurrency: billingCurrency,
-        expectedRecipientUpi: PLATFORM_UPI_ID
+        expectedRecipientUpi: currentUpiId
       });
 
       setVerificationProgress(80);

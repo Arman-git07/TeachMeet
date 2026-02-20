@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { db, storage } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -43,6 +43,17 @@ export default function ClassroomDetailLayout({
   const [isVerifying, setIsVerifying] = useState(false);
   const [paymentInitiated, setPaymentInitiated] = useState(false);
   const [verificationProgress, setVerificationProgress] = useState(0);
+  const [userLocation, setUserLocation] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+        getDoc(doc(db, 'users', user.uid)).then(snap => {
+            if (snap.exists()) {
+                setUserLocation(snap.data().location);
+            }
+        });
+    }
+  }, [user]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -86,7 +97,17 @@ export default function ClassroomDetailLayout({
     };
   }, [classroomId, user, authLoading, router, toast]);
 
-  const billingCurrency = classroom?.billingCurrency || 'USD';
+  const billingCurrency = useMemo(() => {
+      if (userLocation) {
+          const loc = userLocation.toLowerCase();
+          if (loc.includes('india')) return 'INR';
+          if (loc.includes('usa') || loc.includes('united states') || loc.includes('america')) return 'USD';
+          if (loc.includes('united kingdom') || loc.includes('uk')) return 'GBP';
+          if (loc.includes('europe') || loc.includes('germany') || loc.includes('france') || loc.includes('italy') || loc.includes('spain')) return 'EUR';
+      }
+      return classroom?.billingCurrency || 'USD';
+  }, [userLocation, classroom?.billingCurrency]);
+
   const currentUpiId = billingCurrency === 'INR' ? PLATFORM_UPI_INR : PLATFORM_UPI_INTL;
 
   const handleRenew = useCallback(async () => {
