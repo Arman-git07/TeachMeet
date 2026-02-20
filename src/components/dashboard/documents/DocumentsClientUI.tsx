@@ -299,15 +299,23 @@ export function DocumentsClientUI() {
       <Dialog open={isUploadChoiceDialogOpen} onOpenChange={setIsUploadChoiceDialogOpen}>
         <DialogContent className="sm:max-w-md rounded-xl">
           <DialogHeader>
-            <DialogTitle className="text-xl">Choose Upload Destination</DialogTitle>
-            <DialogDescription>Where would you like to upload this document?</DialogDescription>
+            <DialogTitle className="text-xl">Upload Document</DialogTitle>
+            <DialogDescription>Choose a destination for your file.</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
-            <Button variant="outline" className="w-full rounded-lg py-6 text-base" onClick={() => initiateUpload('private')}>
-              <Lock className="mr-2 h-5 w-5" /> Upload to Private
+            <Button variant="outline" className="w-full rounded-xl py-8 text-base font-bold border-2 hover:bg-primary/5 hover:border-primary/30 transition-all flex flex-col gap-1" onClick={() => initiateUpload('private')}>
+              <div className="flex items-center gap-2">
+                <Lock className="h-5 w-5 text-primary" />
+                <span>Private Documents</span>
+              </div>
+              <span className="text-[10px] text-muted-foreground font-normal uppercase">Only you can access this file</span>
             </Button>
-            <Button variant="outline" className="w-full rounded-lg py-6 text-base" onClick={() => initiateUpload('public')}>
-              <Globe className="mr-2 h-5 w-5" /> Upload to Public
+            <Button variant="outline" className="w-full rounded-xl py-8 text-base font-bold border-2 hover:bg-accent/5 hover:border-accent/30 transition-all flex flex-col gap-1" onClick={() => initiateUpload('public')}>
+              <div className="flex items-center gap-2">
+                <Globe className="h-5 w-5 text-accent" />
+                <span>Public Library</span>
+              </div>
+              <span className="text-[10px] text-muted-foreground font-normal uppercase">Shared with meeting & class participants</span>
             </Button>
           </div>
           <DialogFooter>

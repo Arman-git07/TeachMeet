@@ -308,7 +308,7 @@ export function DocumentsClientUI() {
             <Button variant="outline" className="w-full rounded-xl py-8 text-base font-bold border-2 hover:bg-primary/5 hover:border-primary/30 transition-all flex flex-col gap-1" onClick={() => initiateUpload('private')}>
               <div className="flex items-center gap-2">
                 <Lock className="h-5 w-5 text-primary" />
-                <span>Private Vault</span>
+                <span>Private Documents</span>
               </div>
               <span className="text-[10px] text-muted-foreground font-normal uppercase">Only you can access this file</span>
             </Button>
