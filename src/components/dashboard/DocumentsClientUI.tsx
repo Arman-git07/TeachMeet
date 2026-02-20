@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Lock, Globe, FolderOpen, Search, UploadCloud, Trash2, Loader2, FilterX } from "lucide-react";
+import { Lock, Globe, FolderOpen, Search, UploadCloud, Trash2, Loader2, FilterX, PanelLeftOpen } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Document } from "@/hooks/useAuth";
 import Link from "next/link";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 const DocumentRow = ({ doc, onDelete, currentUserId }: { doc: Document; onDelete: (id: string, name: string, storagePath: string) => void; currentUserId: string | null }) => {
   const isOwner = currentUserId === doc.uploaderId;
@@ -226,9 +227,12 @@ export function DocumentsClientUI() {
     <>
       <div className="space-y-4 flex flex-col h-full">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">My Library</h1>
-            <p className="text-muted-foreground">Manage your private resources and shared classroom materials.</p>
+          <div className="flex items-center gap-4">
+            <SidebarTrigger className="md:hidden"><PanelLeftOpen className="h-6 w-6" /></SidebarTrigger>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">My Library</h1>
+              <p className="text-muted-foreground">Manage your private resources and shared classroom materials.</p>
+            </div>
           </div>
           <div className="flex items-center gap-2 w-full md:w-auto">
             <div className="relative flex-grow md:flex-grow-0 md:w-auto md:max-w-xs">
@@ -277,7 +281,7 @@ export function DocumentsClientUI() {
               </Card>
             </TabsContent>
             <TabsContent value="public" className="mt-0">
-              <Card className="shadow-lg rounded-2xl border-border/50 overflow-hidden">
+              <Card className="shadow-lg rounded-xl border-border/50 overflow-hidden">
                 <CardHeader className="bg-muted/10 border-b">
                   <div className="flex items-center gap-2">
                     <Globe className="text-accent h-5 w-5"/>
