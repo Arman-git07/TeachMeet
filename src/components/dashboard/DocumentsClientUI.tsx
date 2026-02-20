@@ -271,7 +271,7 @@ export function DocumentsClientUI() {
                 <CardHeader className="bg-muted/10 border-b">
                   <div className="flex items-center gap-2">
                     <Lock className="text-primary h-5 w-5" />
-                    <CardTitle className="text-lg">Private Vault</CardTitle>
+                    <CardTitle className="text-lg">Private Documents</CardTitle>
                   </div>
                   <CardDescription>Personal documents only visible to you.</CardDescription>
                 </CardHeader>
