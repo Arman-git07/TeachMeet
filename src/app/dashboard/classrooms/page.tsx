@@ -88,6 +88,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { verifyPayment } from '@/ai/flows/verify-payment-flow';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { cn } from '@/lib/utils';
 
 export interface Classroom {
   id: string;
