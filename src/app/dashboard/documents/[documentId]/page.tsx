@@ -92,6 +92,8 @@ export default function DocumentViewerPage() {
         if (!document?.downloadURL) return;
         setIsDownloading(true);
         try {
+            // Standard anchor download doesn't work for cross-origin without specific headers.
+            // We fetch the blob to force the browser to treat it as a direct file download.
             const response = await fetch(document.downloadURL);
             const blob = await response.blob();
             const blobUrl = window.URL.createObjectURL(blob);
@@ -194,11 +196,11 @@ export default function DocumentViewerPage() {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="rounded-xl w-56">
-                            <DropdownMenuItem onClick={handleDirectDownload} className="cursor-pointer py-3">
+                            <DropdownMenuItem onSelect={handleDirectDownload} className="cursor-pointer py-3">
                                 <Download className="mr-2 h-4 w-4" />
                                 <span>Download to Device</span>
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={handleSaveToDrive} className="cursor-pointer py-3">
+                            <DropdownMenuItem onSelect={handleSaveToDrive} className="cursor-pointer py-3">
                                 <Cloud className="mr-2 h-4 w-4" />
                                 <span>Save to Google Drive</span>
                             </DropdownMenuItem>
@@ -232,11 +234,11 @@ export default function DocumentViewerPage() {
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="center" className="rounded-xl w-56">
-                                        <DropdownMenuItem onClick={handleDirectDownload} className="cursor-pointer py-3">
+                                        <DropdownMenuItem onSelect={handleDirectDownload} className="cursor-pointer py-3">
                                             <Download className="mr-2 h-4 w-4" />
                                             <span>Download to Device</span>
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={handleSaveToDrive} className="cursor-pointer py-3">
+                                        <DropdownMenuItem onSelect={handleSaveToDrive} className="cursor-pointer py-3">
                                             <Cloud className="mr-2 h-4 w-4" />
                                             <span>Save to Google Drive</span>
                                         </DropdownMenuItem>
