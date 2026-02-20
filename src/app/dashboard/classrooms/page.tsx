@@ -40,7 +40,6 @@ import {
   serverTimestamp,
   doc,
   updateDoc,
-  deleteDoc,
   onSnapshot,
   query,
   where,
@@ -64,17 +63,15 @@ import {
   User,
   Phone,
   Wallet,
-  CheckCircle2,
-  AlertTriangle,
-  CreditCard,
   Star,
   ShieldCheck,
-  ArrowRight,
-  RefreshCw,
   UploadCloud,
   Image as ImageIcon,
   Info,
-  Mail,
+  MapPin,
+  Locate,
+  CreditCard,
+  AlertTriangle
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
@@ -88,7 +85,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { verifyPayment } from '@/ai/flows/verify-payment-flow';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -209,8 +205,9 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
   const currentUpiId = billingCurrency === 'INR' ? PLATFORM_UPI_INR : PLATFORM_UPI_INTL;
 
   const upiUrl = useMemo(() => {
+      const vpa = currentUpiId;
       const name = encodeURIComponent("TeachMeet Platform");
-      let url = `upi://pay?pa=${currentUpiId}&pn=${name}&am=${PLATFORM_FEE_AMOUNT}`;
+      let url = `upi://pay?pa=${vpa}&pn=${name}&am=${PLATFORM_FEE_AMOUNT}`;
       if (billingCurrency === 'INR') {
           url += `&cu=INR`;
       }

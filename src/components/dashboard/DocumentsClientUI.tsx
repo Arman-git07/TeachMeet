@@ -1,21 +1,22 @@
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { FileText, Lock, Globe, FolderOpen, Search, UploadCloud, Trash2, Loader2, FilterX, Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Lock, Globe, FolderOpen, Search, UploadCloud, Trash2, Loader2, FilterX } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { auth, storage, db } from '@/lib/firebase';
+import { storage, db } from '@/lib/firebase';
 import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, deleteDoc, or, orderBy } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, deleteDoc, or } from 'firebase/firestore';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Document } from "@/hooks/useAuth";
+import Link from "next/link";
 
 const DEMO_DOCUMENTS: Document[] = [
   {
@@ -63,7 +64,7 @@ const DocumentRow = ({ doc, onDelete, currentUserId }: { doc: Document; onDelete
       </div>
       <div className="flex items-center gap-1">
         <Button asChild variant="ghost" size="sm" className="rounded-lg flex-shrink-0">
-          <a href={doc.downloadURL} target="_blank" rel="noopener noreferrer">View</a>
+          <Link href={`/dashboard/documents/${doc.id}`}>View</Link>
         </Button>
         {isOwner && !isDemo && (
           <Button
@@ -122,7 +123,7 @@ export function DocumentsClientUI() {
       setIsLoading(false);
     }, (error) => {
       console.error("Error fetching documents:", error);
-      toast({ variant: 'destructive', title: "Error", description: "Could not fetch documents. Please check your Firestore rules." });
+      toast({ variant: 'destructive', title: "Error", description: "Could not fetch documents." });
       setIsLoading(false);
     });
 
@@ -186,20 +187,7 @@ export function DocumentsClientUI() {
         toastHandle.update({ id: toastHandle.id, title: "Document Uploaded!", description: `${file.name} is now available.` });
     } catch (error: any) {
         console.error("Failed to upload document:", error);
-        let title = "Upload Failed";
-        let description = "Could not upload the document. Please try again.";
-        
-        if (error.code) {
-            if (error.code === 'storage/unauthorized') {
-                title = "Permission Denied";
-                description = "You do not have permission to upload files. Check storage security rules.";
-            } else if (error.code === 'permission-denied') { 
-                title = "Database Error";
-                description = "You do not have permission to save the file metadata. Check Firestore rules.";
-            }
-        }
-        
-        toastHandle.update({ id: toastHandle.id, variant: "destructive", title, description, duration: 9000 });
+        toastHandle.update({ id: toastHandle.id, variant: "destructive", title: "Upload Failed", description: "Could not upload the document. Please try again.", duration: 9000 });
     } finally {
         if (event.target) event.target.value = "";
         setIsUploading(false);
@@ -251,7 +239,7 @@ export function DocumentsClientUI() {
     return real;
   }, [filteredDocuments, searchQuery]);
 
-  const renderDocumentList = (docs: Document[], isPrivate: boolean) => {
+  const renderDocumentList = (docs: Document[]) => {
     if (isLoading) {
       return <div className="space-y-2"><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></div>;
     }
@@ -322,7 +310,7 @@ export function DocumentsClientUI() {
                   <CardDescription>Personal documents only visible to you.</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-6">
-                  {renderDocumentList(privateDocs, true)}
+                  {renderDocumentList(privateDocs)}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -336,7 +324,7 @@ export function DocumentsClientUI() {
                   <CardDescription>Resources visible to everyone in your classrooms.</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-6">
-                  {renderDocumentList(publicDocs, false)}
+                  {renderDocumentList(publicDocs)}
                 </CardContent>
               </Card>
             </TabsContent>
