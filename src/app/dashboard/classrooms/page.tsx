@@ -132,8 +132,44 @@ type TeacherApplicationValues = z.infer<typeof teacherApplicationSchema>;
 
 const PLATFORM_FEE_AMOUNT = 10;
 const GRACE_PERIOD_DAYS = 7;
-const PLATFORM_UPI_INR = "07arman2004-1@oksbi";
-const PLATFORM_UPI_INTL = "07arman2004-1@okicici";
+// Unified to the international-ready UPI ID for better resolution across domestic and global banking providers.
+const PLATFORM_UPI_ID = "07arman2004-1@okicici";
+
+const GLOBAL_CURRENCIES = [
+    { code: 'INR', label: 'INR (₹)', symbol: '₹' },
+    { code: 'USD', label: 'USD ($)', symbol: '$' },
+    { code: 'EUR', label: 'EUR (€)', symbol: '€' },
+    { code: 'GBP', label: 'GBP (£)', symbol: '£' },
+    { code: 'JPY', label: 'JPY (¥)', symbol: '¥' },
+    { code: 'CHF', label: 'CHF (Fr)', symbol: 'Fr' },
+    { code: 'CAD', label: 'CAD (C$)', symbol: 'C$' },
+    { code: 'AUD', label: 'AUD (A$)', symbol: 'A$' },
+    { code: 'CNY', label: 'CNY (¥)', symbol: '¥' },
+    { code: 'HKD', label: 'HKD (HK$)', symbol: 'HK$' },
+    { code: 'NZD', label: 'NZD (NZ$)', symbol: 'NZ$' },
+    { code: 'SGD', label: 'SGD (S$)', symbol: 'S$' },
+    { code: 'KRW', label: 'KRW (₩)', symbol: '₩' },
+    { code: 'AED', label: 'AED (د.إ)', symbol: 'د.إ' },
+    { code: 'SAR', label: 'SAR (﷼)', symbol: '﷼' },
+    { code: 'MXN', label: 'MXN ($)', symbol: '$' },
+    { code: 'BRL', label: 'BRL (R$)', symbol: 'R$' },
+    { code: 'RUB', label: 'RUB (₽)', symbol: '₽' },
+    { code: 'TRY', label: 'TRY (₺)', symbol: '₺' },
+    { code: 'ZAR', label: 'ZAR (R)', symbol: 'R' },
+    { code: 'PHP', label: 'PHP (₱)', symbol: '₱' },
+    { code: 'IDR', label: 'IDR (Rp)', symbol: 'Rp' },
+    { code: 'THB', label: 'THB (฿)', symbol: '฿' },
+    { code: 'MYR', label: 'MYR (RM)', symbol: 'RM' },
+    { code: 'VND', label: 'VND (₫)', symbol: '₫' },
+    { code: 'PLN', label: 'PLN (zł)', symbol: 'zł' },
+    { code: 'SEK', label: 'SEK (kr)', symbol: 'kr' },
+    { code: 'NOK', label: 'NOK (kr)', symbol: 'kr' },
+    { code: 'DKK', label: 'DKK (kr)', symbol: 'kr' },
+    { code: 'EGP', label: 'EGP (E£)', symbol: 'E£' },
+    { code: 'ILS', label: 'ILS (₪)', symbol: '₪' },
+    { code: 'PKR', label: 'PKR (₨)', symbol: '₨' },
+    { code: 'BDT', label: 'BDT (৳)', symbol: '৳' },
+];
 
 function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => void; classroomToEdit?: Classroom | null; }) {
   const [step, setStep] = useState<'details' | 'payment'>('details');
@@ -170,19 +206,16 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
       return 'USD';
   }, [userLocation]);
 
-  const currentUpiId = useMemo(() => {
-      return billingCurrency === 'INR' ? PLATFORM_UPI_INR : PLATFORM_UPI_INTL;
-  }, [billingCurrency]);
-
   const upiUrl = useMemo(() => {
       const name = encodeURIComponent("TeachMeet Platform");
-      let url = `upi://pay?pa=${currentUpiId}&pn=${name}&am=${PLATFORM_FEE_AMOUNT}`;
+      // Omit 'cu' for non-INR to avoid 'Invalid QR' errors in various banking apps.
+      let url = `upi://pay?pa=${PLATFORM_UPI_ID}&pn=${name}&am=${PLATFORM_FEE_AMOUNT}`;
       if (billingCurrency === 'INR') {
           url += `&cu=INR`;
       }
       url += `&tn=ClassroomSubscription`;
       return url;
-  }, [billingCurrency, currentUpiId]);
+  }, [billingCurrency]);
 
   useEffect(() => {
     if (classroomToEdit) {
@@ -231,6 +264,8 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
           lastPaymentAt: serverTimestamp(),
           nextPaymentDue: Timestamp.fromDate(nextDue),
           billingCurrency: billingCurrency,
+          feeAmount: 500, // Default fee
+          feeCurrency: billingCurrency,
         };
         
         batch.set(classroomRef, classroomData);
@@ -283,7 +318,7 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
         screenshotDataUri: dataUri,
         expectedAmount: PLATFORM_FEE_AMOUNT,
         expectedCurrency: billingCurrency,
-        expectedRecipientUpi: currentUpiId
+        expectedRecipientUpi: PLATFORM_UPI_ID
       });
 
       setVerificationProgress(80);

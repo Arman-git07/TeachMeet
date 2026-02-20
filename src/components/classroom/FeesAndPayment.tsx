@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { IndianRupee, DollarSign, Euro, PoundSterling, Settings, Copy, Info, AlertCircle, Loader2, Wallet, CheckCircle, Briefcase, Save, Users, User } from 'lucide-react';
+import { IndianRupee, DollarSign, Euro, PoundSterling, Settings, Copy, Info, AlertCircle, Loader2, Wallet, CheckCircle, Briefcase, Save, Users, User, Banknote } from 'lucide-react';
 import Image from 'next/image';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -41,6 +41,42 @@ interface FeesAndPaymentProps {
     onOpenChange: (isOpen: boolean) => void;
 }
 
+const GLOBAL_CURRENCIES = [
+    { code: 'INR', label: 'INR (₹)', symbol: '₹' },
+    { code: 'USD', label: 'USD ($)', symbol: '$' },
+    { code: 'EUR', label: 'EUR (€)', symbol: '€' },
+    { code: 'GBP', label: 'GBP (£)', symbol: '£' },
+    { code: 'JPY', label: 'JPY (¥)', symbol: '¥' },
+    { code: 'CHF', label: 'CHF (Fr)', symbol: 'Fr' },
+    { code: 'CAD', label: 'CAD (C$)', symbol: 'C$' },
+    { code: 'AUD', label: 'AUD (A$)', symbol: 'A$' },
+    { code: 'CNY', label: 'CNY (¥)', symbol: '¥' },
+    { code: 'HKD', label: 'HKD (HK$)', symbol: 'HK$' },
+    { code: 'NZD', label: 'NZD (NZ$)', symbol: 'NZ$' },
+    { code: 'SGD', label: 'SGD (S$)', symbol: 'S$' },
+    { code: 'KRW', label: 'KRW (₩)', symbol: '₩' },
+    { code: 'AED', label: 'AED (د.إ)', symbol: 'د.إ' },
+    { code: 'SAR', label: 'SAR (﷼)', symbol: '﷼' },
+    { code: 'MXN', label: 'MXN ($)', symbol: '$' },
+    { code: 'BRL', label: 'BRL (R$)', symbol: 'R$' },
+    { code: 'RUB', label: 'RUB (₽)', symbol: '₽' },
+    { code: 'TRY', label: 'TRY (₺)', symbol: '₺' },
+    { code: 'ZAR', label: 'ZAR (R)', symbol: 'R' },
+    { code: 'PHP', label: 'PHP (₱)', symbol: '₱' },
+    { code: 'IDR', label: 'IDR (Rp)', symbol: 'Rp' },
+    { code: 'THB', label: 'THB (฿)', symbol: '฿' },
+    { code: 'MYR', label: 'MYR (RM)', symbol: 'RM' },
+    { code: 'VND', label: 'VND (₫)', symbol: '₫' },
+    { code: 'PLN', label: 'PLN (zł)', symbol: 'zł' },
+    { code: 'SEK', label: 'SEK (kr)', symbol: 'kr' },
+    { code: 'NOK', label: 'NOK (kr)', symbol: 'kr' },
+    { code: 'DKK', label: 'DKK (kr)', symbol: 'kr' },
+    { code: 'EGP', label: 'EGP (E£)', symbol: 'E£' },
+    { code: 'ILS', label: 'ILS (₪)', symbol: '₪' },
+    { code: 'PKR', label: 'PKR (₨)', symbol: '₨' },
+    { code: 'BDT', label: 'BDT (৳)', symbol: '৳' },
+];
+
 export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
     const { classroom, classroomId, user, userRole } = useClassroom();
     const { toast } = useToast();
@@ -49,7 +85,6 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
     const [isPayNowOpen, setIsPayNowOpen] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
     
-    // Teacher & Student States
     const [teachers, setTeachers] = useState<SubjectTeacher[]>([]);
     const [students, setStudents] = useState<any[]>([]);
     const [payTeacherOpen, setPayTeacherOpen] = useState<SubjectTeacher | null>(null);
@@ -77,7 +112,6 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
         } 
     });
 
-    // Reset manual UPI when teacher payment dialog closes
     useEffect(() => {
         if (!payTeacherOpen) {
             setManualTeacherUpi("");
@@ -90,7 +124,6 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
         }
     }, [isPayNowOpen]);
 
-    // Fetch teachers for payroll (Creator only)
     useEffect(() => {
         if (!classroomId || !isCreator) return;
         const q = query(collection(db, `classrooms/${classroomId}/teachers`), orderBy('addedAt', 'desc'));
@@ -99,7 +132,6 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
         });
     }, [classroomId, isCreator]);
 
-    // Fetch students for fee tracking (Creator only)
     useEffect(() => {
         if (!classroomId || !isCreator) return;
         const q = query(collection(db, `classrooms/${classroomId}/participants`), where('role', '==', 'student'));
@@ -108,7 +140,6 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
         });
     }, [classroomId, isCreator]);
 
-    // Fetch personal profile for assistant teachers to populate UPI
     useEffect(() => {
         if (!classroomId || !user || !isTeacher) return;
         const teacherRef = doc(db, 'classrooms', classroomId, 'teachers', user.uid);
@@ -133,7 +164,14 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
         const name = encodeURIComponent(classroom?.title || "TeachMeet Classroom");
         const amount = classroom?.feeAmount || 0;
         const currency = classroom?.feeCurrency || "INR";
-        return `upi://pay?pa=${vpa}&pn=${name}&am=${amount}&cu=${currency}&tn=${name}`;
+        
+        // Removal of non-INR currency parameter avoids "Invalid QR" errors in domestic apps
+        // while amount is still resolved by the bank gateway.
+        let url = `upi://pay?pa=${vpa}&pn=${name}&am=${amount}&tn=${name}`;
+        if (currency === 'INR') {
+            url += `&cu=INR`;
+        }
+        return url;
     }, [classroom, manualClassroomUpi]);
 
     const getTeacherUpiUrl = (teacher: SubjectTeacher) => {
@@ -263,7 +301,7 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                                         <p className="text-muted-foreground mb-3 text-sm">Student Fee Amount</p>
                                         <div className="flex justify-center items-center gap-3">
                                             <div className="text-primary p-2 bg-primary/10 rounded-full">
-                                                {currencySymbols[classroom.feeCurrency as keyof typeof currencySymbols] || <IndianRupee className="h-6 w-6" />}
+                                                {currencySymbols[classroom.feeCurrency as keyof typeof currencySymbols] || <Banknote className="h-6 w-6" />}
                                             </div>
                                             <p className="font-black text-4xl tracking-tighter">{classroom.feeAmount?.toLocaleString() || '0.00'}</p>
                                             <Badge variant="secondary" className="font-bold px-3 py-1">{classroom.feeCurrency || 'INR'}</Badge>
@@ -440,10 +478,9 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                     <SelectTrigger className="rounded-xl h-11"><SelectValue/></SelectTrigger>
                                                     <SelectContent className="rounded-xl">
-                                                        <SelectItem value="INR">INR (₹)</SelectItem>
-                                                        <SelectItem value="USD">USD ($)</SelectItem>
-                                                        <SelectItem value="EUR">EUR (€)</SelectItem>
-                                                        <SelectItem value="GBP">GBP (£)</SelectItem>
+                                                        {GLOBAL_CURRENCIES.map(curr => (
+                                                            <SelectItem key={curr.code} value={curr.code}>{curr.label}</SelectItem>
+                                                        ))}
                                                     </SelectContent>
                                                 </Select>
                                             )} />
@@ -501,7 +538,7 @@ export function FeesAndPayment({ isOpen, onOpenChange }: FeesAndPaymentProps) {
                             <div className="space-y-2">
                                 <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest block text-center">Teacher UPI ID</Label>
                                 <div className="flex items-center gap-2 p-1.5 bg-muted/50 rounded-2xl border">
-                                    <Input readOnly value={payTeacherOpen.upiId} className="bg-transparent border-none text-xs focus-visible:ring-0 shadow-none h-10" />
+                                    <Input readOnly value={payTeacherOpen.upiId} className="bg-transparent border-none text-xs focus-visible:ring-0 shadow-none h-10 px-3" />
                                     <Button size="icon" variant="secondary" className="rounded-xl h-10 w-10 shrink-0" onClick={() => { navigator.clipboard.writeText(payTeacherOpen.upiId!); toast({ title: 'UPI ID Copied!' }); }}>
                                         <Copy className="h-4 w-4" />
                                     </Button>
