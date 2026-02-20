@@ -315,7 +315,7 @@ export function DocumentsClientUI() {
             <Button variant="outline" className="w-full rounded-xl py-8 text-base font-bold border-2 hover:bg-accent/5 hover:border-accent/30 transition-all flex flex-col gap-1" onClick={() => initiateUpload('public')}>
               <div className="flex items-center gap-2">
                 <Globe className="h-5 w-5 text-accent" />
-                <span>Public Library</span>
+                <span>Public Documents</span>
               </div>
               <span className="text-[10px] text-muted-foreground font-normal uppercase">Shared with meeting & class participants</span>
             </Button>
