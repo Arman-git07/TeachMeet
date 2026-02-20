@@ -230,7 +230,7 @@ export function DocumentsClientUI() {
           <div className="flex items-center gap-4">
             <SidebarTrigger className="md:hidden"><PanelLeftOpen className="h-6 w-6" /></SidebarTrigger>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">My Library</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">Documents</h1>
               <p className="text-muted-foreground">Manage your private resources and shared classroom materials.</p>
             </div>
           </div>
