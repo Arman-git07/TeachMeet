@@ -21,27 +21,6 @@ export default function MaterialViewerPage() {
 
     useEffect(() => {
         const fetchData = async () => {
-            if (materialId === 'demo-physics') {
-                setMaterial({
-                    name: "Demo: Physics Lecture Notes.pdf",
-                    url: "https://www.africau.edu/images/default/sample.pdf",
-                    type: 'file',
-                    uploaderName: 'Admin'
-                });
-                setIsLoading(false);
-                return;
-            }
-            if (materialId === 'demo-reading') {
-                setMaterial({
-                    name: "Demo: Recommended Reading",
-                    url: "https://wikipedia.org",
-                    type: 'link',
-                    uploaderName: 'Admin'
-                });
-                setIsLoading(false);
-                return;
-            }
-
             try {
                 const matRef = doc(db, 'classrooms', classroomId, 'materials', materialId);
                 const snap = await getDoc(matRef);

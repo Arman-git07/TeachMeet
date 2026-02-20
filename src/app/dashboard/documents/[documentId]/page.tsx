@@ -37,30 +37,6 @@ export default function DocumentViewerPage() {
 
     useEffect(() => {
         const fetchData = async () => {
-            // Handle Demo Documents
-            if (documentId === 'demo-private-1') {
-                setDocument({
-                    name: '[DEMO] Personal Lesson Plan Draft - Math.pdf',
-                    downloadURL: 'https://www.africau.edu/images/default/sample.pdf',
-                    isPrivate: true,
-                    uploaderId: 'demo-system',
-                    size: '1.2MB'
-                });
-                setIsLoading(false);
-                return;
-            }
-            if (documentId === 'demo-public-1') {
-                setDocument({
-                    name: '[DEMO] Physics 101 Classroom Syllabus.pdf',
-                    downloadURL: 'https://www.africau.edu/images/default/sample.pdf',
-                    isPrivate: false,
-                    uploaderId: 'demo-system',
-                    size: '0.8MB'
-                });
-                setIsLoading(false);
-                return;
-            }
-
             try {
                 const docRef = doc(db, 'documents', documentId);
                 const snap = await getDoc(docRef);

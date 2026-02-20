@@ -18,46 +18,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Document } from "@/hooks/useAuth";
 import Link from "next/link";
 
-const DEMO_DOCUMENTS: Document[] = [
-  {
-    id: 'demo-private-1',
-    name: '[DEMO] Personal Lesson Plan Draft - Math.pdf',
-    lastModified: new Date().toISOString(),
-    size: '1.2MB',
-    uploaderId: 'demo-system',
-    isPrivate: true,
-    downloadURL: 'https://www.africau.edu/images/default/sample.pdf',
-    storagePath: '',
-    createdAt: null
-  },
-  {
-    id: 'demo-public-1',
-    name: '[DEMO] Physics 101 Classroom Syllabus.pdf',
-    lastModified: new Date().toISOString(),
-    size: '0.8MB',
-    uploaderId: 'demo-system',
-    isPrivate: false,
-    downloadURL: 'https://www.africau.edu/images/default/sample.pdf',
-    storagePath: '',
-    createdAt: null
-  }
-];
-
 const DocumentRow = ({ doc, onDelete, currentUserId }: { doc: Document; onDelete: (id: string, name: string, storagePath: string) => void; currentUserId: string | null }) => {
   const isOwner = currentUserId === doc.uploaderId;
-  const isDemo = doc.id.startsWith('demo-');
 
   return (
-    <div className={cn(
-        "flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors group",
-        isDemo && "bg-primary/5 border border-primary/10"
-    )}>
+    <div className="flex items-center justify-between p-3 hover:bg-muted/50 rounded-lg transition-colors group">
       <div className="flex items-center gap-3 min-w-0">
         {doc.isPrivate ? <Lock className="h-5 w-5 text-primary flex-shrink-0" /> : <Globe className="h-5 w-5 text-accent flex-shrink-0" />}
         <div className="flex-grow min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium text-foreground truncate" title={doc.name}>{doc.name}</p>
-            {isDemo && <span className="text-[10px] font-black uppercase bg-primary/20 text-primary px-1.5 py-0.5 rounded">Sample</span>}
           </div>
           <p className="text-xs text-muted-foreground">Modified: {new Date(doc.lastModified).toLocaleDateString()} | Size: {doc.size}</p>
         </div>
@@ -66,7 +36,7 @@ const DocumentRow = ({ doc, onDelete, currentUserId }: { doc: Document; onDelete
         <Button asChild variant="ghost" size="sm" className="rounded-lg flex-shrink-0">
           <Link href={`/dashboard/documents/${doc.id}`}>View</Link>
         </Button>
-        {isOwner && !isDemo && (
+        {isOwner && (
           <Button
             variant="ghost"
             size="icon"
@@ -224,20 +194,12 @@ export function DocumentsClientUI() {
   , [documents, searchQuery]);
 
   const privateDocs = useMemo(() => {
-    const real = filteredDocuments.filter(d => d.isPrivate);
-    if (real.length === 0 && !searchQuery) {
-        return DEMO_DOCUMENTS.filter(d => d.isPrivate);
-    }
-    return real;
-  }, [filteredDocuments, searchQuery]);
+    return filteredDocuments.filter(d => d.isPrivate);
+  }, [filteredDocuments]);
 
   const publicDocs = useMemo(() => {
-    const real = filteredDocuments.filter(d => !d.isPrivate);
-    if (real.length === 0 && !searchQuery) {
-        return DEMO_DOCUMENTS.filter(d => !d.isPrivate);
-    }
-    return real;
-  }, [filteredDocuments, searchQuery]);
+    return filteredDocuments.filter(d => !d.isPrivate);
+  }, [filteredDocuments]);
 
   const renderDocumentList = (docs: Document[]) => {
     if (isLoading) {

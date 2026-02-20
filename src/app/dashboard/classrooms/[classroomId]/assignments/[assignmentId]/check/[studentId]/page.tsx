@@ -77,21 +77,7 @@ export default function CheckingPage() {
     const [paths, setPaths] = useState<Path[]>([]);
     const isDrawingRef = useRef(false);
 
-    const isDemo = studentId === 'demo-student';
-
     useEffect(() => {
-        if (isDemo) {
-            setAssignment({ title: "Demo Assignment", maxScore: 100 });
-            setSubmission({
-                studentName: "Demo Student",
-                submissionUrl: "https://www.africau.edu/images/default/sample.pdf", 
-                grade: null,
-                feedback: ""
-            });
-            setIsLoading(false);
-            return;
-        }
-
         const fetchData = async () => {
             try {
                 const assignmentRef = doc(db, 'classrooms', classroomId, 'assignments', assignmentId);
@@ -122,7 +108,7 @@ export default function CheckingPage() {
         };
 
         fetchData();
-    }, [classroomId, assignmentId, studentId, isDemo, toast]);
+    }, [classroomId, assignmentId, studentId, toast]);
 
     // Canvas Logic
     const redraw = useCallback(() => {
@@ -240,10 +226,6 @@ export default function CheckingPage() {
     };
 
     const handleManualSave = async () => {
-        if (isDemo) {
-            toast({ title: "Demo Mode", description: "Changes are not saved in demo mode." });
-            return;
-        }
         setIsSaving(true);
         try {
             const submissionRef = doc(db, 'classrooms', classroomId, 'assignments', assignmentId, 'submissions', studentId);

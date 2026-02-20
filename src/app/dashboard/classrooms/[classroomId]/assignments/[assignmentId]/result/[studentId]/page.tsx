@@ -24,24 +24,8 @@ export default function AssignmentResultPage() {
     const [submission, setSubmission] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    const isDemo = studentId === 'demo-student';
-
     useEffect(() => {
         const fetchData = async () => {
-            if (isDemo) {
-                setAssignment({ title: "Demo: History Essay", dueDate: Timestamp.fromDate(new Date('2024-01-01')) });
-                setSubmission({
-                    studentName: "Demo Student",
-                    submissionUrl: "https://www.africau.edu/images/default/sample.pdf",
-                    checkedUrl: "https://picsum.photos/seed/checked/800/1200", // Sample flattened check
-                    grade: 92,
-                    feedback: "Great analysis of the French Revolution! Your points on the social causes were very well-argued.",
-                    submittedAt: Timestamp.fromDate(new Date('2023-12-31'))
-                });
-                setIsLoading(false);
-                return;
-            }
-
             try {
                 const assignRef = doc(db, 'classrooms', classroomId, 'assignments', assignmentId);
                 const subRef = doc(db, 'classrooms', classroomId, 'assignments', assignmentId, 'submissions', studentId);
@@ -57,7 +41,7 @@ export default function AssignmentResultPage() {
             }
         };
         fetchData();
-    }, [classroomId, assignmentId, studentId, isDemo, toast]);
+    }, [classroomId, assignmentId, studentId, toast]);
 
     if (isLoading) {
         return <div className="container mx-auto p-8"><Skeleton className="h-[80vh] w-full rounded-2xl" /></div>;
@@ -220,8 +204,3 @@ export default function AssignmentResultPage() {
         </div>
     );
 }
-
-// Simple Timestamp polyfill for demo mode
-const Timestamp = {
-    fromDate: (date: Date) => ({ toDate: () => date })
-};
