@@ -1,5 +1,5 @@
 'use client';
-import { AnimatedLogo } from '@/components/common/AnimatedLogo';
+import { Logo } from '@/components/common/Logo';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
@@ -449,7 +449,7 @@ export default function HomePage() {
       <AppHeader showLogo={false} />
       <main className="flex-grow flex flex-col items-center justify-center pt-16 sm:pt-4 relative pb-[18rem]">
         <div className="relative z-10 flex w-full flex-col items-center text-center px-4">
-          <AnimatedLogo size="medium" className="mb-8" />
+          <Logo size="medium" className="mb-8" />
           <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md border border-border/50">
             <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center justify-center">
                 <motion.div
