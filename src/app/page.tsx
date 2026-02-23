@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Video, 
   XCircle, 
@@ -64,6 +64,18 @@ export interface JoinRequestActivityItem extends BaseActivityItem {
 
 export type ActivityItem = BaseActivityItem | JoinRequestActivityItem;
 
+interface FallenLetter {
+  id: string;
+  char: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fallY: number;
+  style: any;
+  index: number;
+}
+
 const DISMISSED_ITEMS_KEY_PREFIX = 'teachmeet-dismissed-items-';
 const STARTED_MEETINGS_KEY_PREFIX = 'teachmeet-started-meetings-';
 const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000;
@@ -107,6 +119,14 @@ export default function HomePage() {
   const [validMeetings, setValidMeetings] = useState<Record<string, boolean>>({});
   const [currentTime, setCurrentTime] = useState(new Date());
   
+  const [fallenLetters, setFallenLetters] = useState<FallenLetter[]>([]);
+  const [showBubble, setShowBubble] = useState(false);
+  
+  const logoWrapperRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const activityCardRef = useRef<HTMLDivElement>(null);
+  const bubbleDismissedRef = useRef(false);
+
   const managedSubsRef = useRef<Record<string, () => void>>({});
   const enrolledSubsRef = useRef<Record<string, () => void>>({});
   const submissionSubsRef = useRef<Record<string, () => void>>({});
@@ -118,6 +138,100 @@ export default function HomePage() {
     const timer = setInterval(() => setCurrentTime(new Date()), 30000); // Sync every 30 seconds
     return () => clearInterval(timer);
   }, []);
+
+  // Logo Animation Logic
+  useEffect(() => {
+    const isBubbleShown = sessionStorage.getItem('teachmeet-logo-bubble-shown');
+    if (!isBubbleShown) {
+      setShowBubble(true);
+    }
+
+    const wrapper = logoWrapperRef.current;
+    if (!wrapper) return;
+    
+    const h1 = wrapper.querySelector('h1');
+    if (!h1) return;
+
+    // STEP 2: Wrap each letter dynamically
+    const originalText = h1.textContent || "";
+    h1.innerHTML = originalText.split('').map((char, i) => 
+      `<span class="logo-letter-trigger" data-index="${i}" style="display: inline-block; position: relative; cursor: pointer; transition: opacity 0.2s;">${char}</span>`
+    ).join('');
+
+    const handleLetterClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.classList.contains('logo-letter-trigger')) {
+        const index = parseInt(target.getAttribute('data-index') || '0');
+        
+        if (!bubbleDismissedRef.current) {
+          setShowBubble(false);
+          bubbleDismissedRef.current = true;
+          sessionStorage.setItem('teachmeet-logo-bubble-shown', 'true');
+        }
+
+        if (target.style.opacity === '0') return;
+
+        const logoRect = wrapper.getBoundingClientRect();
+        const letterRect = target.getBoundingClientRect();
+        const latestCard = document.getElementById("latest-activity");
+        if (!latestCard) return;
+        const latestRect = latestCard.getBoundingClientRect();
+
+        // STEP 3: Fall Calculation (CRITICAL)
+        // Calculating the required translation to stop above the card
+        const fallY = latestRect.top - letterRect.top - letterRect.height - 12;
+
+        const computed = window.getComputedStyle(h1);
+        const letterStyle = {
+          fontFamily: computed.fontFamily,
+          fontSize: computed.fontSize,
+          fontWeight: computed.fontWeight,
+          letterSpacing: computed.letterSpacing,
+          background: computed.background,
+          backgroundImage: computed.backgroundImage,
+          WebkitBackgroundClip: computed.webkitBackgroundClip,
+          WebkitTextFillColor: computed.webkitTextFillColor,
+          filter: computed.filter,
+          lineHeight: computed.lineHeight,
+          textTransform: computed.textTransform,
+          display: 'inline-block',
+          transform: computed.transform, // Capture scaleX(1.4)
+          transformOrigin: 'center',
+          pointerEvents: 'auto',
+        };
+
+        const newFallen: FallenLetter = {
+          id: `fallen-${index}-${Date.now()}`,
+          char: target.textContent || "",
+          x: letterRect.left - logoRect.left,
+          y: letterRect.top - logoRect.top,
+          width: letterRect.width,
+          height: letterRect.height,
+          fallY,
+          style: letterStyle,
+          index
+        };
+
+        setFallenLetters(prev => [...prev, newFallen]);
+        target.style.opacity = '0';
+      }
+    };
+
+    h1.addEventListener('click', handleLetterClick);
+    return () => h1.removeEventListener('click', handleLetterClick);
+  }, []);
+
+  const handleDragEnd = (letter: FallenLetter, info: any) => {
+    // If distance to original < 50px
+    if (Math.abs(info.offset.y + letter.fallY) < 50) {
+      setFallenLetters(prev => prev.filter(l => l.id !== letter.id));
+      const wrapper = logoWrapperRef.current;
+      if (wrapper) {
+        const original = wrapper.querySelector(`[data-index="${letter.index}"]`) as HTMLElement;
+        if (original) original.style.opacity = '1';
+      }
+    }
+  };
 
   // 1. Identify all classrooms the user is involved in (as teacher or student)
   useEffect(() => {
@@ -449,8 +563,65 @@ export default function HomePage() {
       <AppHeader showLogo={false} />
       <main className="flex-grow flex flex-col items-center justify-center pt-16 sm:pt-4 relative pb-[18rem]">
         <div className="relative z-10 flex w-full flex-col items-center text-center px-4">
-          <Logo size="medium" className="mb-8" />
-          <div className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md border border-border/50">
+          
+          {/* STEP 1: Wrap existing logo */}
+          <div ref={logoWrapperRef} className="relative inline-block mb-8">
+            <AnimatePresence>
+              {showBubble && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  className="absolute bottom-full left-0 mb-6 z-[60]"
+                >
+                  <div className="relative bg-gradient-to-b from-white to-[#ececec] px-6 py-2 rounded-[28px] shadow-xl border border-white/20">
+                    <span className="text-sm font-bold text-gray-700 whitespace-nowrap">Click it</span>
+                    {/* Pulsing Tail */}
+                    <div className="absolute -bottom-3 right-6 w-6 h-6 animate-tail-pulse">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M0 0C0 12 12 24 24 24V0H0Z" fill="#ececec" />
+                      </svg>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <Logo size="medium" />
+            
+            {/* OVERLAY for falling letters */}
+            <div ref={overlayRef} className="absolute inset-0 pointer-events-none z-50">
+              {fallenLetters.map((letter) => (
+                <motion.span
+                  key={letter.id}
+                  drag="y"
+                  dragElastic={0.15}
+                  dragMomentum={false}
+                  onDragEnd={(_, info) => handleDragEnd(letter, info)}
+                  initial={{ y: 0, rotate: 0 }}
+                  animate={{ y: letter.fallY, rotate: letter.index % 2 === 0 ? 15 : -15 }}
+                  transition={{ type: 'spring', stiffness: 100, damping: 10 }}
+                  style={{
+                    ...letter.style,
+                    position: 'absolute',
+                    top: letter.y,
+                    left: letter.x,
+                    width: letter.width,
+                    height: letter.height,
+                    cursor: 'grab',
+                  }}
+                >
+                  {letter.char}
+                </motion.span>
+              ))}
+            </div>
+          </div>
+
+          <div 
+            id="latest-activity" 
+            ref={activityCardRef}
+            className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md border border-border/50"
+          >
             <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center justify-center">
                 <motion.div
                   animate={{ rotate: [0, -10, 10, -10, 10, 0] }}
