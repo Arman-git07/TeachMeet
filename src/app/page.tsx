@@ -152,7 +152,7 @@ export default function HomePage() {
     const originalText = h1.textContent || "";
     // Wrap each character dynamically for measuring and visibility
     h1.innerHTML = originalText.split('').map((char, i) => 
-      `<span class="logo-letter-trigger" data-index="${i}" style="display: inline-block; position: relative; cursor: pointer; transition: opacity 0.2s; opacity: 1; visibility: visible !important; -webkit-text-fill-color: currentColor;">${char}</span>`
+      `<span class="logo-letter-trigger" data-index="${i}" style="display: inline-block; position: relative; cursor: pointer; transition: opacity 0.2s; opacity: 1; visibility: visible !important; background: linear-gradient(to top, #32CD32, #00FFFF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; color: #32CD32;">${char}</span>`
     ).join('');
 
     const handleLetterClick = (e: MouseEvent) => {
@@ -186,8 +186,10 @@ export default function HomePage() {
           transform: computed.transform, 
           transformOrigin: 'center',
           pointerEvents: 'auto',
-          color: '#32CD32', /* Forced visible fallback */
-          WebkitTextFillColor: 'currentColor', /* Ensure it doesn't stay transparent in overlay */
+          background: 'linear-gradient(to top, #32CD32, #00FFFF)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          color: '#32CD32',
         };
 
         const newFallen: FallenLetter = {
