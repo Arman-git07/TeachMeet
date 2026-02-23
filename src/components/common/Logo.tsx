@@ -1,4 +1,3 @@
-
 'use client';
 
 import { cn } from '@/lib/utils';
@@ -37,6 +36,8 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', ...props 
         filter: `drop-shadow(1px 1px 0px #228B22) 
                 drop-shadow(2px 2px 0px #008B8B) 
                 drop-shadow(4px 4px 10px rgba(50, 205, 50, 0.3))`,
+        opacity: 1,
+        visibility: 'visible',
       }}
       {...props}
     >

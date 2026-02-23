@@ -1,4 +1,3 @@
-
 'use client';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -145,15 +144,15 @@ export default function HomePage() {
     const h1 = wrapper.querySelector('h1');
     if (!h1) return;
 
-    // Ensure original text is visible initially
+    // Force visibility reset for the original h1
     h1.style.opacity = '1';
     h1.style.visibility = 'visible';
     h1.style.transform = 'none';
 
     const originalText = h1.textContent || "";
-    // Wrap each character dynamically for measuring
+    // Wrap each character dynamically for measuring and visibility
     h1.innerHTML = originalText.split('').map((char, i) => 
-      `<span class="logo-letter-trigger" data-index="${i}" style="display: inline-block; position: relative; cursor: pointer; transition: opacity 0.2s; opacity: 1; visibility: visible !important;">${char}</span>`
+      `<span class="logo-letter-trigger" data-index="${i}" style="display: inline-block; position: relative; cursor: pointer; transition: opacity 0.2s; opacity: 1; visibility: visible !important; -webkit-text-fill-color: currentColor;">${char}</span>`
     ).join('');
 
     const handleLetterClick = (e: MouseEvent) => {
@@ -183,18 +182,12 @@ export default function HomePage() {
           fontSize: computed.fontSize,
           fontWeight: computed.fontWeight,
           letterSpacing: computed.letterSpacing,
-          background: computed.background,
-          backgroundImage: computed.backgroundImage,
-          WebkitBackgroundClip: computed.webkitBackgroundClip,
-          WebkitTextFillColor: computed.webkitTextFillColor,
-          color: '#32CD32', /* Ensure visibility in overlay */
-          filter: computed.filter,
-          lineHeight: computed.lineHeight,
-          textTransform: computed.textTransform,
           display: 'inline-block',
           transform: computed.transform, 
           transformOrigin: 'center',
           pointerEvents: 'auto',
+          color: '#32CD32', /* Forced visible fallback */
+          WebkitTextFillColor: 'currentColor', /* Ensure it doesn't stay transparent in overlay */
         };
 
         const newFallen: FallenLetter = {
@@ -229,6 +222,7 @@ export default function HomePage() {
   };
 
   const handleDragEnd = (letter: FallenLetter, info: any) => {
+    // If close to original position (within 50px), snap back
     if (Math.abs(info.offset.y + letter.fallY) < 50) {
       setFallenLetters(prev => prev.filter(l => l.id !== letter.id));
       setFallenIndices(prev => {
@@ -534,7 +528,7 @@ export default function HomePage() {
                   <span style={letter.style}>{letter.char}</span>
                   
                   {!letter.isDragging && (
-                    <div className="absolute top-[-35px] left-1/2 -translate-x-1/2 px-3 py-1 bg-gradient-to-br from-white to-[#ececec] rounded-full text-[10px] font-bold text-gray-800 shadow-lg whitespace-nowrap pointer-events-none border border-white/50">
+                    <div className="absolute top-[-35px] left-1/2 -translate-x-1/2 px-3 py-1 bg-gradient-to-br from-white to-[#ececec] rounded-full text-[10px] font-bold text-gray-800 shadow-lg whitespace-nowrap pointer-events-none border border-white/50 animate-fade-in">
                       Pick me up!
                     </div>
                   )}
