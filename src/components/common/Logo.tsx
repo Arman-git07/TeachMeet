@@ -1,3 +1,4 @@
+
 'use client';
 
 import { cn } from '@/lib/utils';
@@ -32,6 +33,7 @@ export function Logo({ className, size = 'medium', text = 'TeachMeet', ...props 
         background: 'linear-gradient(to top, #32CD32, #00FFFF)',
         WebkitBackgroundClip: 'text',
         WebkitTextFillColor: 'transparent',
+        color: '#32CD32', /* Fallback color for visibility */
         filter: `drop-shadow(1px 1px 0px #228B22) 
                 drop-shadow(2px 2px 0px #008B8B) 
                 drop-shadow(4px 4px 10px rgba(50, 205, 50, 0.3))`,

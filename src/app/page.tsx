@@ -1,5 +1,5 @@
+
 'use client';
-import { Logo } from '@/components/common/Logo';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
@@ -26,6 +26,7 @@ import { AppHeader } from '@/components/common/AppHeader';
 import { useAuth } from '@/hooks/useAuth';
 import { collection, query, where, onSnapshot, limit, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { Logo } from '@/components/common/Logo';
 
 export type ActivityItemType = 
   | 'meeting' 
@@ -79,7 +80,6 @@ interface FallenLetter {
 const DISMISSED_ITEMS_KEY_PREFIX = 'teachmeet-dismissed-items-';
 const STARTED_MEETINGS_KEY_PREFIX = 'teachmeet-started-meetings-';
 const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000;
-const TWENTY_FOUR_HOURS_IN_MS = 24 * 60 * 60 * 1000;
 
 const itemIcons: Record<ActivityItemType, React.ElementType> = {
   meeting: Video,
@@ -116,8 +116,7 @@ export default function HomePage() {
   
   const [activityChunks, setActivityChunks] = useState<Record<string, ActivityItem[]>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [validMeetings, setValidMeetings] = useState<Record<string, boolean>>({});
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [validMeetings] = useState<Record<string, boolean>>({});
   
   const [fallenLetters, setFallenLetters] = useState<FallenLetter[]>([]);
   const [showBubble, setShowBubble] = useState(false);
@@ -125,22 +124,15 @@ export default function HomePage() {
   
   const logoWrapperRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const activityCardRef = useRef<HTMLDivElement>(null);
   const bubbleDismissedRef = useRef(false);
 
   const managedSubsRef = useRef<Record<string, () => void>>({});
   const enrolledSubsRef = useRef<Record<string, () => void>>({});
-  const submissionSubsRef = useRef<Record<string, () => void>>({});
   const personalSubsRef = useRef<(() => void)[]>([]);
 
   const [allClassroomIds, setAllClassroomIds] = useState<Record<string, { title: string, role: 'teacher' | 'student' }>>({});
 
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 30000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Logo Animation Logic
+  // Logo Animation & Visibility Logic
   useEffect(() => {
     const isBubbleShown = sessionStorage.getItem('teachmeet-logo-bubble-shown');
     if (!isBubbleShown) {
@@ -153,10 +145,15 @@ export default function HomePage() {
     const h1 = wrapper.querySelector('h1');
     if (!h1) return;
 
+    // Ensure original text is visible initially
+    h1.style.opacity = '1';
+    h1.style.visibility = 'visible';
+    h1.style.transform = 'none';
+
     const originalText = h1.textContent || "";
-    // Wrap each character dynamically without breaking original component style
+    // Wrap each character dynamically for measuring
     h1.innerHTML = originalText.split('').map((char, i) => 
-      `<span class="logo-letter-trigger" data-index="${i}" style="display: inline-block; position: relative; cursor: pointer; transition: opacity 0.2s; opacity: 1;">${char}</span>`
+      `<span class="logo-letter-trigger" data-index="${i}" style="display: inline-block; position: relative; cursor: pointer; transition: opacity 0.2s; opacity: 1; visibility: visible !important;">${char}</span>`
     ).join('');
 
     const handleLetterClick = (e: MouseEvent) => {
@@ -164,7 +161,6 @@ export default function HomePage() {
       if (target.classList.contains('logo-letter-trigger')) {
         const index = parseInt(target.getAttribute('data-index') || '0');
         
-        // Prevent clicking already fallen letter
         if (target.style.opacity === '0') return;
 
         if (!bubbleDismissedRef.current) {
@@ -179,7 +175,6 @@ export default function HomePage() {
         if (!latestCard) return;
         const latestRect = latestCard.getBoundingClientRect();
 
-        // Calculate fall position
         const fallY = latestRect.top - letterRect.top - letterRect.height - 12;
 
         const computed = window.getComputedStyle(h1);
@@ -192,6 +187,7 @@ export default function HomePage() {
           backgroundImage: computed.backgroundImage,
           WebkitBackgroundClip: computed.webkitBackgroundClip,
           WebkitTextFillColor: computed.webkitTextFillColor,
+          color: '#32CD32', /* Ensure visibility in overlay */
           filter: computed.filter,
           lineHeight: computed.lineHeight,
           textTransform: computed.textTransform,
@@ -215,7 +211,11 @@ export default function HomePage() {
         };
 
         setFallenLetters(prev => [...prev, newFallen]);
-        setFallenIndices(prev => new Set(prev).add(index));
+        setFallenIndices(prev => {
+          const next = new Set(prev);
+          next.add(index);
+          return next;
+        });
         target.style.opacity = '0';
       }
     };
@@ -229,7 +229,6 @@ export default function HomePage() {
   };
 
   const handleDragEnd = (letter: FallenLetter, info: any) => {
-    // If distance to original < 50px
     if (Math.abs(info.offset.y + letter.fallY) < 50) {
       setFallenLetters(prev => prev.filter(l => l.id !== letter.id));
       setFallenIndices(prev => {
@@ -293,7 +292,6 @@ export default function HomePage() {
 
     Object.keys(allClassroomIds).forEach(classId => {
         const classInfo = allClassroomIds[classId];
-        
         const categories: {cat: ActivityItemType, col: string, order: string}[] = [
             { cat: 'assignment', col: 'assignments', order: 'dueDate' },
             { cat: 'material', col: 'materials', order: 'uploadedAt' },
@@ -499,7 +497,6 @@ export default function HomePage() {
                 >
                   <div className="relative bg-gradient-to-b from-white to-[#ececec] px-6 py-2 rounded-[28px] shadow-xl border border-white/20">
                     <span className="text-sm font-bold text-gray-700 whitespace-nowrap">Click it</span>
-                    {/* Pulsing Tail */}
                     <div className="absolute -bottom-3 right-6 w-6 h-6 animate-tail-pulse">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                         <path d="M0 0C0 12 12 24 24 24V0H0Z" fill="#ececec" />
@@ -512,7 +509,6 @@ export default function HomePage() {
 
             <Logo size="medium" />
             
-            {/* Overlay for falling letters */}
             <div ref={overlayRef} className="absolute inset-0 pointer-events-none z-50">
               {fallenLetters.map((letter) => (
                 <motion.div
@@ -537,7 +533,6 @@ export default function HomePage() {
                 >
                   <span style={letter.style}>{letter.char}</span>
                   
-                  {/* Pick me up bubble */}
                   {!letter.isDragging && (
                     <div className="absolute top-[-35px] left-1/2 -translate-x-1/2 px-3 py-1 bg-gradient-to-br from-white to-[#ececec] rounded-full text-[10px] font-bold text-gray-800 shadow-lg whitespace-nowrap pointer-events-none border border-white/50">
                       Pick me up!
@@ -550,7 +545,6 @@ export default function HomePage() {
 
           <div 
             id="latest-activity" 
-            ref={activityCardRef}
             className="mt-8 p-6 bg-card/50 backdrop-blur-sm rounded-xl shadow-lg w-full max-w-md border border-border/50"
           >
             <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center justify-center">
