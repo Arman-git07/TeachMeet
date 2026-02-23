@@ -1,4 +1,3 @@
-
 'use client';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -490,7 +489,7 @@ export default function HomePage() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
                   className="absolute z-[60]"
-                  style={{ top: '-27px', left: '-60px' }}
+                  style={{ top: '-45px', left: '-60px' }}
                 >
                   <div className="relative bg-gradient-to-b from-white to-[#ececec] px-6 py-2 rounded-[28px] shadow-xl border border-white/20">
                     <span className="text-sm font-bold text-gray-700 whitespace-nowrap">Click it</span>
