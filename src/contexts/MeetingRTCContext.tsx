@@ -6,6 +6,7 @@ import type { MeshRTC } from '@/lib/webrtc/mesh';
 interface RecordingControls {
   start: () => Promise<void>;
   stop: (destination: 'private' | 'public') => Promise<void>;
+  discard: () => Promise<void>;
 }
 
 interface MeetingRTCContextType {
@@ -31,6 +32,7 @@ export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
   const [recordingControls, setRecordingControls] = useState<RecordingControls>({
     start: async () => console.warn('startRecording not implemented'),
     stop: async (destination) => console.warn('stopRecording not implemented'),
+    discard: async () => console.warn('discardRecording not implemented'),
   });
 
   return (

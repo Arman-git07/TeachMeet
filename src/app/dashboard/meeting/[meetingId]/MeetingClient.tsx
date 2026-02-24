@@ -100,6 +100,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingStartRef = useRef<number>(0);
   const saveDestinationRef = useRef<'private' | 'public'>('private');
+  const shouldDiscardRef = useRef<boolean>(false);
 
   const unlockAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
@@ -220,6 +221,13 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         };
 
         mediaRecorderRef.current.onstop = async () => {
+          if (shouldDiscardRef.current) {
+            shouldDiscardRef.current = false;
+            recordedChunksRef.current = [];
+            setIsRecording(false);
+            return;
+          }
+
           setIsUploading(true);
           const toastId = toast({ title: 'Processing Recording...', duration: Infinity });
 
@@ -268,6 +276,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
   const stopRecording = useCallback(async (destination: 'private' | 'public') => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+          shouldDiscardRef.current = false;
           saveDestinationRef.current = destination;
           mediaRecorderRef.current.stop();
           setIsRecording(false);
@@ -275,9 +284,18 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       }
   }, [setIsRecording, toast]);
 
+  const discardRecording = useCallback(async () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+          shouldDiscardRef.current = true;
+          mediaRecorderRef.current.stop();
+          setIsRecording(false);
+          toast({ title: 'Recording Discarded', description: 'The current recording has been deleted.' });
+      }
+  }, [setIsRecording, toast]);
+
   useEffect(() => {
-    setRecordingControls({ start: startRecording, stop: stopRecording });
-  }, [setRecordingControls, startRecording, stopRecording]);
+    setRecordingControls({ start: startRecording, stop: stopRecording, discard: discardRecording });
+  }, [setRecordingControls, startRecording, stopRecording, discardRecording]);
 
   useEffect(() => {
     const fetchMeetingCreator = async () => {
@@ -728,7 +746,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
               drag
               dragConstraints={mainContainerRef}
               dragMomentum={false}
-              className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing"
+              className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing"
             >
               <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} className="w-full h-full" onDoubleClick={() => togglePin(localParticipant.id)} onUnpin={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} draggable={true} />
             </motion.div>
@@ -788,7 +806,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
               </Link>
             </div>
           </div>
-          <motion.div drag dragConstraints={mainContainerRef} dragMomentum={false} className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-30">
+          <motion.div drag dragConstraints={mainContainerRef} dragMomentum={false} className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-30">
             <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} className="w-full h-full" onDoubleClick={() => togglePin(localParticipant.id)} onUnpin={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} draggable={true} />
           </motion.div>
         </div>

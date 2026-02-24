@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -13,17 +12,18 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Mail, Lock, Globe, Loader2 } from 'lucide-react';
+import { Mail, Lock, Globe, Loader2, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 interface SaveRecordingDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onSave: (destination: 'private' | 'public') => void;
+  onDiscard: () => void;
   isSaving: boolean;
 }
 
-export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, isSaving }: SaveRecordingDialogProps) {
+export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, onDiscard, isSaving }: SaveRecordingDialogProps) {
   const [destination, setDestination] = useState<'private' | 'public'>('private');
 
   const handleSave = () => {
@@ -72,9 +72,17 @@ export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, isSaving }: 
              </p>
           </div>
         </div>
-        <DialogFooter>
-          <DialogClose asChild><Button type="button" variant="ghost" disabled={isSaving}>Cancel</Button></DialogClose>
-          <Button type="button" onClick={handleSave} disabled={isSaving} className="btn-gel">
+        <DialogFooter className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-1 gap-2">
+            <DialogClose asChild>
+              <Button type="button" variant="ghost" className="flex-1 rounded-lg" disabled={isSaving}>Cancel</Button>
+            </DialogClose>
+            <Button type="button" variant="destructive" className="flex-1 rounded-lg" onClick={onDiscard} disabled={isSaving}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Discard
+            </Button>
+          </div>
+          <Button type="button" onClick={handleSave} disabled={isSaving} className="btn-gel rounded-lg px-8">
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
             {isSaving ? 'Saving...' : 'Save Recording'}
           </Button>

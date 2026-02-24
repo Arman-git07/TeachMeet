@@ -258,6 +258,10 @@ function MeetingPageContent() {
               recordingControls.stop(destination);
               setIsSaveRecordingDialogOpen(false);
             }}
+            onDiscard={() => {
+              recordingControls.discard();
+              setIsSaveRecordingDialogOpen(false);
+            }}
             isSaving={isUploading}
           />
         </>
