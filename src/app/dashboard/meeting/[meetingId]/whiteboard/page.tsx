@@ -24,7 +24,7 @@ import {
   DialogTitle as ShadDialogTitle,
   DialogClose,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline, FileDown, Loader2, Lock, Globe, Camera, UserCheck } from "lucide-react";
+import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline, FileDown, Loader2, Lock, Globe, Camera } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -47,10 +47,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import jsPDF from 'jspdf';
 import { auth, storage, db } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
-import { io, Socket } from "socket.io-client";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Switch } from "@/components/ui/switch";
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 
 // --- Type Definitions ---
@@ -76,13 +73,6 @@ type OperationState =
   | { type: 'texting'; position: Point }
   | { type: 'lassoing'; lassoPath: Point[] }
   | { type: 'dragging'; startPos: Point; originalElements: Map<string, WhiteboardElement> };
-  
-interface Participant {
-  id: string;
-  name: string;
-  photoURL?: string;
-  isHost?: boolean;
-}
 
 // --- Constants ---
 const MAX_HISTORY_STEPS = 50;
@@ -171,56 +161,14 @@ const ToolButton = React.memo(({ icon: Icon, label, onClick, isActive = false, d
 ));
 ToolButton.displayName = "ToolButton";
 
-const CollaborateDialogContent = ({ participants, drawingPermissions, onPermissionChange }: { participants: Participant[], drawingPermissions: Record<string, boolean>, onPermissionChange: (id: string, canDraw: boolean) => void }) => {
-    return (
-        <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-                <ShadDialogTitle>Whiteboard Collaboration</ShadDialogTitle>
-                <DialogDescription>
-                    Allow others in the meeting to draw on your whiteboard. Only one person can draw at a time.
-                </DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="max-h-64">
-                <div className="space-y-2 p-1">
-                    {participants.map((p) => (
-                        <div key={p.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted">
-                            <div className="flex items-center gap-3">
-                                <Avatar className="h-9 w-9">
-                                    <AvatarImage src={p.photoURL} data-ai-hint="avatar user"/>
-                                    <AvatarFallback>{p.name.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <div>
-                                    <p className="text-sm font-medium">{p.name}</p>
-                                    <p className="text-xs text-muted-foreground">{p.isHost ? "Host (You)" : "Participant"}</p>
-                                </div>
-                            </div>
-                            {!p.isHost && (
-                                <Switch
-                                    checked={!!drawingPermissions[p.id]}
-                                    onCheckedChange={(checked) => onPermissionChange(p.id, checked)}
-                                    aria-label={`Allow ${p.name} to draw`}
-                                />
-                            )}
-                        </div>
-                    ))}
-                </div>
-            </ScrollArea>
-        </DialogContent>
-    );
-};
-
 export default function WhiteboardPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const topic = searchParams.get('topic');
-  const cam = searchParams.get('cam');
-  const mic = searchParams.get('mic');
   const meetingId = params.meetingId as string;
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   const { toast } = useToast();
-  
-  const socketRef = useRef<Socket | null>(null);
 
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
   const tempCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -254,10 +202,6 @@ export default function WhiteboardPage() {
 
   const [isRefineDialogOpen, setIsRefineDialogOpen] = useState(false);
   const [refinePrompt, setRefinePrompt] = useState("");
-
-  const [participants, setParticipants] = useState<Participant[]>([]);
-  const [drawingPermissions, setDrawingPermissions] = useState<Record<string, boolean>>({});
-  const [canIDraw, setCanIDraw] = useState(true); // Default to true, managed by host
 
 
   useEffect(() => {
@@ -502,36 +446,39 @@ export default function WhiteboardPage() {
   const finalizeLiveText = useCallback(() => {
     const opState = operationStateRef.current;
     if (opState.type !== 'texting') return;
-
     const textInput = liveTextInputRef.current;
-    if (!textInput) return;
-    
-    if (textInput.value.trim()) {
-        const tempCtx = tempCanvasRef.current!.getContext('2d')!;
-        const font = getFontString();
-        tempCtx.font = font;
-        const lines = textInput.value.split('\n');
-        const textMetrics = lines.map(line => tempCtx.measureText(line));
-        const maxWidth = Math.max(...textMetrics.map(m => m.width));
-        const totalHeight = lines.length * (fontSize * 1.2);
-        
-        const newTextElement: TextElement = { type: 'text', id: `text_${Date.now()}`, text: textInput.value, x: opState.position.x, y: opState.position.y, color: selectedColor, font, width: maxWidth, height: totalHeight };
-        
-        setPages(currentPages => {
-            const newPages = [...currentPages];
-            const currentPage = newPages[currentPageIndex];
-            const newElements = [...currentPage.elements, newTextElement];
-            const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set() };
-            newPages[currentPageIndex] = updatedPage;
-            pushToHistory(currentPageIndex, updatedPage);
-            return newPages;
-        });
+    if (!textInput || !textInput.value.trim()) {
+      if (textInput) textInput.style.display = 'none';
+      operationStateRef.current = { type: 'idle' };
+      return;
     }
+    
+    const tempCtx = tempCanvasRef.current?.getContext('2d');
+    if(!tempCtx) return;
+    
+    const font = getFontString();
+    tempCtx.font = font;
+    const lines = textInput.value.split('\n');
+    const textMetrics = lines.map(line => tempCtx.measureText(line));
+    const maxWidth = Math.max(...textMetrics.map(m => m.width));
+    const totalHeight = lines.length * (fontSize * 1.2);
+    
+    const newTextElement: TextElement = { type: 'text', id: `text_${Date.now()}`, text: textInput.value, x: opState.position.x, y: opState.position.y, color: selectedColor, font, width: maxWidth, height: totalHeight };
+    
+    setPages(currentPages => {
+        const newPages = [...currentPages];
+        const currentPage = newPages[currentPageIndex];
+        const newElements = [...currentPage.elements, newTextElement];
+        const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set() };
+        newPages[currentPageIndex] = updatedPage;
+        pushToHistory(currentPageIndex, updatedPage);
+        return newPages;
+    });
 
     textInput.value = '';
     textInput.style.display = 'none';
     operationStateRef.current = { type: 'idle' };
-  }, [selectedColor, pushToHistory, getFontString, currentPageIndex, fontSize, fontFamily]);
+  }, [selectedColor, pushToHistory, getFontString, currentPageIndex, fontSize]);
   
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -555,20 +502,13 @@ export default function WhiteboardPage() {
   }, [handleDeleteSelected, pages, currentPageIndex]);
 
   const handlePointerDown = useCallback((event: React.PointerEvent) => {
-    if (event.buttons !== 1 || !canIDraw) return;
-    
-    if (activeTool === 'text' && event.target === liveTextInputRef.current) {
-        return;
-    }
+    if (event.buttons !== 1) return;
+    const pos = getPointerPosition(event);
 
-    if (operationStateRef.current.type === 'texting') {
-      finalizeLiveText();
-    }
-    
+    finalizeLiveText();
     setIsDrawPanelVisible(false);
     setIsTextPanelVisible(false);
 
-    const pos = getPointerPosition(event);
     const currentPage = pages[currentPageIndex];
 
     if (activeTool === 'select' || activeTool === 'lasso') {
@@ -633,7 +573,6 @@ export default function WhiteboardPage() {
     switch(activeTool) {
         case 'draw':
             operationStateRef.current = { type: 'drawing', currentPath: [pos] };
-            socketRef.current?.emit('draw', { type: 'start', point: pos, tool: activeTool, color: selectedColor, lineWidth });
             break;
         case 'shape':
             operationStateRef.current = { type: 'shaping', startPoint: pos, currentPoint: pos };
@@ -641,33 +580,30 @@ export default function WhiteboardPage() {
         case 'text':
             operationStateRef.current = { type: 'texting', position: pos };
             if (liveTextInputRef.current) {
-                const input = liveTextInputRef.current;
-                input.style.top = `${pos.y}px`;
-                input.style.left = `${pos.x}px`;
-                input.style.display = 'block';
-                input.style.color = selectedColor;
-                input.style.font = getFontString();
-                input.style.lineHeight = `${fontSize * 1.2}px`;
-                input.style.height = 'auto'; // Reset height
-                input.style.width = 'auto'; // Reset width
-                input.style.minWidth = '50px';
-                setTimeout(() => input.focus(), 0);
+                liveTextInputRef.current.style.top = `${pos.y}px`;
+                liveTextInputRef.current.style.left = `${pos.x}px`;
+                liveTextInputRef.current.style.display = 'block';
+                liveTextInputRef.current.style.color = selectedColor;
+                liveTextInputRef.current.style.font = getFontString();
+                liveTextInputRef.current.style.lineHeight = `${fontSize * 1.2}px`;
+                liveTextInputRef.current.style.height = 'auto';
+                liveTextInputRef.current.style.width = 'auto';
+                liveTextInputRef.current.focus();
             }
             break;
         case 'erase':
             break;
     }
-  }, [getPointerPosition, activeTool, selectedColor, pages, currentPageIndex, finalizeLiveText, getFontString, fontSize, fontFamily, canIDraw]);
+  }, [getPointerPosition, activeTool, selectedColor, pages, currentPageIndex, finalizeLiveText, getFontString, fontSize, fontFamily]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent) => {
-    if (event.buttons !== 1 || !canIDraw) return;
+    if (event.buttons !== 1) return;
     const pos = getPointerPosition(event);
     const opState = operationStateRef.current;
 
     if (opState.type === 'drawing') {
         opState.currentPath.push(pos);
         redrawTempCanvas();
-        socketRef.current?.emit('draw', { type: 'move', point: pos });
     } else if (opState.type === 'shaping') {
         opState.currentPoint = pos;
         redrawTempCanvas();
@@ -692,17 +628,12 @@ export default function WhiteboardPage() {
         }
         setTempDragPreview(draggedElements);
     }
-  }, [getPointerPosition, redrawTempCanvas, canIDraw]);
+  }, [getPointerPosition, redrawTempCanvas]);
 
   const handlePointerUp = useCallback((event: React.PointerEvent) => {
     const opState = operationStateRef.current;
-
-    if (opState.type === 'texting') {
-      return;
-    }
-
+    
     if (opState.type === 'drawing' && opState.currentPath.length > 1) {
-        socketRef.current?.emit('draw', { type: 'end' });
         const newPath: PathElement = { type: 'path', id: `path_${Date.now()}`, points: opState.currentPath, color: selectedColor, lineWidth };
         setPages(currentPages => {
             const newPages = [...currentPages];
@@ -786,7 +717,7 @@ export default function WhiteboardPage() {
         setTempDragPreview([]);
     }
     
-    if (activeTool === 'erase' && opState.type === 'idle' && canIDraw) {
+    if (activeTool === 'erase' && opState.type === 'idle') {
          let elementToDeleteId: string | null = null;
          const pos = getPointerPosition(event);
          const currentPageElements = pages[currentPageIndex].elements;
@@ -823,14 +754,11 @@ export default function WhiteboardPage() {
         }
     }
 
-    if (opState.type !== 'texting') {
-        operationStateRef.current = { type: 'idle' };
-    }
-    
+    operationStateRef.current = { type: 'idle' };
     const tempCtx = tempCanvasRef.current?.getContext('2d');
     if (tempCtx) tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
 
-  }, [getPointerPosition, selectedColor, lineWidth, pages, currentPageIndex, activeTool, pushToHistory, selectedShape, canIDraw]);
+  }, [getPointerPosition, selectedColor, lineWidth, pages, currentPageIndex, activeTool, pushToHistory, selectedShape]);
 
   const handleClearPage = () => { 
     const clearedPage: ElementState = { elements: [], selectedElementIds: new Set() };
@@ -917,7 +845,8 @@ export default function WhiteboardPage() {
     setIsPagesPopoverOpen(false);
   };
   
-  const handleRecognizeShape = useCallback(async () => {
+  const handleRecognizeShape = async () => {
+    // This will be called by the dialog action, so we close it here.
     setIsRefineDialogOpen(false);
     
     const currentPage = pages[currentPageIndex];
@@ -926,18 +855,20 @@ export default function WhiteboardPage() {
         title: "Nothing to Refine",
         description: "Please select a drawing first using the select tool.",
       });
-      setRefinePrompt('');
+      setRefinePrompt(''); // Also clear prompt on error
       return;
     }
   
     const selectionBox = getSelectionBoundingBox(currentPage.elements, currentPage.selectedElementIds);
     if (!selectionBox) {
       toast({ variant: "destructive", title: "Error", description: "Could not determine selection area." });
-      setRefinePrompt('');
+      setRefinePrompt(''); // Also clear prompt on error
       return;
     }
   
-    const recognitionToast = toast({
+    const recognitionToastId = `recognize-${Date.now()}`;
+    toast({
+      id: recognitionToastId,
       title: "Refining Shape...",
       description: "The AI is analyzing your drawing. This might take a moment.",
       duration: Infinity,
@@ -952,11 +883,12 @@ export default function WhiteboardPage() {
     tempCanvas.height = height;
     const tempCtx = tempCanvas.getContext('2d');
     if (!tempCtx) {
-      recognitionToast.update({ id: recognitionToast.id, variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
-      setRefinePrompt('');
+      toast.update(recognitionToastId, { variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
+      setRefinePrompt(''); // Also clear prompt on error
       return;
     }
   
+    // Fill with a solid white background, as transparent can be problematic for some models
     tempCtx.fillStyle = 'white';
     tempCtx.fillRect(0, 0, width, height);
   
@@ -1015,23 +947,23 @@ export default function WhiteboardPage() {
           return newPages;
         });
   
-        recognitionToast.update({ id: recognitionToast.id, title: "Shape Refined!", description: "Your drawing has been transformed." });
+        toast.update(recognitionToastId, { title: "Shape Refined!", description: "Your drawing has been transformed." });
       };
       newImg.onerror = () => {
-        recognitionToast.update({ id: recognitionToast.id, variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
+        toast.update(recognitionToastId, { variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
       };
       newImg.src = result.refinedImageUri;
     } catch (error) {
       console.error("Shape recognition failed:", error);
-      recognitionToast.update({ id: recognitionToast.id, 
+      toast.update(recognitionToastId, {
         variant: "destructive",
         title: "Refinement Failed",
         description: error instanceof Error ? error.message : "An unknown error occurred.",
       });
     } finally {
-        setRefinePrompt('');
+        setRefinePrompt(''); // Reset prompt after use
     }
-  }, [pages, currentPageIndex, toast, refinePrompt, drawElement, pushToHistory]);
+  };
 
   const getCanvasAsBlob = async (): Promise<Blob | null> => {
     const canvas = mainCanvasRef.current;
@@ -1061,8 +993,8 @@ export default function WhiteboardPage() {
     setIsScreenshotDialogOpen(false);
     if (isProcessing) return;
     setIsProcessing(true);
-    
-    const toastResult = toast({ title: "Saving Screenshot...", description: "Please wait...", duration: Infinity });
+    const toastId = `screenshot-save-${Date.now()}`;
+    toast({ id: toastId, title: "Saving Screenshot...", description: "Please wait...", duration: Infinity });
     
     try {
       const blob = await getCanvasAsBlob();
@@ -1088,11 +1020,11 @@ export default function WhiteboardPage() {
           createdAt: serverTimestamp(),
       });
       
-      toastResult.update({ id: toastResult.id, title: "Screenshot Saved!", description: `Saved to your ${destination} documents.` });
+      toast({ id: toastId, title: "Screenshot Saved!", description: `Saved to your ${destination} documents.` });
 
     } catch (error) {
       console.error("Failed to save screenshot:", error);
-      toastResult.update({ id: toastResult.id, variant: "destructive", title: "Save Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
+      toast({ id: toastId, variant: "destructive", title: "Save Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
     } finally {
       setIsProcessing(false);
     }
@@ -1104,7 +1036,9 @@ export default function WhiteboardPage() {
     setIsProcessing(true);
     setIsPagesPopoverOpen(false);
 
-    const exportToast = toast({
+    const exportToastId = `export-${Date.now()}`;
+    toast({
+        id: exportToastId,
         title: "Exporting to PDF...",
         description: "Please wait while your whiteboard is being converted.",
         duration: Infinity
@@ -1113,7 +1047,7 @@ export default function WhiteboardPage() {
     const offscreenCanvas = document.createElement('canvas');
     const mainCanvas = mainCanvasRef.current;
     if (!mainCanvas) {
-        exportToast.update({ id: exportToast.id, variant: "destructive", title: "Export Failed", description: "Canvas element not found." });
+        toast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: "Canvas element not found." });
         setIsProcessing(false);
         return;
     }
@@ -1122,7 +1056,7 @@ export default function WhiteboardPage() {
     offscreenCanvas.height = mainCanvas.height;
     const offscreenCtx = offscreenCanvas.getContext('2d');
     if (!offscreenCtx) {
-        exportToast.update({ id: exportToast.id, variant: "destructive", title: "Export Failed", description: "Could not create offscreen canvas context." });
+        toast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: "Could not create offscreen canvas context." });
         setIsProcessing(false);
         return;
     }
@@ -1135,7 +1069,7 @@ export default function WhiteboardPage() {
 
     try {
         for (let i = 0; i < pages.length; i++) {
-            exportToast.update({ id: exportToast.id, title: "Exporting to PDF...", description: `Processing page ${i + 1} of ${pages.length}...` });
+            toast({ id: exportToastId, title: "Exporting to PDF...", description: `Processing page ${i + 1} of ${pages.length}...` });
             
             offscreenCtx.fillStyle = bgColor;
             offscreenCtx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
@@ -1173,124 +1107,70 @@ export default function WhiteboardPage() {
             createdAt: serverTimestamp(),
         });
 
-        exportToast.update({ id: exportToast.id, title: "Export Successful!", description: `Your whiteboard has been saved to your ${destination} documents.` });
+        toast({ id: exportToastId, title: "Export Successful!", description: `Your whiteboard has been saved to your ${destination} documents.` });
         
     } catch (error) {
         console.error("PDF Export or Upload Failed:", error);
-        exportToast.update({ id: exportToast.id, variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred during export." });
+        toast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred during export." });
     } finally {
         setIsProcessing(false);
     }
 };
 
-  const memoizedHeaderAction = useCallback(() => (
-    <Dialog>
-      <div className="flex items-center gap-2">
-        {meetingId && (
-          <Button asChild variant="outline" size="sm" className="rounded-lg">
-            <Link href={`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic || '')}&cam=${cam}&mic=${mic}`}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Link>
-          </Button>
-        )}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full">
-              <MoreVertical className="h-5 w-5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="rounded-xl">
-            <DialogTrigger asChild>
-              <DropdownMenuItem onSelect={e => e.preventDefault()} className="cursor-pointer">
-                <UserCheck className="mr-2 h-4 w-4" />
-                <span>Collaborate</span>
-              </DropdownMenuItem>
-            </DialogTrigger>
-            <DropdownMenuItem onSelect={() => setIsScreenshotDialogOpen(true)} className="cursor-pointer">
-              <Camera className="mr-2 h-4 w-4" />
-              <span>Screenshot</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`)} className="cursor-pointer">
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Whiteboard Settings</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      <CollaborateDialogContent
-          participants={participants}
-          drawingPermissions={drawingPermissions}
-          onPermissionChange={handlePermissionChange}
-      />
-    </Dialog>
-  ), [meetingId, router, topic, participants, drawingPermissions, cam, mic]);
-  
+
   useEffect(() => {
     const newInitialPage = { elements: [], selectedElementIds: new Set() };
     setPages([newInitialPage]);
     pagesHistoryRef.current = [[newInitialPage]];
     pagesHistoryStepRef.current = [0];
 
-    // --- Socket.IO Connection ---
-    if (meetingId && auth.currentUser) {
-      const whiteboardRoomId = `whiteboard-owner-${auth.currentUser.uid}`;
-      const socket = io({
-        path: "/api/socketio",
-        query: { userId: auth.currentUser.uid }
-      });
-      socketRef.current = socket;
-
-      socket.on('connect', () => {
-        socket.emit('join-room', whiteboardRoomId);
-        console.log(`Whiteboard owner joined own room: ${whiteboardRoomId}`);
-      });
-      
-      socket.on('draw-from-collaborator', (data) => {
-        // Here, the owner receives drawing data from a collaborator and draws it locally.
-        console.log('Received draw event from collaborator:', data);
-        // This part needs logic to draw the received data, possibly on a temporary canvas layer for collaborators.
-        // For now, we'll just log it.
-      });
-      
-      const unsubParticipants = onSnapshot(collection(db, "meetings", meetingId, "participants"), (snapshot) => {
-          const fetchedParticipants: Participant[] = [];
-          snapshot.forEach((doc) => {
-              fetchedParticipants.push({ id: doc.id, ...doc.data() } as Participant);
-          });
-          setParticipants(fetchedParticipants);
-      });
-
-      return () => {
-        console.log('[Whiteboard] Disconnecting socket...');
-        socket.disconnect();
-        unsubParticipants();
-      };
-    }
-  }, [meetingId]);
-  
-  const handlePermissionChange = (participantId: string, canDraw: boolean) => {
-    setDrawingPermissions(prev => {
-        const newPermissions = {...prev, [participantId]: canDraw };
-        socketRef.current?.emit('set-permission', { ownerId: auth.currentUser?.uid, participantId, canDraw });
-        return newPermissions;
-    });
-  };
-  
-  useEffect(() => {
     setHeaderContent(
         <div className="flex items-center gap-3">
           <Brush className="h-7 w-7 text-primary" />
           <h1 className="text-xl font-semibold truncate">Whiteboard</h1>
         </div>
     );
-    setHeaderAction(memoizedHeaderAction());
+    setHeaderAction(
+        <div className="flex items-center gap-2">
+            {meetingId && (
+              <Button asChild variant="outline" size="sm" className="rounded-lg">
+                <Link href={`/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic || '')}`}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Link>
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-full">
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="rounded-xl">
+                <DropdownMenuItem
+                    onSelect={() => setIsScreenshotDialogOpen(true)}
+                    className="cursor-pointer"
+                  >
+                    <Camera className="mr-2 h-4 w-4" />
+                    <span>Screenshot</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`)}
+                  className="cursor-pointer"
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Whiteboard Settings</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
+    );
 
     return () => {
         setHeaderContent(null);
         setHeaderAction(null);
     };
-  }, [setHeaderContent, setHeaderAction, memoizedHeaderAction]);
+  }, [setHeaderContent, setHeaderAction, meetingId, router, topic]);
 
 
   return (
@@ -1369,17 +1249,17 @@ export default function WhiteboardPage() {
               </Card>
             )}
              <ToolButton icon={Lasso} label="Select" onClick={() => handleNonDrawingToolSelect("lasso")} isActive={activeTool === "lasso" || activeTool === "select"}/>
-             <Dialog open={isRefineDialogOpen} onOpenChange={setIsRefineDialogOpen}>
-              <DialogTrigger asChild>
+             <AlertDialog open={isRefineDialogOpen} onOpenChange={setIsRefineDialogOpen}>
+              <AlertDialogTrigger asChild>
                 <ToolButton icon={Sparkles} label="Refine" disabled={pages[currentPageIndex]?.selectedElementIds.size === 0} />
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <ShadDialogTitle>Refine Your Drawing</ShadDialogTitle>
-                  <DialogDescription>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Refine Your Drawing</AlertDialogTitle>
+                  <AlertDialogDescription>
                     Optionally, tell the AI what you drew to get a better result.
-                  </DialogDescription>
-                </DialogHeader>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
                 <div className="py-2">
                   <Label htmlFor="refine-prompt" className="text-sm text-muted-foreground">What did you draw? (e.g., "a bird", "a house")</Label>
                   <Input
@@ -1396,14 +1276,12 @@ export default function WhiteboardPage() {
                     }}
                   />
                 </div>
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <Button type="button" variant="secondary" onClick={() => setRefinePrompt('')}>Cancel</Button>
-                  </DialogClose>
-                  <Button type="button" onClick={handleRecognizeShape}>Refine</Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setRefinePrompt('')}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleRecognizeShape}>Refine</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
              <ToolButton icon={Type} label="Text" onClick={handleTextButtonClick} isActive={activeTool === "text"}/>
              {isTextPanelVisible && (
                 <Card className="absolute top-full mt-2 w-[320px] p-4 rounded-xl z-30 bg-popover text-popover-foreground shadow-lg border left-1/2 -translate-x-1/2">
@@ -1508,7 +1386,10 @@ export default function WhiteboardPage() {
 
              <AlertDialog>
                 <AlertDialogTrigger asChild>
-                    <ToolButton icon={Trash2} label="Clear" />
+                    <Button variant="outline" size="icon" className="rounded-lg w-12 h-12 flex flex-col items-center justify-center text-xs" aria-label="Clear Page">
+                        <Trash2 className="h-5 w-5 mb-0.5" />
+                        <span className="text-[10px] leading-tight">Clear</span>
+                    </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent className="rounded-xl"><AlertDialogHeader><AlertDialogTitle>Clear this page?</AlertDialogTitle><AlertDialogDescription>This will clear the current page. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearPage} className="rounded-lg">Clear Page</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
              </AlertDialog>
@@ -1518,7 +1399,7 @@ export default function WhiteboardPage() {
         <main className="flex-grow flex flex-col overflow-hidden min-h-0">
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
             <CardContent className="flex-grow flex items-center justify-center relative p-0">
-                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 1, backgroundColor: bgColor }} />
+                <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 1 }} />
                 <canvas 
                     ref={tempCanvasRef} 
                     onPointerDown={handlePointerDown} 
@@ -1552,7 +1433,7 @@ export default function WhiteboardPage() {
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button type="button" variant="secondary" className="rounded-lg" disabled={isProcessing}>Cancel</Button>
+              <Button type="button" variant="ghost" className="rounded-lg" disabled={isProcessing}>Cancel</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
@@ -1571,7 +1452,7 @@ export default function WhiteboardPage() {
             <Dialog>
               <DialogTrigger asChild>
                  <Button variant="outline" className="w-full rounded-lg py-6 text-base" disabled={isProcessing}>
-                   <Globe className="mr-2 h-5 w-5" /> Save to Documents
+                   <Globe className="mr-2 h-4 w-4" /> Save to Documents
                  </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-xs rounded-xl">
@@ -1592,7 +1473,7 @@ export default function WhiteboardPage() {
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button type="button" variant="secondary" className="w-full rounded-lg" disabled={isProcessing}>Cancel</Button>
+              <Button type="button" variant="ghost" className="w-full rounded-lg" disabled={isProcessing}>Cancel</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
