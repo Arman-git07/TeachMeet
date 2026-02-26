@@ -32,6 +32,12 @@ export interface Recording {
   createdAt?: any;
 }
 
+interface RecordingControls {
+  start: () => Promise<void>;
+  stop: (destination: 'private' | 'public' | 'device') => Promise<void>;
+  discard: () => Promise<void>;
+}
+
 
 function MeetingPageContent() {
   const params = useParams();

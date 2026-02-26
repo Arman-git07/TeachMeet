@@ -12,19 +12,19 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Mail, Lock, Globe, Loader2, Trash2 } from 'lucide-react';
+import { Mail, Lock, Globe, Loader2, Trash2, FileDown } from 'lucide-react';
 import { useState } from 'react';
 
 interface SaveRecordingDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (destination: 'private' | 'public') => void;
+  onSave: (destination: 'private' | 'public' | 'device') => void;
   onDiscard: () => void;
   isSaving: boolean;
 }
 
 export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, onDiscard, isSaving }: SaveRecordingDialogProps) {
-  const [destination, setDestination] = useState<'private' | 'public'>('private');
+  const [destination, setDestination] = useState<'private' | 'public' | 'device'>('private');
 
   const handleSave = () => {
     onSave(destination);
@@ -48,7 +48,7 @@ export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, onDiscard, i
         <div className="py-4 space-y-6">
           <div className="space-y-3">
             <Label className="font-semibold">1. Choose Save Destination</Label>
-            <RadioGroup value={destination} onValueChange={(value) => setDestination(value as 'private' | 'public')}>
+            <RadioGroup value={destination} onValueChange={(value) => setDestination(value as 'private' | 'public' | 'device')}>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="private" id="r-private" />
                 <Label htmlFor="r-private" className="flex items-center gap-2 cursor-pointer"><Lock className="h-4 w-4 text-primary" /> Private (Only you can see)</Label>
@@ -56,6 +56,10 @@ export function SaveRecordingDialog({ isOpen, onOpenChange, onSave, onDiscard, i
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="public" id="r-public" />
                 <Label htmlFor="r-public" className="flex items-center gap-2 cursor-pointer"><Globe className="h-4 w-4 text-accent" /> Public (Visible to others)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="device" id="r-device" />
+                <Label htmlFor="r-device" className="flex items-center gap-2 cursor-pointer"><FileDown className="h-4 w-4 text-secondary" /> Download to Device</Label>
               </div>
             </RadioGroup>
           </div>

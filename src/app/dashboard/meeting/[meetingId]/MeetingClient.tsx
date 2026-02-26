@@ -99,7 +99,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const recordingStartRef = useRef<number>(0);
-  const saveDestinationRef = useRef<'private' | 'public'>('private');
+  const saveDestinationRef = useRef<'private' | 'public' | 'device'>('private');
   const shouldDiscardRef = useRef<boolean>(false);
 
   const unlockAudio = useCallback(() => {
@@ -228,6 +228,26 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
             return;
           }
 
+          const destination = saveDestinationRef.current;
+
+          if (destination === 'device') {
+            const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `rec_${topic.replace(/\s/g, '_')}_${new Date().toISOString()}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+              document.body.removeChild(a);
+              window.URL.revokeObjectURL(url);
+            }, 100);
+            setIsRecording(false);
+            toast({ title: 'Recording Saved', description: 'The video has been downloaded to your device.' });
+            return;
+          }
+
           setIsUploading(true);
           const toastId = toast({ title: 'Processing Recording...', duration: Infinity });
 
@@ -237,7 +257,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
             const durationStr = new Date(durationMs).toISOString().substr(11, 8);
 
             const fileName = `rec_${topic.replace(/\s/g, '_')}_${new Date().toISOString()}.webm`;
-            const destination = saveDestinationRef.current;
             const filePath = `recordings/${user.uid}/${destination}/${fileName}`;
 
             const fileRef = storageRef(storage, filePath);
@@ -274,13 +293,15 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
   }, [localStream, user, setIsRecording, setIsUploading, toast, topic]);
 
-  const stopRecording = useCallback(async (destination: 'private' | 'public') => {
+  const stopRecording = useCallback(async (destination: 'private' | 'public' | 'device') => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
           shouldDiscardRef.current = false;
           saveDestinationRef.current = destination;
           mediaRecorderRef.current.stop();
           setIsRecording(false);
-          toast({ title: 'Recording Stopped', description: 'Finalizing and uploading your recording...' });
+          if (destination !== 'device') {
+            toast({ title: 'Recording Stopped', description: 'Finalizing and uploading your recording...' });
+          }
       }
   }, [setIsRecording, toast]);
 

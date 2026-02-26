@@ -5,7 +5,7 @@ import type { MeshRTC } from '@/lib/webrtc/mesh';
 
 interface RecordingControls {
   start: () => Promise<void>;
-  stop: (destination: 'private' | 'public') => Promise<void>;
+  stop: (destination: 'private' | 'public' | 'device') => Promise<void>;
   discard: () => Promise<void>;
 }
 
