@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -24,7 +23,7 @@ import {
   DialogTitle as ShadDialogTitle,
   DialogClose,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline, FileDown, Loader2, Lock, Globe, Camera } from "lucide-react";
+import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline, FileDown, Loader2, Lock, Globe, Camera, Star } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -189,6 +188,7 @@ export default function WhiteboardPage() {
   const [isDrawPanelVisible, setIsDrawPanelVisible] = useState(false);
   const [isTextPanelVisible, setIsTextPanelVisible] = useState(false);
   const [isPagesPopoverOpen, setIsPagesPopoverOpen] = useState(false);
+  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const lastDrawToolRef = useRef<'draw' | 'shape'>('draw');
 
   const operationStateRef = useRef<OperationState>({ type: 'idle' });
@@ -200,7 +200,6 @@ export default function WhiteboardPage() {
   const [isScreenshotDialogOpen, setIsScreenshotDialogOpen] = useState(false);
 
 
-  const [isRefineDialogOpen, setIsRefineDialogOpen] = useState(false);
   const [refinePrompt, setRefinePrompt] = useState("");
 
 
@@ -846,9 +845,6 @@ export default function WhiteboardPage() {
   };
   
   const handleRecognizeShape = async () => {
-    // This will be called by the dialog action, so we close it here.
-    setIsRefineDialogOpen(false);
-    
     const currentPage = pages[currentPageIndex];
     if (currentPage.selectedElementIds.size === 0) {
       toast({
@@ -1249,39 +1245,14 @@ export default function WhiteboardPage() {
               </Card>
             )}
              <ToolButton icon={Lasso} label="Select" onClick={() => handleNonDrawingToolSelect("lasso")} isActive={activeTool === "lasso" || activeTool === "select"}/>
-             <AlertDialog open={isRefineDialogOpen} onOpenChange={setIsRefineDialogOpen}>
-              <AlertDialogTrigger asChild>
-                <ToolButton icon={Sparkles} label="Refine" disabled={pages[currentPageIndex]?.selectedElementIds.size === 0} />
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Refine Your Drawing</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Optionally, tell the AI what you drew to get a better result.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <div className="py-2">
-                  <Label htmlFor="refine-prompt" className="text-sm text-muted-foreground">What did you draw? (e.g., "a bird", "a house")</Label>
-                  <Input
-                    id="refine-prompt"
-                    value={refinePrompt}
-                    onChange={(e) => setRefinePrompt(e.target.value)}
-                    placeholder="Optional prompt..."
-                    className="mt-2"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleRecognizeShape();
-                      }
-                    }}
-                  />
-                </div>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setRefinePrompt('')}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleRecognizeShape}>Refine</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+             <ToolButton 
+               icon={Sparkles} 
+               label="Refine" 
+               onClick={() => {
+                 toast({ title: "Feature Coming Soon!", description: "AI Shape Refinement is currently under development." });
+                 setIsReviewDialogOpen(true);
+               }} 
+             />
              <ToolButton icon={Type} label="Text" onClick={handleTextButtonClick} isActive={activeTool === "text"}/>
              {isTextPanelVisible && (
                 <Card className="absolute top-full mt-2 w-[320px] p-4 rounded-xl z-30 bg-popover text-popover-foreground shadow-lg border left-1/2 -translate-x-1/2">
@@ -1477,6 +1448,38 @@ export default function WhiteboardPage() {
             </DialogClose>
           </DialogFooter>
         </DialogContent>
+      </Dialog>
+
+      {/* Review Dialog */}
+      <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
+          <DialogContent className="sm:max-w-md rounded-2xl p-6 overflow-hidden border-none shadow-2xl">
+              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary via-accent to-primary" />
+              <DialogHeader className="space-y-3 pt-4">
+                  <div className="mx-auto bg-primary/10 w-20 h-20 rounded-full flex items-center justify-center mb-2 shadow-inner">
+                      <Star className="h-10 w-10 text-primary fill-primary animate-pulse" />
+                  </div>
+                  <DialogTitle className="text-2xl font-bold text-center">Enjoying TeachMeet?</DialogTitle>
+                  <DialogDescription className="text-center text-base leading-relaxed">
+                      The <span className="font-bold text-primary">AI Refinement</span> feature is currently under development. 🏗️
+                      <br /><br />
+                      While we work on it, would you mind taking a moment to support us with a review on the Play Store?
+                  </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col sm:flex-row gap-3 mt-8">
+                  <Button variant="outline" onClick={() => setIsReviewDialogOpen(false)} className="flex-1 rounded-xl h-12 text-muted-foreground font-semibold border-muted-foreground/20 hover:bg-muted/50">
+                      Maybe Later
+                  </Button>
+                  <Button 
+                      onClick={() => {
+                          window.open('https://play.google.com/store/apps/details?id=com.teachmeet.3d', '_blank');
+                          setIsReviewDialogOpen(false);
+                      }} 
+                      className="flex-1 btn-gel rounded-xl h-12 text-lg font-bold shadow-lg hover:shadow-primary/30"
+                  >
+                      Yes, I'll Review!
+                  </Button>
+              </div>
+          </DialogContent>
       </Dialog>
     </>
   );
