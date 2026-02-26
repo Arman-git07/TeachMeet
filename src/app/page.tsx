@@ -133,10 +133,14 @@ export default function HomePage() {
 
   // Logo Animation & Visibility Logic
   useEffect(() => {
-    const isBubbleShown = sessionStorage.getItem('teachmeet-logo-bubble-shown');
-    if (!isBubbleShown) {
-      setShowBubble(true);
-    }
+    // Show bubble immediately on mount
+    setShowBubble(true);
+
+    // Auto-dismiss after 6 seconds as requested
+    const bubbleTimer = setTimeout(() => {
+      setShowBubble(false);
+      bubbleDismissedRef.current = true;
+    }, 6000);
 
     const wrapper = logoWrapperRef.current;
     if (!wrapper) return;
@@ -216,7 +220,10 @@ export default function HomePage() {
     };
 
     h1.addEventListener('click', handleLetterClick);
-    return () => h1.removeEventListener('click', handleLetterClick);
+    return () => {
+      h1.removeEventListener('click', handleLetterClick);
+      clearTimeout(bubbleTimer);
+    };
   }, []);
 
   const handleDragStart = (id: string) => {
