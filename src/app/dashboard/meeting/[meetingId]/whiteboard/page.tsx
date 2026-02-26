@@ -1248,6 +1248,7 @@ export default function WhiteboardPage() {
              <ToolButton 
                icon={Sparkles} 
                label="Refine" 
+               disabled={!pages[currentPageIndex]?.selectedElementIds || pages[currentPageIndex].selectedElementIds.size === 0}
                onClick={() => {
                  toast({ title: "Feature Coming Soon!", description: "AI Shape Refinement is currently under development." });
                  setIsReviewDialogOpen(true);
