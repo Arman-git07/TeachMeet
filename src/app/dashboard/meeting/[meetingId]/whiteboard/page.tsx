@@ -1458,7 +1458,7 @@ export default function WhiteboardPage() {
                   <div className="mx-auto bg-primary/10 w-20 h-20 rounded-full flex items-center justify-center mb-2 shadow-inner">
                       <Star className="h-10 w-10 text-primary fill-primary animate-pulse" />
                   </div>
-                  <DialogTitle className="text-2xl font-bold text-center">Enjoying TeachMeet?</DialogTitle>
+                  <ShadDialogTitle className="text-2xl font-bold text-center">Enjoying TeachMeet?</ShadDialogTitle>
                   <DialogDescription className="text-center text-base leading-relaxed">
                       The <span className="font-bold text-primary">AI Refinement</span> feature is currently under development. 🏗️
                       <br /><br />
