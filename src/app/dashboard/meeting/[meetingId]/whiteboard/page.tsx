@@ -214,20 +214,25 @@ export default function WhiteboardPage() {
   const getFontString = useCallback(() => `${fontSize}px ${fontFamily}`, [fontSize, fontFamily]);
 
   const pushToHistory = useCallback((pageIndex: number, state: ElementState) => {
-    const history = pagesHistoryRef.current[pageIndex] || [];
-    let step = pagesHistoryStepRef.current[pageIndex] ?? -1;
+    // We must clone the state to avoid reference issues in history
+    const history = [...(pagesHistoryRef.current[pageIndex] || [])];
+    const step = pagesHistoryStepRef.current[pageIndex] ?? -1;
     
-    if (step < history.length - 1) {
-        history.splice(step + 1);
+    // If we were at an earlier point in history, truncate the future
+    const truncatedHistory = history.slice(0, step + 1);
+    
+    const stateToPush = JSON.parse(JSON.stringify(state));
+    stateToPush.selectedElementIds = new Set(state.selectedElementIds);
+    
+    truncatedHistory.push(stateToPush);
+    
+    // Maintain limit
+    if (truncatedHistory.length > MAX_HISTORY_STEPS) {
+      truncatedHistory.shift();
     }
-    history.push(state);
-    if (history.length > MAX_HISTORY_STEPS) {
-      history.shift();
-    } else {
-      step++;
-    }
-    pagesHistoryRef.current[pageIndex] = history;
-    pagesHistoryStepRef.current[pageIndex] = step;
+    
+    pagesHistoryRef.current[pageIndex] = truncatedHistory;
+    pagesHistoryStepRef.current[pageIndex] = truncatedHistory.length - 1;
   }, []);
   
   const handleDeleteSelected = useCallback(() => {
@@ -408,30 +413,37 @@ export default function WhiteboardPage() {
   }, [tempDragPreview, redrawTempCanvas]);
 
   const handleUndo = useCallback(() => {
-    const currentHistory = pagesHistoryRef.current[currentPageIndex];
-    let currentStep = pagesHistoryStepRef.current[currentPageIndex];
-    if (currentStep > 0) {
-      currentStep--;
-      pagesHistoryStepRef.current[currentPageIndex] = currentStep;
-      const prevState = currentHistory[currentStep];
+    const history = pagesHistoryRef.current[currentPageIndex];
+    const step = pagesHistoryStepRef.current[currentPageIndex];
+    if (step > 0) {
+      const nextStep = step - 1;
+      pagesHistoryStepRef.current[currentPageIndex] = nextStep;
+      const prevState = history[nextStep];
+      
       setPages(currentPages => {
           const newPages = [...currentPages];
-          newPages[currentPageIndex] = prevState;
+          // Restore state from history (clone to avoid reference issues)
+          const clonedState = JSON.parse(JSON.stringify(prevState));
+          clonedState.selectedElementIds = new Set(prevState.selectedElementIds);
+          newPages[currentPageIndex] = clonedState;
           return newPages;
       });
     }
   }, [currentPageIndex]);
 
   const handleRedo = useCallback(() => {
-    const currentHistory = pagesHistoryRef.current[currentPageIndex];
-    let currentStep = pagesHistoryStepRef.current[currentPageIndex];
-    if (currentStep < currentHistory.length - 1) {
-      currentStep++;
-      pagesHistoryStepRef.current[currentPageIndex] = currentStep;
-      const nextState = currentHistory[currentStep];
+    const history = pagesHistoryRef.current[currentPageIndex];
+    const step = pagesHistoryStepRef.current[currentPageIndex];
+    if (step < history.length - 1) {
+      const nextStep = step + 1;
+      pagesHistoryStepRef.current[currentPageIndex] = nextStep;
+      const nextState = history[nextStep];
+      
       setPages(currentPages => {
           const newPages = [...currentPages];
-          newPages[currentPageIndex] = nextState;
+          const clonedState = JSON.parse(JSON.stringify(nextState));
+          clonedState.selectedElementIds = new Set(nextState.selectedElementIds);
+          newPages[currentPageIndex] = clonedState;
           return newPages;
       });
     }
@@ -760,30 +772,17 @@ export default function WhiteboardPage() {
   }, [getPointerPosition, selectedColor, lineWidth, pages, currentPageIndex, activeTool, pushToHistory, selectedShape]);
 
   const handleClearPage = () => { 
-    // Complete reset of current page data
-    const clearedPage: ElementState = { elements: [], selectedElementIds: new Set() };
-    
-    // Clear live text input if active
     if (liveTextInputRef.current) {
       liveTextInputRef.current.value = '';
       liveTextInputRef.current.style.display = 'none';
     }
-    
-    // Reset any active operation
     operationStateRef.current = { type: 'idle' };
-    
+    const clearedPage: ElementState = { elements: [], selectedElementIds: new Set() };
     setPages(currentPages => {
         const newPages = [...currentPages];
         newPages[currentPageIndex] = clearedPage;
         return newPages;
     });
-    
-    // Clear temp canvas visually
-    const tempCtx = tempCanvasRef.current?.getContext('2d');
-    if (tempCtx) {
-      tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
-    }
-    
     pushToHistory(currentPageIndex, clearedPage);
   };
   
