@@ -123,10 +123,21 @@ service cloud.firestore {
      * Meetings Collection
      */
     match /meetings/{id} {
+      function isMeetingParticipant() {
+        return isSignedIn() && exists(/databases/$(database)/documents/meetings/$(id)/participants/$(request.auth.uid));
+      }
+
       allow get, list: if true;
       allow create: if isSignedIn() && request.resource.data.hostId == request.auth.uid;
       allow update, delete: if isSignedIn() && request.resource.data.hostId == request.auth.uid;
       
+      match /messages/{messageId} {
+        allow read: if isMeetingParticipant();
+        allow create: if isMeetingParticipant()
+          && request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if false;
+      }
+
       match /joinRequests/{rid} { 
         allow get, list: if isSignedIn() && (rid == request.auth.uid || get(/databases/$(database)/documents/meetings/$(id)).data.hostId == request.auth.uid); 
         allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid; 

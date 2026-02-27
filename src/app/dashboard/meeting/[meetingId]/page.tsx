@@ -196,7 +196,10 @@ function MeetingPageContent() {
               </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="rounded-xl w-56">
-              <DropdownMenuItem className="cursor-pointer">
+              <DropdownMenuItem 
+                className="cursor-pointer"
+                onSelect={() => router.push(`/dashboard/meeting/${meetingId}/chat?topic=${encodeURIComponent(topic || '')}`)}
+              >
                 <MessageSquare className="mr-2 h-4 w-4" />
                 <span>Meeting Chat</span>
               </DropdownMenuItem>
@@ -226,7 +229,7 @@ function MeetingPageContent() {
         </DropdownMenu>
       </div>
     );
-  }, [meetingId, topic, camOn, micOn, pinnedId, isRecording, isUploading, recordingControls, setIsSaveRecordingDialogOpen]);
+  }, [meetingId, topic, camOn, micOn, pinnedId, isRecording, isUploading, recordingControls, setIsSaveRecordingDialogOpen, router]);
   
   useEffect(() => {
       setHeaderContent(
