@@ -67,18 +67,20 @@ function MeetingChatNotificationListener({ meetingId, topic }: { meetingId: stri
           if (data.senderId === user.uid) return;
 
           // Check if message is actually new (sent after this listener mounted)
-          // Use Date.now() as fallback if server timestamp isn't resolved yet
           const msgTime = data.createdAt?.toMillis() || Date.now();
           
           if (msgTime > mountTime.current) {
-            toast({
+            const { dismiss } = toast({
               title: `New message from ${data.senderName}`,
               description: data.text.length > 60 ? data.text.substring(0, 60) + "..." : data.text,
               action: (
                 <Button 
                   size="sm" 
                   className="rounded-lg h-8 px-3 text-xs font-bold"
-                  onClick={() => router.push(`/dashboard/meeting/${meetingId}/chat?topic=${encodeURIComponent(topic)}`)}
+                  onClick={() => {
+                    dismiss(); // Ensure notification clears immediately on click
+                    router.push(`/dashboard/meeting/${meetingId}/chat?topic=${encodeURIComponent(topic)}`);
+                  }}
                 >
                   Open Chat
                 </Button>

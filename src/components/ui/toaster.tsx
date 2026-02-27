@@ -9,9 +9,18 @@ import {
   ToastTitle,
   ToastViewport,
 } from "@/components/ui/toast"
+import { usePathname } from "next/navigation"
+import { useEffect } from "react"
 
 export function Toaster() {
-  const { toasts } = useToast()
+  const { toasts, dismiss } = useToast()
+  const pathname = usePathname()
+
+  // Automatically dismiss all active notifications when the route changes.
+  // This ensures that meeting alerts disappear once the user navigates to the chat or elsewhere.
+  useEffect(() => {
+    dismiss()
+  }, [pathname, dismiss])
 
   return (
     <ToastProvider>
