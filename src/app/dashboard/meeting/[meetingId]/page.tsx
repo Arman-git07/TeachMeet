@@ -1,12 +1,12 @@
 // src/app/dashboard/meeting/[meetingId]/page.tsx
 "use client";
 
-import React, { useEffect, useState, useCallback, Suspense } from "react";
+import React, { useEffect, useState, useCallback, Suspense, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import MeetingClient from "./MeetingClient";
-import { doc, deleteDoc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, deleteDoc, onSnapshot, updateDoc, collection, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useDynamicHeader } from '@/contexts/DynamicHeaderContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -17,6 +17,7 @@ import { useMeetingRTC } from "@/contexts/MeetingRTCContext";
 import { SaveRecordingDialog } from "@/components/meeting/SaveRecordingDialog";
 
 const STARTED_MEETINGS_KEY_PREFIX = 'teachmeet-started-meetings-';
+const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
 
 export interface Recording {
   id: string;
@@ -36,6 +37,62 @@ interface RecordingControls {
   start: () => Promise<void>;
   stop: (destination: 'private' | 'public' | 'device') => Promise<void>;
   discard: () => Promise<void>;
+}
+
+/**
+ * Listener component that triggers a toast notification when new messages arrive in Firestore.
+ */
+function MeetingChatNotificationListener({ meetingId, topic }: { meetingId: string, topic: string }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const router = useRouter();
+  const mountTime = useRef(Date.now());
+
+  useEffect(() => {
+    if (!meetingId || !user) return;
+
+    // Listen for the absolute latest message
+    const q = query(
+      collection(db, "meetings", meetingId, "messages"),
+      orderBy("createdAt", "desc"),
+      limit(1)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          const data = change.doc.data();
+          
+          // Don't notify if the message is from the current user
+          if (data.senderId === user.uid) return;
+
+          // Check if message is actually new (sent after this listener mounted)
+          // Use Date.now() as fallback if server timestamp isn't resolved yet
+          const msgTime = data.createdAt?.toMillis() || Date.now();
+          
+          if (msgTime > mountTime.current) {
+            toast({
+              title: `New message from ${data.senderName}`,
+              description: data.text.length > 60 ? data.text.substring(0, 60) + "..." : data.text,
+              action: (
+                <Button 
+                  size="sm" 
+                  className="rounded-lg h-8 px-3 text-xs font-bold"
+                  onClick={() => router.push(`/dashboard/meeting/${meetingId}/chat?topic=${encodeURIComponent(topic)}`)}
+                >
+                  Open Chat
+                </Button>
+              ),
+            });
+          }
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, [meetingId, user, toast, router, topic]);
+
+  return null;
 }
 
 
@@ -260,6 +317,7 @@ function MeetingPageContent() {
             topic={topic}
             initialPinnedId={pinnedId}
           />
+          <MeetingChatNotificationListener meetingId={meetingId} topic={topic} />
           <SaveRecordingDialog 
             isOpen={isSaveRecordingDialogOpen}
             onOpenChange={setIsSaveRecordingDialogOpen}
