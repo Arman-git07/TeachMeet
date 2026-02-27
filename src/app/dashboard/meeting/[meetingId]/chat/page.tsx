@@ -12,14 +12,15 @@ import {
   addDoc, 
   serverTimestamp, 
   doc, 
-  getDoc 
+  getDoc,
+  deleteDoc
 } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Send, ArrowLeft, ShieldAlert } from 'lucide-react';
+import { Loader2, Send, ArrowLeft, ShieldAlert, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ChatMessage {
@@ -44,10 +45,11 @@ export default function MeetingChatPage() {
   const [isSending, setIsSending] = useState(false);
   const [isCheckingParticipant, setIsCheckingParticipant] = useState(true);
   const [hasAccess, setHasHasAccess] = useState(false);
+  const [meetingHostId, setMeetingHostId] = useState<string | null>(null);
   
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // 1. Check If User Is Participant
+  // 1. Check If User Is Participant & Get Meeting Host ID
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
@@ -58,8 +60,15 @@ export default function MeetingChatPage() {
     const checkAccess = async () => {
       try {
         const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
-        const snap = await getDoc(participantRef);
-        if (!snap.exists()) {
+        const participantSnap = await getDoc(participantRef);
+        
+        const meetingRef = doc(db, "meetings", meetingId);
+        const meetingSnap = await getDoc(meetingRef);
+        if (meetingSnap.exists()) {
+            setMeetingHostId(meetingSnap.data().hostId);
+        }
+
+        if (!participantSnap.exists()) {
           setHasHasAccess(false);
         } else {
           setHasHasAccess(true);
@@ -136,6 +145,20 @@ export default function MeetingChatPage() {
     }
   };
 
+  const deleteMessage = async (messageId: string) => {
+    try {
+      await deleteDoc(doc(db, "meetings", meetingId, "messages", messageId));
+      toast({ title: "Message Deleted" });
+    } catch (error: any) {
+      console.error("Delete failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Delete Failed",
+        description: "You do not have permission to delete this message.",
+      });
+    }
+  };
+
   if (authLoading || isCheckingParticipant) {
     return (
       <div className="h-full flex flex-col items-center justify-center space-y-4 bg-background">
@@ -192,6 +215,8 @@ export default function MeetingChatPage() {
             ) : (
               messages.map((msg) => {
                 const isMe = msg.senderId === user?.uid;
+                const canDelete = isMe || user?.uid === meetingHostId;
+
                 return (
                   <div 
                     key={msg.id} 
@@ -207,14 +232,32 @@ export default function MeetingChatPage() {
                           {msg.senderName.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <div className={cn(
-                        "p-4 rounded-3xl shadow-sm border transition-all",
-                        isMe 
-                          ? "bg-primary text-primary-foreground rounded-tr-none border-primary" 
-                          : "bg-background text-foreground rounded-tl-none border-border/50"
-                      )}>
-                        {!isMe && <p className="text-[10px] font-black uppercase opacity-60 mb-1 tracking-wider">{msg.senderName}</p>}
-                        <p className="text-sm whitespace-pre-wrap break-words leading-relaxed font-medium">{msg.text}</p>
+                      
+                      <div className="relative group flex items-center">
+                        <div className={cn(
+                            "p-4 rounded-3xl shadow-sm border transition-all relative",
+                            isMe 
+                            ? "bg-primary text-primary-foreground rounded-tr-none border-primary" 
+                            : "bg-background text-foreground rounded-tl-none border-border/50"
+                        )}>
+                            {!isMe && <p className="text-[10px] font-black uppercase opacity-60 mb-1 tracking-wider">{msg.senderName}</p>}
+                            <p className="text-sm whitespace-pre-wrap break-words leading-relaxed font-medium">{msg.text}</p>
+                        </div>
+                        
+                        {canDelete && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => deleteMessage(msg.id)}
+                                className={cn(
+                                    "h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity text-destructive shrink-0 hover:bg-destructive/10 hover:text-destructive",
+                                    isMe ? "mr-1 order-first" : "ml-1"
+                                )}
+                                title="Delete Message"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        )}
                       </div>
                     </div>
                     <span className="text-[9px] text-muted-foreground mt-1.5 px-1 font-bold uppercase tracking-tighter">
