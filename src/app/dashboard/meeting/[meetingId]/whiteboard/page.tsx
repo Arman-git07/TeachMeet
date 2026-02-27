@@ -760,12 +760,30 @@ export default function WhiteboardPage() {
   }, [getPointerPosition, selectedColor, lineWidth, pages, currentPageIndex, activeTool, pushToHistory, selectedShape]);
 
   const handleClearPage = () => { 
+    // Complete reset of current page data
     const clearedPage: ElementState = { elements: [], selectedElementIds: new Set() };
+    
+    // Clear live text input if active
+    if (liveTextInputRef.current) {
+      liveTextInputRef.current.value = '';
+      liveTextInputRef.current.style.display = 'none';
+    }
+    
+    // Reset any active operation
+    operationStateRef.current = { type: 'idle' };
+    
     setPages(currentPages => {
         const newPages = [...currentPages];
         newPages[currentPageIndex] = clearedPage;
         return newPages;
     });
+    
+    // Clear temp canvas visually
+    const tempCtx = tempCanvasRef.current?.getContext('2d');
+    if (tempCtx) {
+      tempCtx.clearRect(0, 0, tempCtx.canvas.width, tempCtx.canvas.height);
+    }
+    
     pushToHistory(currentPageIndex, clearedPage);
   };
   
