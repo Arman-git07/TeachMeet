@@ -23,7 +23,7 @@ import {
   DialogTitle as ShadDialogTitle,
   DialogClose,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline, FileDown, Loader2, Lock, Globe, Camera, Star } from "lucide-react";
+import { ArrowLeft, Brush, Type, Eraser, Trash2, Undo2, Redo2, Lasso, RectangleHorizontal, Circle, Minus, Files, PlusCircle, Triangle, MoveRight, Diamond, Settings, Sparkles, MoreVertical, Baseline, FileDown, Loader2, Lock, Globe, Camera, Star, Pencil, X } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -52,7 +52,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 // --- Type Definitions ---
 interface Point { x: number; y: number; }
 type PathElement = { type: 'path'; id: string; points: Point[]; color: string; lineWidth: number; };
-type TextElement = { type: 'text'; id: string; text: string; x: number; y: number; color: string; font: string; width: number; height: number; };
+type TextElement = { type: 'text'; id: string; text: string; x: number; y: number; color: string; fontSize: number; fontFamily: string; width: number; height: number; isEditing?: boolean; };
 type ShapeElement = { type: 'shape'; id: string; shapeType: 'rectangle' | 'circle' | 'line' | 'triangle' | 'arrow' | 'diamond'; x1: number; y1: number; x2: number; y2: number; color: string; lineWidth: number; };
 type ImageElement = { type: 'image'; id: string; src: string; x: number; y: number; width: number; height: number; };
 type WhiteboardElement = PathElement | TextElement | ShapeElement | ImageElement;
@@ -111,7 +111,7 @@ function getElementBoundingBox(element: WhiteboardElement): BoundingBox | null {
         });
         return { minX, minY, maxX, maxY };
     } else if (element.type === 'text') {
-        return { minX: element.x, minY: element.y, maxX: element.x + element.width, maxY: element.y + element.height };
+        return { minX: element.x, minY: element.y, maxX: element.x + (element.width || 100), maxY: element.y + (element.height || 24) };
     } else if (element.type === 'shape') {
         const minX = Math.min(element.x1, element.x2);
         const minY = Math.min(element.y1, element.y2);
@@ -257,12 +257,8 @@ export default function WhiteboardPage() {
       }
       ctx.stroke();
     } else if (element.type === 'text') {
-      ctx.fillStyle = element.color;
-      ctx.font = element.font;
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      const parsedFontSize = parseInt(element.font.match(/(\d+)px/)?.[1] || '16', 10);
-      element.text.split('\n').forEach((line, index) => ctx.fillText(line, element.x, element.y + (index * (parsedFontSize * 1.2))));
+      // Text is now handled by independent draggable layer in DOM
+      // We skip drawing it on canvas if it's currently being managed by React
     } else if (element.type === 'shape') {
       ctx.strokeStyle = element.color;
       ctx.lineWidth = element.lineWidth;
@@ -476,6 +472,13 @@ export default function WhiteboardPage() {
 
     const currentPage = pages[currentPageIndex];
 
+    // If an element is being edited, click outside should finalize it
+    const currentlyEditing = currentPage.elements.find(el => el.type === 'text' && el.isEditing);
+    if (currentlyEditing && activeTool !== 'text') {
+        // Finalize by tool change or other logic? 
+        // Usually clicking empty space should finish it.
+    }
+
     if (activeTool === 'select' || activeTool === 'lasso') {
       const selectionBox = getSelectionBoundingBox(currentPage.elements, currentPage.selectedElementIds);
       if (activeTool === 'select' && selectionBox && isPointInRect(pos, selectionBox)) {
@@ -542,10 +545,35 @@ export default function WhiteboardPage() {
         case 'shape':
             operationStateRef.current = { type: 'shaping', startPoint: pos, currentPoint: pos };
             break;
+        case 'text':
+            const newTextId = `text_${Date.now()}`;
+            const newText: TextElement = {
+                id: newTextId,
+                type: 'text',
+                x: pos.x,
+                y: pos.y,
+                text: "",
+                color: selectedColor,
+                fontSize: fontSize,
+                fontFamily: fontFamily,
+                width: 200,
+                height: 40,
+                isEditing: true
+            };
+            setPages(prev => {
+                const next = [...prev];
+                next[currentPageIndex] = {
+                    ...next[currentPageIndex],
+                    elements: [...next[currentPageIndex].elements, newText],
+                    selectedElementIds: new Set([newTextId])
+                };
+                return next;
+            });
+            break;
         case 'erase':
             break;
     }
-  }, [getPointerPosition, activeTool, pages, currentPageIndex]);
+  }, [getPointerPosition, activeTool, pages, currentPageIndex, selectedColor, fontSize, fontFamily]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent) => {
     if (event.buttons !== 1) return;
@@ -803,14 +831,14 @@ export default function WhiteboardPage() {
         title: "Nothing to Refine",
         description: "Please select a drawing first using the select tool.",
       });
-      setRefinePrompt(''); // Also clear prompt on error
+      setRefinePrompt(''); 
       return;
     }
   
     const selectionBox = getSelectionBoundingBox(currentPage.elements, currentPage.selectedElementIds);
     if (!selectionBox) {
       toast({ variant: "destructive", title: "Error", description: "Could not determine selection area." });
-      setRefinePrompt(''); // Also clear prompt on error
+      setRefinePrompt(''); 
       return;
     }
   
@@ -832,7 +860,7 @@ export default function WhiteboardPage() {
     const tempCtx = tempCanvas.getContext('2d');
     if (!tempCtx) {
       toast.update(recognitionToastId, { variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
-      setRefinePrompt(''); // Also clear prompt on error
+      setRefinePrompt(''); 
       return;
     }
   
@@ -908,7 +936,7 @@ export default function WhiteboardPage() {
         description: error instanceof Error ? error.message : "An unknown error occurred.",
       });
     } finally {
-        setRefinePrompt(''); // Reset prompt after use
+        setRefinePrompt(''); 
     }
   };
 
@@ -1119,6 +1147,39 @@ export default function WhiteboardPage() {
     };
   }, [setHeaderContent, setHeaderAction, meetingId, router, topic]);
 
+  // Handle finalizing text
+  const finalizeText = useCallback((id: string) => {
+    setPages(prev => {
+        const next = [...prev];
+        const page = next[currentPageIndex];
+        const updatedElements = page.elements.map(el => {
+            if (el.id === id && el.type === 'text') {
+                if (el.text.trim() === "") return null; // Mark for removal
+                return { ...el, isEditing: false };
+            }
+            return el;
+        }).filter(Boolean) as WhiteboardElement[];
+        
+        const updatedPage = { ...page, elements: updatedElements };
+        next[currentPageIndex] = updatedPage;
+        
+        // Push to history after finalization
+        pushToHistory(currentPageIndex, updatedPage);
+        return next;
+    });
+  }, [currentPageIndex, pushToHistory]);
+
+  const updateTextValue = useCallback((id: string, text: string) => {
+    setPages(prev => {
+        const next = [...prev];
+        const page = next[currentPageIndex];
+        next[currentPageIndex] = {
+            ...page,
+            elements: page.elements.map(el => (el.id === id && el.type === 'text' ? { ...el, text } : el))
+        };
+        return next;
+    });
+  }, [currentPageIndex]);
 
   return (
     <>
@@ -1172,7 +1233,6 @@ export default function WhiteboardPage() {
                label="Refine" 
                disabled={!pages[currentPageIndex]?.selectedElementIds || pages[currentPageIndex].selectedElementIds.size === 0}
                onClick={() => {
-                 toast({ title: "Feature Coming Soon!", description: "AI Shape Refinement is currently under development." });
                  setIsReviewDialogOpen(true);
                }} 
              />
@@ -1187,7 +1247,7 @@ export default function WhiteboardPage() {
                                     <button key={color} style={{ backgroundColor: color }} className={cn('w-6 h-6 rounded-full border-2 transition-transform hover:scale-110', selectedColor === color ? 'border-primary ring-2 ring-offset-2 ring-offset-background ring-primary' : 'border-background')} onClick={() => setSelectedColor(color)} />
                                 ))}
                                 <div className="w-8 h-8 rounded-full border-2 border-border overflow-hidden inline-flex items-center justify-center">
-                                    <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="w-full h-full p-0 m-0 border-none appearance-none cursor-pointer bg-transparent" style={{'WebkitAppearance': 'none'}}/>
+                                    <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(color)} className="w-full h-full p-0 m-0 border-none appearance-none cursor-pointer bg-transparent" style={{'WebkitAppearance': 'none'}}/>
                                 </div>
                             </div>
                         </div>
@@ -1290,10 +1350,111 @@ export default function WhiteboardPage() {
           </div>
         </div>
 
-        <main className="flex-grow flex flex-col overflow-hidden min-h-0">
+        <main className="flex-grow flex flex-col overflow-hidden min-h-0 relative">
           <Card className="w-full h-full max-w-full text-center shadow-none rounded-none border-0 flex flex-col overflow-hidden">
-            <CardContent className="flex-grow flex items-center justify-center relative p-0">
+            <CardContent className="flex-grow flex items-center justify-center relative p-0 overflow-hidden">
                 <canvas ref={mainCanvasRef} className="touch-none w-full h-full block absolute top-0 left-0" style={{ zIndex: 1 }} />
+                
+                {/* Independent Text Layer */}
+                <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 10 }}>
+                    {pages[currentPageIndex].elements.map(el => {
+                        if (el.type !== 'text') return null;
+                        const isSelected = pages[currentPageIndex].selectedElementIds.has(el.id);
+                        
+                        return (
+                            <div 
+                                key={el.id}
+                                className={cn(
+                                    "absolute pointer-events-auto select-none",
+                                    isSelected && !el.isEditing && "ring-2 ring-primary/50 ring-offset-2"
+                                )}
+                                style={{
+                                    left: el.x,
+                                    top: el.y,
+                                    color: el.color,
+                                    fontSize: `${el.fontSize}px`,
+                                    fontFamily: el.fontFamily,
+                                    cursor: el.isEditing ? 'text' : 'move',
+                                }}
+                                onPointerDown={(e) => {
+                                    if (el.isEditing) return;
+                                    e.stopPropagation();
+                                    setPages(prev => {
+                                        const next = [...prev];
+                                        next[currentPageIndex] = {
+                                            ...next[currentPageIndex],
+                                            selectedElementIds: new Set([el.id])
+                                        };
+                                        return next;
+                                    });
+                                    operationStateRef.current = {
+                                        type: 'dragging',
+                                        startPos: getPointerPosition(e),
+                                        originalElements: new Map([[el.id, JSON.parse(JSON.stringify(el))]])
+                                    };
+                                }}
+                            >
+                                {el.isEditing ? (
+                                    <textarea
+                                        autoFocus
+                                        className="bg-transparent border-none outline-none p-0 m-0 resize-none overflow-hidden min-w-[50px] whitespace-pre"
+                                        style={{ 
+                                            color: 'inherit', 
+                                            fontSize: 'inherit', 
+                                            fontFamily: 'inherit',
+                                            height: 'auto'
+                                        }}
+                                        value={el.text}
+                                        onChange={(e) => updateTextValue(el.id, e.target.value)}
+                                        onBlur={() => finalizeText(el.id)}
+                                        onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur(); } }}
+                                        ref={(ref) => {
+                                            if (ref) {
+                                                ref.style.height = 'auto';
+                                                ref.style.height = `${ref.scrollHeight}px`;
+                                                ref.style.width = 'auto';
+                                                ref.style.width = `${Math.max(50, ref.scrollWidth)}px`;
+                                            }
+                                        }}
+                                    />
+                                ) : (
+                                    <div className="relative group p-1 whitespace-pre">
+                                        {el.text || <span className="italic opacity-30">Type something...</span>}
+                                        
+                                        {/* Controls */}
+                                        {isSelected && (
+                                            <>
+                                                <button 
+                                                    className="absolute -top-6 -right-6 p-1.5 bg-destructive text-white rounded-full shadow-lg z-20 hover:scale-110 transition-transform"
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteSelected(); }}
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </button>
+                                                <button 
+                                                    className="absolute -bottom-6 -left-6 p-1.5 bg-primary text-white rounded-full shadow-lg z-20 hover:scale-110 transition-transform"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setPages(prev => {
+                                                            const next = [...prev];
+                                                            next[currentPageIndex] = {
+                                                                ...next[currentPageIndex],
+                                                                elements: next[currentPageIndex].elements.map(item => item.id === el.id ? { ...item, isEditing: true } : item)
+                                                            };
+                                                            return next;
+                                                        });
+                                                    }}
+                                                >
+                                                    <Pencil className="h-3 w-3" />
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
                 <canvas 
                     ref={tempCanvasRef} 
                     onPointerDown={handlePointerDown} 
