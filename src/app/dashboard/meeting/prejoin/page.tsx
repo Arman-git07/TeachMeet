@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef, Suspense } from 'react';
@@ -88,9 +87,11 @@ function PreJoinPageContent() {
     const isHostRole = role === 'host';
     setIsHost(isHostRole);
 
-    const finalMeetingId = idFromParams.trim();
+    const rawId = idFromParams.trim();
+    // Normalize ID with prefix for consistent storage/history
+    const finalMeetingId = rawId.startsWith('meeting-') ? rawId : `meeting-${rawId}`;
     const finalTopic = topicFromParams || (isHostRole ? 'Untitled Meeting' : 'Joining a Meeting');
-    const finalCode = finalMeetingId.includes('meeting-') ? finalMeetingId.split('meeting-')[1] : finalMeetingId;
+    const finalCode = finalMeetingId.replace('meeting-', '');
 
     setMeetingId(finalMeetingId);
     setTopic(finalTopic);

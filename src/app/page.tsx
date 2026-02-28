@@ -456,7 +456,19 @@ export default function HomePage() {
         .sort((a,b) => (b.updatedAt || b.timestamp) - (a.updatedAt || a.timestamp));
 
     const unique = combined.reduce((acc: ActivityItem[], current) => {
-        if (!acc.find(item => item.id === current.id)) acc.push(current);
+        // Robust deduplication: For meetings, normalize the ID (consistent with or without 'meeting-' prefix)
+        const currentCompareId = current.type === 'meeting' 
+            ? (current.id.startsWith('meeting-') ? current.id : `meeting-${current.id}`)
+            : current.id;
+
+        const alreadyExists = acc.some(item => {
+            const itemCompareId = item.type === 'meeting'
+                ? (item.id.startsWith('meeting-') ? item.id : `meeting-${item.id}`)
+                : item.id;
+            return itemCompareId === currentCompareId;
+        });
+
+        if (!alreadyExists) acc.push(current);
         return acc;
     }, []);
 
