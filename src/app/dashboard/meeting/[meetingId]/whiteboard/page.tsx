@@ -69,7 +69,6 @@ type OperationState =
   | { type: 'idle' }
   | { type: 'drawing'; currentPath: Point[] }
   | { type: 'shaping'; startPoint: Point, currentPoint: Point }
-  | { type: 'texting'; position: Point }
   | { type: 'lassoing'; lassoPath: Point[] }
   | { type: 'dragging'; startPos: Point; originalElements: Map<string, WhiteboardElement> };
 
@@ -171,7 +170,6 @@ export default function WhiteboardPage() {
 
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
   const tempCanvasRef = useRef<HTMLCanvasElement>(null);
-  const liveTextInputRef = useRef<HTMLTextAreaElement>(null);
 
   const [pages, setPages] = useState<ElementState[]>([{ elements: [], selectedElementIds: new Set() }]);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
@@ -211,14 +209,10 @@ export default function WhiteboardPage() {
     setFontFamily(localStorage.getItem('teachmeet-whiteboard-fontfamily') || 'sans-serif');
   }, []);
   
-  const getFontString = useCallback(() => `${fontSize}px ${fontFamily}`, [fontSize, fontFamily]);
-
   const pushToHistory = useCallback((pageIndex: number, state: ElementState) => {
-    // We must clone the state to avoid reference issues in history
     const history = [...(pagesHistoryRef.current[pageIndex] || [])];
     const step = pagesHistoryStepRef.current[pageIndex] ?? -1;
     
-    // If we were at an earlier point in history, truncate the future
     const truncatedHistory = history.slice(0, step + 1);
     
     const stateToPush = JSON.parse(JSON.stringify(state));
@@ -226,7 +220,6 @@ export default function WhiteboardPage() {
     
     truncatedHistory.push(stateToPush);
     
-    // Maintain limit
     if (truncatedHistory.length > MAX_HISTORY_STEPS) {
       truncatedHistory.shift();
     }
@@ -422,7 +415,6 @@ export default function WhiteboardPage() {
       
       setPages(currentPages => {
           const newPages = [...currentPages];
-          // Restore state from history (clone to avoid reference issues)
           const clonedState = JSON.parse(JSON.stringify(prevState));
           clonedState.selectedElementIds = new Set(prevState.selectedElementIds);
           newPages[currentPageIndex] = clonedState;
@@ -454,43 +446,6 @@ export default function WhiteboardPage() {
       return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   }, []);
 
-  const finalizeLiveText = useCallback(() => {
-    const opState = operationStateRef.current;
-    if (opState.type !== 'texting') return;
-    const textInput = liveTextInputRef.current;
-    if (!textInput || !textInput.value.trim()) {
-      if (textInput) textInput.style.display = 'none';
-      operationStateRef.current = { type: 'idle' };
-      return;
-    }
-    
-    const tempCtx = tempCanvasRef.current?.getContext('2d');
-    if(!tempCtx) return;
-    
-    const font = getFontString();
-    tempCtx.font = font;
-    const lines = textInput.value.split('\n');
-    const textMetrics = lines.map(line => tempCtx.measureText(line));
-    const maxWidth = Math.max(...textMetrics.map(m => m.width));
-    const totalHeight = lines.length * (fontSize * 1.2);
-    
-    const newTextElement: TextElement = { type: 'text', id: `text_${Date.now()}`, text: textInput.value, x: opState.position.x, y: opState.position.y, color: selectedColor, font, width: maxWidth, height: totalHeight };
-    
-    setPages(currentPages => {
-        const newPages = [...currentPages];
-        const currentPage = newPages[currentPageIndex];
-        const newElements = [...currentPage.elements, newTextElement];
-        const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set() };
-        newPages[currentPageIndex] = updatedPage;
-        pushToHistory(currentPageIndex, updatedPage);
-        return newPages;
-    });
-
-    textInput.value = '';
-    textInput.style.display = 'none';
-    operationStateRef.current = { type: 'idle' };
-  }, [selectedColor, pushToHistory, getFontString, currentPageIndex, fontSize]);
-  
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.target as HTMLElement).tagName.toLowerCase() === 'input' || (event.target as HTMLElement).tagName.toLowerCase() === 'textarea') {
@@ -516,7 +471,6 @@ export default function WhiteboardPage() {
     if (event.buttons !== 1) return;
     const pos = getPointerPosition(event);
 
-    finalizeLiveText();
     setIsDrawPanelVisible(false);
     setIsTextPanelVisible(false);
 
@@ -588,24 +542,10 @@ export default function WhiteboardPage() {
         case 'shape':
             operationStateRef.current = { type: 'shaping', startPoint: pos, currentPoint: pos };
             break;
-        case 'text':
-            operationStateRef.current = { type: 'texting', position: pos };
-            if (liveTextInputRef.current) {
-                liveTextInputRef.current.style.top = `${pos.y}px`;
-                liveTextInputRef.current.style.left = `${pos.x}px`;
-                liveTextInputRef.current.style.display = 'block';
-                liveTextInputRef.current.style.color = selectedColor;
-                liveTextInputRef.current.style.font = getFontString();
-                liveTextInputRef.current.style.lineHeight = `${fontSize * 1.2}px`;
-                liveTextInputRef.current.style.height = 'auto';
-                liveTextInputRef.current.style.width = 'auto';
-                liveTextInputRef.current.focus();
-            }
-            break;
         case 'erase':
             break;
     }
-  }, [getPointerPosition, activeTool, selectedColor, pages, currentPageIndex, finalizeLiveText, getFontString, fontSize, fontFamily]);
+  }, [getPointerPosition, activeTool, pages, currentPageIndex]);
 
   const handlePointerMove = useCallback((event: React.PointerEvent) => {
     if (event.buttons !== 1) return;
@@ -772,10 +712,6 @@ export default function WhiteboardPage() {
   }, [getPointerPosition, selectedColor, lineWidth, pages, currentPageIndex, activeTool, pushToHistory, selectedShape]);
 
   const handleClearPage = () => { 
-    if (liveTextInputRef.current) {
-      liveTextInputRef.current.value = '';
-      liveTextInputRef.current.style.display = 'none';
-    }
     operationStateRef.current = { type: 'idle' };
     const clearedPage: ElementState = { elements: [], selectedElementIds: new Set() };
     setPages(currentPages => {
@@ -832,7 +768,6 @@ export default function WhiteboardPage() {
 
   const handleSwitchPage = (index: number) => {
     if (index !== currentPageIndex) {
-        finalizeLiveText();
         setPages(currentPages => {
             const newPages = [...currentPages];
             newPages[currentPageIndex] = { ...newPages[currentPageIndex], selectedElementIds: new Set() };
@@ -901,7 +836,6 @@ export default function WhiteboardPage() {
       return;
     }
   
-    // Fill with a solid white background, as transparent can be problematic for some models
     tempCtx.fillStyle = 'white';
     tempCtx.fillRect(0, 0, width, height);
   
@@ -1188,35 +1122,6 @@ export default function WhiteboardPage() {
 
   return (
     <>
-      <textarea
-        ref={liveTextInputRef}
-        onBlur={finalizeLiveText}
-        onInput={(e) => {
-            const textarea = e.currentTarget;
-            textarea.style.height = 'auto';
-            textarea.style.height = `${textarea.scrollHeight}px`;
-            const tempCtx = tempCanvasRef.current?.getContext('2d');
-            if (tempCtx) {
-              tempCtx.font = getFontString();
-              const textMetrics = tempCtx.measureText(textarea.value);
-              textarea.style.width = `${Math.max(50, textMetrics.width + 10)}px`;
-            }
-        }}
-        style={{
-          position: 'absolute',
-          display: 'none',
-          border: '1px dashed hsl(var(--primary))',
-          outline: 'none',
-          background: 'transparent',
-          zIndex: 10,
-          resize: 'none',
-          overflow: 'hidden',
-          whiteSpace: 'pre',
-          padding: '4px',
-          fontFamily: fontFamily,
-        }}
-        tabIndex={-1}
-      />
       <div className="flex flex-col h-full bg-muted/30">
         <div className="flex-none p-2 border-b bg-background shadow-md z-20">
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2 relative">
