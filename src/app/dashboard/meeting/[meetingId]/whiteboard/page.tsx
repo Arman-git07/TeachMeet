@@ -200,6 +200,12 @@ export default function WhiteboardPage() {
 
   const [refinePrompt, setRefinePrompt] = useState("");
 
+  const dragRef = useRef<{ id: string; startX: number; startY: number } | null>(null);
+  const currentPageIndexRef = useRef(currentPageIndex);
+
+  useEffect(() => {
+    currentPageIndexRef.current = currentPageIndex;
+  }, [currentPageIndex]);
 
   useEffect(() => {
     setBgColor(localStorage.getItem('teachmeet-whiteboard-bg-color') || '#FFFFFF');
@@ -441,6 +447,83 @@ export default function WhiteboardPage() {
       const rect = tempCanvasRef.current!.getBoundingClientRect();
       return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   }, []);
+
+  const handleDragStart = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    dragRef.current = {
+      id,
+      startX: e.clientX,
+      startY: e.clientY
+    };
+  };
+
+  const handleTouchStart = (e: React.TouchEvent, id: string) => {
+    e.stopPropagation();
+    const touch = e.touches[0];
+    dragRef.current = {
+      id,
+      startX: touch.clientX,
+      startY: touch.clientY
+    };
+  };
+
+  useEffect(() => {
+    const handleMove = (e: any) => {
+      if (!dragRef.current) return;
+
+      const clientX = e.clientX ?? e.touches?.[0]?.clientX;
+      const clientY = e.clientY ?? e.touches?.[0]?.clientY;
+
+      if (clientX === undefined || clientY === undefined) return;
+
+      const { id, startX, startY } = dragRef.current;
+
+      const dx = clientX - startX;
+      const dy = clientY - startY;
+
+      dragRef.current.startX = clientX;
+      dragRef.current.startY = clientY;
+
+      setPages(prev => {
+        const next = [...prev];
+        const pageIdx = currentPageIndexRef.current;
+        const page = next[pageIdx];
+        if (!page) return prev;
+        
+        next[pageIdx] = {
+          ...page,
+          elements: page.elements.map(el =>
+            el.id === id && el.type === 'text'
+              ? { ...el, x: el.x + dx, y: el.y + dy }
+              : el
+          )
+        };
+        return next;
+      });
+    };
+
+    const handleEnd = () => {
+      if (dragRef.current) {
+        setPages(prev => {
+            pushToHistory(currentPageIndexRef.current, prev[currentPageIndexRef.current]);
+            return prev;
+        });
+        dragRef.current = null;
+      }
+    };
+
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleEnd);
+    window.addEventListener("touchmove", handleMove);
+    window.addEventListener("touchend", handleEnd);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleEnd);
+      window.removeEventListener("touchmove", handleMove);
+      window.removeEventListener("touchend", handleEnd);
+    };
+  }, [pushToHistory]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1376,22 +1459,21 @@ export default function WhiteboardPage() {
                                     fontFamily: el.fontFamily,
                                     cursor: el.isEditing ? 'text' : 'move',
                                 }}
+                                onMouseDown={(e) => !el.isEditing && handleDragStart(e, el.id)}
+                                onTouchStart={(e) => !el.isEditing && handleTouchStart(e, el.id)}
                                 onPointerDown={(e) => {
-                                    if (el.isEditing) return;
                                     e.stopPropagation();
                                     setPages(prev => {
                                         const next = [...prev];
-                                        next[currentPageIndex] = {
-                                            ...next[currentPageIndex],
-                                            selectedElementIds: new Set([el.id])
-                                        };
+                                        const pageIdx = currentPageIndex;
+                                        if (next[pageIdx]) {
+                                            next[pageIdx] = {
+                                                ...next[pageIdx],
+                                                selectedElementIds: new Set([el.id])
+                                            };
+                                        }
                                         return next;
                                     });
-                                    operationStateRef.current = {
-                                        type: 'dragging',
-                                        startPos: getPointerPosition(e),
-                                        originalElements: new Map([[el.id, JSON.parse(JSON.stringify(el))]])
-                                    };
                                 }}
                             >
                                 {el.isEditing ? (
