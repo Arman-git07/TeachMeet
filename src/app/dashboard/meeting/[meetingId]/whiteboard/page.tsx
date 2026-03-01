@@ -111,7 +111,7 @@ function getElementBoundingBox(element: WhiteboardElement): BoundingBox | null {
         });
         return { minX, minY, maxX, maxY };
     } else if (element.type === 'text') {
-        return { minX: element.x, minY: element.y, maxX: element.x + (element.width || 100), maxY: element.y + (element.height || 24) };
+        return { minX: element.x, minY: element.y, maxX: element.x + element.width, maxY: element.y + element.height };
     } else if (element.type === 'shape') {
         const minX = Math.min(element.x1, element.x2);
         const minY = Math.min(element.y1, element.y2);
@@ -339,7 +339,16 @@ export default function WhiteboardPage() {
     
     currentPage.elements.forEach(element => drawElement(mainCtx, element));
 
-    const selectionBox = getSelectionBoundingBox(currentPage.elements, currentPage.selectedElementIds);
+    // Only draw selection box for finalized elements (not currently being edited)
+    // AND skip text elements as requested by instructions
+    const finalizedSelectedIds = new Set(
+        Array.from(currentPage.selectedElementIds).filter(id => {
+            const el = currentPage.elements.find(e => e.id === id);
+            return el && el.type !== 'text';
+        })
+    );
+
+    const selectionBox = getSelectionBoundingBox(currentPage.elements, finalizedSelectedIds);
     if (selectionBox) {
       mainCtx.strokeStyle = 'rgba(0, 150, 255, 0.8)';
       mainCtx.lineWidth = 1;
@@ -558,8 +567,7 @@ export default function WhiteboardPage() {
     // If an element is being edited, click outside should finalize it
     const currentlyEditing = currentPage.elements.find(el => el.type === 'text' && el.isEditing);
     if (currentlyEditing && activeTool !== 'text') {
-        // Finalize by tool change or other logic? 
-        // Usually clicking empty space should finish it.
+        // Finalize logic handled by onBlur of textarea
     }
 
     if (activeTool === 'select' || activeTool === 'lasso') {
@@ -639,8 +647,8 @@ export default function WhiteboardPage() {
                 color: selectedColor,
                 fontSize: fontSize,
                 fontFamily: fontFamily,
-                width: 200,
-                height: 40,
+                width: 0,
+                height: 0,
                 isEditing: true
             };
             setPages(prev => {
@@ -869,7 +877,7 @@ export default function WhiteboardPage() {
   const handleAddPage = () => {
     const newPageIndex = pages.length;
     const newPage: ElementState = { elements: [], selectedElementIds: new Set() };
-    setPages(currentPages => [...currentPages, newPage]);
+    setPages(currentPages => [...currentPages, nPage]);
     pagesHistoryRef.current.push([]);
     pagesHistoryStepRef.current.push(-1);
     setCurrentPageIndex(newPageIndex); 
@@ -1230,15 +1238,15 @@ export default function WhiteboardPage() {
     };
   }, [setHeaderContent, setHeaderAction, meetingId, router, topic]);
 
-  // Handle finalizing text
-  const finalizeText = useCallback((id: string) => {
+  // Handle finalizing text with dimensions
+  const finalizeText = useCallback((id: string, width?: number, height?: number) => {
     setPages(prev => {
         const next = [...prev];
         const page = next[currentPageIndex];
         const updatedElements = page.elements.map(el => {
             if (el.id === id && el.type === 'text') {
                 if (el.text.trim() === "") return null; // Mark for removal
-                return { ...el, isEditing: false };
+                return { ...el, isEditing: false, width: width ?? el.width, height: height ?? el.height };
             }
             return el;
         }).filter(Boolean) as WhiteboardElement[];
@@ -1330,7 +1338,7 @@ export default function WhiteboardPage() {
                                     <button key={color} style={{ backgroundColor: color }} className={cn('w-6 h-6 rounded-full border-2 transition-transform hover:scale-110', selectedColor === color ? 'border-primary ring-2 ring-offset-2 ring-offset-background ring-primary' : 'border-background')} onClick={() => setSelectedColor(color)} />
                                 ))}
                                 <div className="w-8 h-8 rounded-full border-2 border-border overflow-hidden inline-flex items-center justify-center">
-                                    <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(color)} className="w-full h-full p-0 m-0 border-none appearance-none cursor-pointer bg-transparent" style={{'WebkitAppearance': 'none'}}/>
+                                    <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="w-full h-full p-0 m-0 border-none appearance-none cursor-pointer bg-transparent" style={{'WebkitAppearance': 'none'}}/>
                                 </div>
                             </div>
                         </div>
@@ -1447,10 +1455,7 @@ export default function WhiteboardPage() {
                         return (
                             <div 
                                 key={el.id}
-                                className={cn(
-                                    "absolute pointer-events-auto select-none",
-                                    isSelected && !el.isEditing && "ring-2 ring-primary/50 ring-offset-2"
-                                )}
+                                className="absolute pointer-events-auto"
                                 style={{
                                     left: el.x,
                                     top: el.y,
@@ -1458,6 +1463,11 @@ export default function WhiteboardPage() {
                                     fontSize: `${el.fontSize}px`,
                                     fontFamily: el.fontFamily,
                                     cursor: el.isEditing ? 'text' : 'move',
+                                    border: "none",
+                                    outline: "none",
+                                    boxShadow: "none",
+                                    background: "transparent",
+                                    userSelect: "none"
                                 }}
                                 onMouseDown={(e) => !el.isEditing && handleDragStart(e, el.id)}
                                 onTouchStart={(e) => !el.isEditing && handleTouchStart(e, el.id)}
@@ -1488,7 +1498,7 @@ export default function WhiteboardPage() {
                                         }}
                                         value={el.text}
                                         onChange={(e) => updateTextValue(el.id, e.target.value)}
-                                        onBlur={() => finalizeText(el.id)}
+                                        onBlur={(e) => finalizeText(el.id, e.target.offsetWidth, e.target.offsetHeight)}
                                         onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur(); } }}
                                         ref={(ref) => {
                                             if (ref) {
