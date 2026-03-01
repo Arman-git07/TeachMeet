@@ -184,27 +184,57 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         setIsSharingScreen(true);
     }
 
-    const videoTrack = localStream.getVideoTracks()[0];
-    if (videoTrack) {
-      videoTrack.enabled = nextState;
-      if (nextState) {
-        await rtc.replaceTrack(videoTrack);
+    let videoTrack = localStream.getVideoTracks()[0];
+
+    if (nextState) {
+      try {
+        // Requirements: Get video track using getUserMedia
+        if (!videoTrack || videoTrack.readyState === 'ended') {
+          const freshStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          const freshTrack = freshStream.getVideoTracks()[0];
+          
+          if (videoTrack) {
+            localStream.removeTrack(videoTrack);
+            videoTrack.stop();
+          }
+          localStream.addTrack(freshTrack);
+          videoTrack = freshTrack;
+          
+          // Trigger a reference update for local preview reliability
+          setLocalStream(new MediaStream(localStream.getTracks()));
+        }
+        
+        videoTrack.enabled = true;
+        // Requirements: For each existing RTCPeerConnection: If sender with kind "video" exists → replaceTrack, Else → addTrack
+        await rtc.replaceTrack(videoTrack, 'video');
         await rtc.renegotiateAll();
+      } catch (err) {
+        console.error("Camera ON failed:", err);
+        toast({ variant: 'destructive', title: "Camera Error", description: "Could not access your camera." });
+        return;
       }
+    } else {
+      // Requirements: Stop video track, Replace track with null
+      if (videoTrack) {
+        videoTrack.enabled = false;
+        videoTrack.stop();
+      }
+      await rtc.replaceTrack(null, 'video');
     }
     
     setCamOn(nextState);
     localStorage.setItem('teachmeet-cam-state', String(nextState));
     updateMyStatus({ isCameraOn: nextState });
-  }, [localStream, camOn, updateMyStatus, rtc, isSharingScreen, screenShareHelper, screenShareStream]);
+  }, [localStream, camOn, updateMyStatus, rtc, isSharingScreen, screenShareHelper, screenShareStream, toast]);
 
-  const toggleMic = useCallback(() => {
-    if (!localStream) return;
+  const toggleMic = useCallback(async () => {
+    if (!localStream || !rtc) return;
     const audioTrack = localStream.getAudioTracks()[0];
     if (!audioTrack) return;
   
     const newState = !micOn;
     audioTrack.enabled = newState;
+    
     setMicOn(newState);
     localStorage.setItem('teachmeet-mic-state', String(newState));
     
@@ -214,7 +244,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       next.set(userId, newState ? (next.get(userId) ?? 0) : 0);
       return next;
     });
-  }, [localStream, micOn, updateMyStatus, userId]);
+  }, [localStream, micOn, updateMyStatus, userId, rtc]);
 
   const startRecording = useCallback(async () => {
     if (!localStream || !user) {
@@ -893,7 +923,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
       <footer className="p-2 sm:p-4 bg-background shrink-0 relative z-10">
         <div className="flex items-center justify-center gap-2 sm:gap-4">
-            <Button onClick={toggleMic} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", micOn ? "bg-primary/80 hover:bg-primary" : "bg-destructive hover:bg-destructive/90")} aria-label={micOn ? "Mute" : "Unmute"}>{micOn ? <Mic className="h-5 w-5 sm:h-6 sm:w-6" /> : <MicOff className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
+            <Button onClick={() => toggleMic()} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", micOn ? "bg-primary/80 hover:bg-primary" : "bg-destructive hover:bg-destructive/90")} aria-label={micOn ? "Mute" : "Unmute"}>{micOn ? <Mic className="h-5 w-5 sm:h-6 sm:w-6" /> : <MicOff className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
             <Button onClick={() => toggleCamera()} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", camOn ? "bg-primary/80 hover:bg-primary" : "bg-destructive hover:bg-destructive/90")} aria-label={camOn ? "Stop Camera" : "Start Camera"}>{camOn ? <Video className="h-5 w-5 sm:h-6 sm:w-6" /> : <VideoOff className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
             <Button onClick={handleShareClick} variant="ghost" className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", isSharingScreen ? "bg-red-600 text-white hover:bg-red-700" : "bg-secondary/50 hover:bg-secondary/70 text-foreground")} aria-label={isSharingScreen ? "Stop Sharing" : "Share Screen"}>{isSharingScreen ? <ScreenShareOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <ScreenShare className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
             <Button onClick={handleToggleHandRaise} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", isHandRaised ? "bg-primary/80 hover:bg-primary" : "bg-destructive hover:bg-destructive/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-5 w-5 sm:h-6 sm:w-6" /></Button>

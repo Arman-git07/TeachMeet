@@ -1,4 +1,3 @@
-
 // src/lib/webrtc/screenShare.ts
 import type { MeshRTC } from "./mesh";
 
@@ -54,9 +53,9 @@ export class ScreenShareHelper {
 
     if (mode === "replace") {
       this.originalTrack = this.mesh.getLocalVideoTrack?.() ?? null;
-      await this.mesh.replaceTrack(this.screenTrack);
+      await this.mesh.replaceTrack(this.screenTrack, 'video');
     } else { // 'alongside'
-      await this.mesh.addTrack?.(this.screenTrack);
+      await this.mesh.addTrack?.(this.screenTrack, stream);
     }
     
     this.isSharingFlag = true;
@@ -97,12 +96,11 @@ export class ScreenShareHelper {
         } catch (e) { /* ignore */ }
       }
 
-      if (this.currentMode === 'replace' && this.originalTrack) {
+      if (this.currentMode === 'replace') {
         try {
           await this.mesh.restoreCameraTrack?.();
         } catch (err) {
           console.error("Failed to restore camera track:", err);
-          try { await this.mesh.replaceTrack(this.originalTrack); } catch (e) { console.error(e); }
         }
       } else if (this.currentMode === 'alongside' && this.screenTrack) {
         try {
