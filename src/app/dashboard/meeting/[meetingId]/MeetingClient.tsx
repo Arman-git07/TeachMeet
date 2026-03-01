@@ -167,10 +167,23 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
   }, [user, meetingId]);
   
+  const screenShareHelper = useMemo(() => {
+    if (!rtc) return null;
+    return new ScreenShareHelper(rtc);
+  }, [rtc]);
+
   const toggleCamera = useCallback(async (forceState?: boolean) => {
     if (!localStream || !rtc) return;
     const nextState = typeof forceState === 'boolean' ? forceState : !camOn;
     
+    // Auto-switch screen share mode if we are turning camera on
+    // If we were in 'replace' mode, we must move the screen to 'alongside' so the camera can be seen
+    if (nextState === true && isSharingScreen && screenShareHelper?.currentMode === 'replace' && screenShareStream) {
+        await screenShareHelper.stopSharing(); 
+        await screenShareHelper.startSharingWithStream('alongside', screenShareStream);
+        setIsSharingScreen(true);
+    }
+
     const videoTrack = localStream.getVideoTracks()[0];
     if (videoTrack) {
       videoTrack.enabled = nextState;
@@ -183,7 +196,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     setCamOn(nextState);
     localStorage.setItem('teachmeet-cam-state', String(nextState));
     updateMyStatus({ isCameraOn: nextState });
-  }, [localStream, camOn, updateMyStatus, rtc]);
+  }, [localStream, camOn, updateMyStatus, rtc, isSharingScreen, screenShareHelper, screenShareStream]);
 
   const toggleMic = useCallback(() => {
     if (!localStream) return;
@@ -337,11 +350,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   }, [meetingId, userId]);
 
 
-  const screenShareHelper = useMemo(() => {
-    if (!rtc) return null;
-    return new ScreenShareHelper(rtc);
-  }, [rtc]);
-  
   useEffect(() => {
     if (!screenShareHelper) return;
     const off = screenShareHelper.onStop(() => setIsSharingScreen(false));
@@ -858,7 +866,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   return (
     <div className="flex flex-col h-full overflow-hidden flex-1" onClick={unlockAudio}>
       {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
-      <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} />
+      <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} isCameraOn={camOn} />
 
       <main className="flex-1 overflow-hidden relative" ref={mainContainerRef}>
           <div className={"w-full h-full p-2 transition-all duration-300"}>
