@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { collection, onSnapshot, query, where, doc, writeBatch, serverTimestamp, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, writeBatch, serverTimestamp, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Check, X, Volume2, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -88,6 +88,26 @@ export default function HostJoinRequestNotification({ meetingId }: { meetingId: 
       const joinRequestRef = doc(db, "meetings", meetingId, "joinRequests", req.userId);
   
       if (isApprove) {
+        // FRESH VALIDATION: Ensure the participant is still connected and waiting
+        const snap = await getDoc(joinRequestRef);
+        if (!snap.exists()) {
+          toast({ variant: "destructive", title: "Request Gone", description: "This request is no longer valid." });
+          setRequests(prev => prev.filter(r => r.id !== req.id));
+          return;
+        }
+
+        const data = snap.data();
+        const now = Date.now();
+        const lastBeat = data.lastHeartbeat?.toMillis() || 0;
+
+        // Verify status is still pending and heartbeat is recent (within 12 seconds)
+        if (data.status !== 'pending' || (now - lastBeat > 12000)) {
+          await updateDoc(joinRequestRef, { status: "cancelled" });
+          toast({ variant: "destructive", title: "Participant Left", description: "The user is no longer in the waiting area." });
+          setRequests(prev => prev.filter(r => r.id !== req.id));
+          return;
+        }
+
         const participantRef = doc(db, "meetings", meetingId, "participants", req.userId);
         const batch = writeBatch(db);
         batch.set(participantRef, {

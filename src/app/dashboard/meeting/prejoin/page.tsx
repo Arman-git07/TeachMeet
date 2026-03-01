@@ -221,6 +221,30 @@ useEffect(() => {
   };
 }, [meetingId, isHost, user, router, topic, isCameraOn, isMicOn]);
 
+  // Join Request Heartbeat Logic
+  useEffect(() => {
+    if (!meetingId || !user || isHost || requestStatus !== 'pending') return;
+
+    const reqRef = doc(db, 'meetings', meetingId, 'joinRequests', user.uid);
+    const heartbeatInterval = setInterval(() => {
+      updateDoc(reqRef, { lastHeartbeat: serverTimestamp() }).catch(() => {});
+    }, 5000);
+
+    const markCancelled = () => {
+      updateDoc(reqRef, { status: 'cancelled' }).catch(() => {});
+    };
+
+    window.addEventListener('beforeunload', markCancelled);
+
+    return () => {
+      clearInterval(heartbeatInterval);
+      window.removeEventListener('beforeunload', markCancelled);
+      if (requestStatus === 'pending') {
+        markCancelled();
+      }
+    };
+  }, [meetingId, user, isHost, requestStatus]);
+
   const handleCreateAndJoinMeeting = async () => {
     if (!agreed || !user || !isHost) return;
     setIsCreatingMeeting(true);
@@ -285,7 +309,8 @@ useEffect(() => {
             userName: user.displayName || "Guest User",
             userPhotoURL: user.photoURL || "",
             status: "pending",
-            requestedAt: serverTimestamp()
+            requestedAt: serverTimestamp(),
+            lastHeartbeat: serverTimestamp(),
         }, { merge: true });
 
         toast({ title: "Request Sent", description: "Waiting for the host to approve your request." });
@@ -402,7 +427,7 @@ useEffect(() => {
                         <Button variant="outline" className="w-full rounded-lg" onClick={() => setIsSharePanelOpen(true)}><Share2 className="mr-2 h-4 w-4" /> Share Full Invite</Button>
                     </CardContent>
                 </Card>
-                <div className="flex items-center space-x-2 pt-2"><Checkbox id="terms" checked={agreed} onCheckedChange={(checked) => setAgreed(!!checked)}/><label htmlFor="terms" className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">I agree to the <Link href="/terms-of-service" target="_blank" className="text-primary hover:underline">Terms of Service</Link> and <Link href="/community-guidelines" target="_blank" className="text-primary hover:underline">Community Guidelines</Link>.</label></div>
+                <div className="flex items-center space-x-2 pt-2"><Checkbox id="terms" agreed={agreed} onCheckedChange={(checked) => setAgreed(!!checked)}/><label htmlFor="terms" className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">I agree to the <Link href="/terms-of-service" target="_blank" className="text-primary hover:underline">Terms of Service</Link> and <Link href="/community-guidelines" target="_blank" className="text-primary hover:underline">Community Guidelines</Link>.</label></div>
                 {renderJoinButton()}
             </div>
         </main>

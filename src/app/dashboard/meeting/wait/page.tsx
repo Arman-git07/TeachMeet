@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Loader2, ShieldCheck } from "lucide-react";
@@ -9,12 +9,40 @@ import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import AskToJoinButton from '@/components/meeting/AskToJoinButton';
 import JoinMeetingWatcher from '@/components/meeting/JoinMeetingWatcher';
+import { useAuth } from '@/hooks/useAuth';
+import { db } from '@/lib/firebase';
+import { doc, updateDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 
 function WaitPageContent() {
   const searchParams = useSearchParams();
   const meetingId = searchParams.get("meetingId");
   const topic = searchParams.get("topic") || "TeachMeet Meeting";
   const [requestSent, setRequestSent] = useState(false);
+  const { user } = useAuth();
+
+  // Presence Heartbeat for Join Requests
+  useEffect(() => {
+    if (!meetingId || !user || !requestSent) return;
+
+    const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+    
+    const interval = setInterval(() => {
+      updateDoc(reqRef, { lastHeartbeat: serverTimestamp() }).catch(() => {});
+    }, 5000);
+
+    const handleCleanup = () => {
+      // Use try-catch or simple promise to avoid blocking unload
+      updateDoc(reqRef, { status: 'cancelled' }).catch(() => {});
+    };
+
+    window.addEventListener('beforeunload', handleCleanup);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('beforeunload', handleCleanup);
+      handleCleanup();
+    };
+  }, [meetingId, user, requestSent]);
 
   if (!meetingId) {
     return (

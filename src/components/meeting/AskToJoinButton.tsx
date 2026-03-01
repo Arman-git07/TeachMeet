@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -56,6 +55,7 @@ export default function AskToJoinButton({ meetingId, onSent, disabled }: AskToJo
         userPhotoURL: user.photoURL || "",
         status: "pending",
         requestedAt: serverTimestamp(),
+        lastHeartbeat: serverTimestamp(),
       });
 
       setLoading(false);
