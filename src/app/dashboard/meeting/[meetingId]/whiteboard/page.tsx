@@ -195,7 +195,6 @@ export default function WhiteboardPage() {
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
   const [isProcessing, setIsProcessing] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
-  const [isScreenshotDialogOpen, setIsScreenshotDialogOpen] = useState(false);
 
 
   const [refinePrompt, setRefinePrompt] = useState("");
@@ -263,8 +262,15 @@ export default function WhiteboardPage() {
       }
       ctx.stroke();
     } else if (element.type === 'text') {
-      // Text is now handled by independent draggable layer in DOM
-      // We skip drawing it on canvas if it's currently being managed by React
+      // Logic for compositing text onto canvas (used during screenshot/export)
+      ctx.fillStyle = element.color;
+      ctx.font = `${element.fontSize}px ${element.fontFamily}`;
+      ctx.textBaseline = 'top';
+      const lines = element.text.split('\n');
+      const lineHeight = element.fontSize * 1.2;
+      lines.forEach((line, i) => {
+        ctx.fillText(line, element.x, element.y + (i * lineHeight));
+      });
     } else if (element.type === 'shape') {
       ctx.strokeStyle = element.color;
       ctx.lineWidth = element.lineWidth;
@@ -337,10 +343,13 @@ export default function WhiteboardPage() {
     const currentPage = pages[currentPageIndex];
     if (!currentPage) return;
     
-    currentPage.elements.forEach(element => drawElement(mainCtx, element));
+    currentPage.elements.forEach(element => {
+        // Only draw standard elements on main canvas (text is a DOM layer)
+        if (element.type !== 'text') {
+            drawElement(mainCtx, element);
+        }
+    });
 
-    // Only draw selection box for finalized elements (not currently being edited)
-    // AND skip text elements as requested by instructions
     const finalizedSelectedIds = new Set(
         Array.from(currentPage.selectedElementIds).filter(id => {
             const el = currentPage.elements.find(e => e.id === id);
@@ -385,7 +394,9 @@ export default function WhiteboardPage() {
       tempCtx.stroke();
       tempCtx.setLineDash([]);
     } else if (opState.type === 'dragging') {
-        tempDragPreview.forEach(el => drawElement(tempCtx, el));
+        tempDragPreview.forEach(el => {
+            if (el.type !== 'text') drawElement(tempCtx, el);
+        });
     }
   }, [selectedColor, lineWidth, drawElement, tempDragPreview, selectedShape]);
 
@@ -563,12 +574,6 @@ export default function WhiteboardPage() {
     setIsTextPanelVisible(false);
 
     const currentPage = pages[currentPageIndex];
-
-    // If an element is being edited, click outside should finalize it
-    const currentlyEditing = currentPage.elements.find(el => el.type === 'text' && el.isEditing);
-    if (currentlyEditing && activeTool !== 'text') {
-        // Finalize logic handled by onBlur of textarea
-    }
 
     if (activeTool === 'select' || activeTool === 'lasso') {
       const selectionBox = getSelectionBoundingBox(currentPage.elements, currentPage.selectedElementIds);
@@ -1031,45 +1036,55 @@ export default function WhiteboardPage() {
     }
   };
 
-  const getCanvasAsBlob = async (): Promise<Blob | null> => {
-    const canvas = mainCanvasRef.current;
-    if (!canvas) return null;
-    return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-  };
-
-  const handleDownloadScreenshot = async () => {
-    setIsScreenshotDialogOpen(false);
-    const blob = await getCanvasAsBlob();
-    if (!blob) {
-        toast({ variant: "destructive", title: "Error", description: "Could not capture screenshot." });
-        return;
-    }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `TeachMeet Whiteboard - ${new Date().toISOString()}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast({ title: "Screenshot Downloaded", description: "Your whiteboard has been saved." });
-  };
-  
-  const handleSaveScreenshotToDocuments = async (destination: 'private' | 'public') => {
-    setIsScreenshotDialogOpen(false);
+  const handleTakeWhiteboardScreenshot = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
-    const toastId = `screenshot-save-${Date.now()}`;
-    toast({ id: toastId, title: "Saving Screenshot...", description: "Please wait...", duration: Infinity });
     
-    try {
-      const blob = await getCanvasAsBlob();
-      if (!blob) throw new Error("Could not capture screenshot blob.");
+    const toastId = `screenshot-cap-${Date.now()}`;
+    toast({ id: toastId, title: "Capturing Screenshot...", description: "Compositing drawing and text layers..." });
 
-      if (!auth.currentUser) throw new Error("Authentication required to save.");
+    try {
+      const mainCanvas = mainCanvasRef.current;
+      if (!mainCanvas) throw new Error("Canvas not found.");
+
+      // Create a composite canvas to combine background, drawing, and text
+      const compositeCanvas = document.createElement('canvas');
+      compositeCanvas.width = mainCanvas.width;
+      compositeCanvas.height = mainCanvas.height;
+      const ctx = compositeCanvas.getContext('2d');
+      if (!ctx) throw new Error("Could not create composite context.");
+
+      // 1. Fill Background
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, compositeCanvas.width, compositeCanvas.height);
+
+      // 2. Draw Main Canvas content (Paths, Shapes, Images)
+      ctx.drawImage(mainCanvas, 0, 0);
+
+      // 3. Draw Text Elements onto the composite
+      const currentPage = pages[currentPageIndex];
+      currentPage.elements.forEach(el => {
+        if (el.type === 'text') {
+          ctx.fillStyle = el.color;
+          ctx.font = `${el.fontSize}px ${el.fontFamily}`;
+          ctx.textBaseline = 'top';
+          
+          const lines = el.text.split('\n');
+          const lineHeight = el.fontSize * 1.2;
+          lines.forEach((line, i) => {
+            ctx.fillText(line, el.x, el.y + (i * lineHeight));
+          });
+        }
+      });
+
+      const blob = await new Promise<Blob | null>(r => compositeCanvas.toBlob(r, 'image/png'));
+      if (!blob) throw new Error("Failed to generate screenshot blob.");
+
+      if (!auth.currentUser) throw new Error("Authentication required to save screenshots.");
+      
       const userId = auth.currentUser.uid;
-      const fileName = `Whiteboard Screenshot - ${new Date().toISOString()}.png`;
-      const path = `documents/${userId}/${destination}/${Date.now()}-${fileName}`;
+      const fileName = `Whiteboard Screenshot - ${Date.now()}.png`;
+      const path = `documents/${userId}/private/${Date.now()}-${fileName}`;
       const fileRef = storageRef(storage, path);
       
       await uploadBytes(fileRef, blob);
@@ -1080,17 +1095,17 @@ export default function WhiteboardPage() {
           lastModified: new Date().toISOString(),
           size: `${(blob.size / 1024 / 1024).toFixed(2)}MB`,
           uploaderId: userId,
-          isPrivate: destination === 'private',
+          isPrivate: true,
           downloadURL,
           storagePath: path,
           createdAt: serverTimestamp(),
       });
       
-      toast({ id: toastId, title: "Screenshot Saved!", description: `Saved to your ${destination} documents.` });
+      toast({ id: toastId, title: "Screenshot Captured!", description: "Saved to your Private Documents." });
 
     } catch (error) {
-      console.error("Failed to save screenshot:", error);
-      toast({ id: toastId, variant: "destructive", title: "Save Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
+      console.error("Screenshot failed:", error);
+      toast({ id: toastId, variant: "destructive", title: "Capture Failed", description: error instanceof Error ? error.message : "An unexpected error occurred." });
     } finally {
       setIsProcessing(false);
     }
@@ -1214,11 +1229,12 @@ export default function WhiteboardPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="rounded-xl">
                 <DropdownMenuItem
-                    onSelect={() => setIsScreenshotDialogOpen(true)}
+                    onSelect={handleTakeWhiteboardScreenshot}
+                    disabled={isProcessing}
                     className="cursor-pointer"
                   >
-                    <Camera className="mr-2 h-4 w-4" />
-                    <span>Screenshot</span>
+                    {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Camera className="mr-2 h-4 w-4" />}
+                    <span>{isProcessing ? 'Capturing...' : 'Screenshot'}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => router.push(`/dashboard/settings?highlight=whiteboardSettings&meetingId=${meetingId}&topic=${encodeURIComponent(topic || '')}`)}
@@ -1236,7 +1252,7 @@ export default function WhiteboardPage() {
         setHeaderContent(null);
         setHeaderAction(null);
     };
-  }, [setHeaderContent, setHeaderAction, meetingId, router, topic]);
+  }, [setHeaderContent, setHeaderAction, meetingId, router, topic, isProcessing]);
 
   // Handle finalizing text with dimensions
   const finalizeText = useCallback((id: string, width?: number, height?: number) => {
@@ -1586,46 +1602,6 @@ export default function WhiteboardPage() {
         </DialogContent>
       </Dialog>
       
-      <Dialog open={isScreenshotDialogOpen} onOpenChange={setIsScreenshotDialogOpen}>
-        <DialogContent className="sm:max-w-md rounded-xl">
-          <DialogHeader>
-            <ShadDialogTitle className="text-xl">Save Screenshot</ShadDialogTitle>
-            <DialogDescription>How would you like to save the screenshot of your whiteboard?</DialogDescription>
-          </DialogHeader>
-          <div className="py-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Button variant="outline" className="w-full rounded-lg py-6 text-base" onClick={handleDownloadScreenshot} disabled={isProcessing}>
-              <FileDown className="mr-2 h-5 w-5" /> Download to Device
-            </Button>
-            <Dialog>
-              <DialogTrigger asChild>
-                 <Button variant="outline" className="w-full rounded-lg py-6 text-base" disabled={isProcessing}>
-                   <Globe className="mr-2 h-4 w-4" /> Save to Documents
-                 </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-xs rounded-xl">
-                 <DialogHeader>
-                    <ShadDialogTitle>Save to Documents</ShadDialogTitle>
-                    <DialogDescription>Choose a destination for your screenshot.</DialogDescription>
-                  </DialogHeader>
-                  <div className="py-4 space-y-3">
-                    <Button variant="outline" className="w-full rounded-lg" onClick={() => handleSaveScreenshotToDocuments('private')} disabled={isProcessing}>
-                      <Lock className="mr-2 h-4 w-4" /> Save as Private
-                    </Button>
-                    <Button variant="outline" className="w-full rounded-lg" onClick={() => handleSaveScreenshotToDocuments('public')} disabled={isProcessing}>
-                      <Globe className="mr-2 h-4 w-4" /> Save as Public
-                    </Button>
-                  </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="ghost" className="w-full rounded-lg" disabled={isProcessing}>Cancel</Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Review Dialog */}
       <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
           <DialogContent className="sm:max-w-md rounded-2xl p-6 overflow-hidden border-none shadow-2xl">
