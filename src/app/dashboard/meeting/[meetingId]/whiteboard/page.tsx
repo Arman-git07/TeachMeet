@@ -877,7 +877,7 @@ export default function WhiteboardPage() {
   const handleAddPage = () => {
     const newPageIndex = pages.length;
     const newPage: ElementState = { elements: [], selectedElementIds: new Set() };
-    setPages(currentPages => [...currentPages, nPage]);
+    setPages(currentPages => [...currentPages, newPage]);
     pagesHistoryRef.current.push([]);
     pagesHistoryStepRef.current.push(-1);
     setCurrentPageIndex(newPageIndex); 
@@ -1327,6 +1327,7 @@ export default function WhiteboardPage() {
                  setIsReviewDialogOpen(true);
                }} 
              />
+             <ToolButton icon={Eraser} label="Erase" onClick={() => handleNonDrawingToolSelect("erase")} isActive={activeTool === "erase"}/>
              <ToolButton icon={Type} label="Text" onClick={handleTextButtonClick} isActive={activeTool === "text"}/>
              {isTextPanelVisible && (
                 <Card className="absolute top-full mt-2 w-[320px] p-4 rounded-xl z-30 bg-popover text-popover-foreground shadow-lg border left-1/2 -translate-x-1/2">
@@ -1373,7 +1374,6 @@ export default function WhiteboardPage() {
                     </div>
                 </Card>
              )}
-             <ToolButton icon={Eraser} label="Erase" onClick={() => handleNonDrawingToolSelect("erase")} isActive={activeTool === "erase"}/>
              <ToolButton icon={Undo2} label="Undo" onClick={handleUndo} />
              <ToolButton icon={Redo2} label="Redo" onClick={handleRedo} />
              
