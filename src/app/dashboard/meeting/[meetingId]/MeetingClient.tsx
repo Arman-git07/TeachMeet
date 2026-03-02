@@ -175,11 +175,9 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     if (!localStream || !rtc) return;
     const nextState = typeof forceState === 'boolean' ? forceState : !camOn;
     
-    // We don't stop the track or replace it with null. 
-    // We simply toggle 'enabled'. This is the standard WebRTC way to mute video.
-    // It keeps the pipeline "warm" so others don't lose the connection reference.
     const videoTrack = localStream.getVideoTracks()[0];
     if (videoTrack) {
+      // Warm track approach: keep hardware running but disable transmission
       videoTrack.enabled = nextState;
     }
     

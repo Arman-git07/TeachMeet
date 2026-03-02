@@ -48,25 +48,9 @@ export class MeshRTC {
   public async init(localStream: MediaStream, displayName: string, photoURL?: string) {
     this.localStream = localStream;
     
-    // Attach tracks to any peers that were created before the stream was ready
+    // For all existing peers, ensure they get the tracks
     for (const entry of this.peers.values()) {
-      const pc = entry.pc;
-      const senders = pc.getSenders();
-      
-      this.localStream.getTracks().forEach(track => {
-        const existingSender = senders.find(s => s.track?.kind === track.kind);
-        const storedSender = track.kind === 'video' ? entry.videoSender : entry.audioSender;
-
-        if (!storedSender && !existingSender) {
-          const sender = pc.addTrack(track, this.localStream!);
-          if (track.kind === 'video') entry.videoSender = sender;
-          else if (track.kind === 'audio') entry.audioSender = sender;
-        } else {
-          // Sync internal references if they were missing
-          if (track.kind === 'video') entry.videoSender = storedSender || existingSender;
-          else if (track.kind === 'audio') entry.audioSender = storedSender || existingSender;
-        }
-      });
+      this.attachLocalTracksToPeer(entry);
     }
 
     this._ready = true;
@@ -171,9 +155,14 @@ export class MeshRTC {
     const entry: PeerEntry = { pc, stream: null, negotiating: false, iceCandidateQueue: [] };
 
     pc.ontrack = (ev) => {
-      ev.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
-      entry.stream = remoteStream;
-      this.onRemoteStream(remoteId, entry.stream);
+      // Ensure we catch the track and attach it to our local remoteStream proxy
+      if (ev.track) {
+        remoteStream.addTrack(ev.track);
+      }
+      // Use provided streams or fallback to our proxy
+      const streamToNotify = ev.streams[0] || remoteStream;
+      entry.stream = streamToNotify;
+      this.onRemoteStream(remoteId, streamToNotify);
     };
 
     pc.onicecandidate = (ev) => {
@@ -195,14 +184,31 @@ export class MeshRTC {
     };
 
     if (this.localStream) {
-      this.localStream.getTracks().forEach(track => {
-        const sender = pc.addTrack(track, this.localStream!);
-        if (track.kind === 'video') entry.videoSender = sender;
-        else if (track.kind === 'audio') entry.audioSender = sender;
-      });
+      this.attachLocalTracksToPeer(entry);
     }
 
     return entry;
+  }
+
+  private attachLocalTracksToPeer(entry: PeerEntry) {
+    if (!this.localStream) return;
+    
+    const pc = entry.pc;
+    const senders = pc.getSenders();
+
+    this.localStream.getTracks().forEach(track => {
+      const existingSender = senders.find(s => s.track?.kind === track.kind || (s as any).kind === track.kind);
+      
+      if (!existingSender) {
+        const sender = pc.addTrack(track, this.localStream!);
+        if (track.kind === 'video') entry.videoSender = sender;
+        else if (track.kind === 'audio') entry.audioSender = sender;
+      } else {
+        // Track references for future replaceTrack calls
+        if (track.kind === 'video') entry.videoSender = existingSender;
+        else if (track.kind === 'audio') entry.audioSender = existingSender;
+      }
+    });
   }
 
   public leave() {
@@ -228,32 +234,6 @@ export class MeshRTC {
           await sender.replaceTrack(newTrack);
         } catch (e) {
           console.error(`[mesh] replaceTrack failed for ${kind}:`, e);
-        }
-      } else if (newTrack && this.localStream) {
-        // Fallback: if sender was somehow lost, add the track fresh
-        try {
-          const newSender = entry.pc.addTrack(newTrack, this.localStream);
-          if (kind === 'video') entry.videoSender = newSender;
-          else if (kind === 'audio') entry.audioSender = newSender;
-        } catch (e) {
-          console.error(`[mesh] addTrack fallback failed for ${kind}:`, e);
-        }
-      }
-    }
-  }
-
-  public async renegotiateAll() {
-    for (const [remoteId, entry] of this.peers.entries()) {
-      if (!entry.negotiating) {
-        try {
-          entry.negotiating = true;
-          const offer = await entry.pc.createOffer();
-          await entry.pc.setLocalDescription(offer);
-          this.socket.emit("offer", remoteId, offer);
-        } catch (e) {
-          console.error(`[mesh] Renegotiation failed for ${remoteId}:`, e);
-        } finally {
-          entry.negotiating = false;
         }
       }
     }
