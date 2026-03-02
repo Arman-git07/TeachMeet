@@ -1,5 +1,5 @@
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   MicOff,
@@ -81,41 +81,46 @@ const VideoTile: React.FC<Props> = ({
     }
   }, [isLocal, isScreenSharing]);
 
-  useEffect(() => {
+  const syncStream = useCallback(() => {
     const videoEl = videoRef.current;
     if (!videoEl || !stream) {
       setHasVideoTrack(false);
       return;
     }
 
-    const syncStream = () => {
-      if (videoEl.srcObject !== stream) {
-        videoEl.srcObject = stream;
-      }
-      
-      const hasVideo = stream.getVideoTracks().length > 0;
-      setHasVideoTrack(hasVideo);
+    if (videoEl.srcObject !== stream) {
+      videoEl.srcObject = stream;
+    }
+    
+    const hasVideo = stream.getVideoTracks().length > 0;
+    setHasVideoTrack(hasVideo);
 
-      if (hasVideo || stream.getAudioTracks().length > 0) {
-        videoEl.play().catch(e => {
-          if (e.name !== 'AbortError') {
-            console.warn(`[VideoTile] Playback issue for ${name}:`, e);
-          }
-        });
-      }
-    };
+    if (hasVideo || stream.getAudioTracks().length > 0) {
+      videoEl.play().catch(e => {
+        if (e.name !== 'AbortError') {
+          console.warn(`[VideoTile] Playback issue for ${name}:`, e);
+        }
+      });
+    }
+  }, [stream, name]);
 
+  useEffect(() => {
     syncStream();
 
-    // Listen for tracks being added to the stream (WebRTC often adds audio then video)
-    stream.addEventListener('addtrack', syncStream);
-    stream.addEventListener('removetrack', syncStream);
+    // In modern WebRTC with addTrack, tracks might arrive after the MediaStream reference is created.
+    // We listen for track addition events to ensure the video renders as soon as it's available.
+    if (stream) {
+      stream.addEventListener('addtrack', syncStream);
+      stream.addEventListener('removetrack', syncStream);
+    }
 
     return () => {
-      stream.removeEventListener('addtrack', syncStream);
-      stream.removeEventListener('removetrack', syncStream);
+      if (stream) {
+        stream.removeEventListener('addtrack', syncStream);
+        stream.removeEventListener('removetrack', syncStream);
+      }
     };
-  }, [stream, name]);
+  }, [stream, syncStream]);
 
   const isSpeaking = (volumeLevel ?? 0) > 0.1 && isMicOn;
   

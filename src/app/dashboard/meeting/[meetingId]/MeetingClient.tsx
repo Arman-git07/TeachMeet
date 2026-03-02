@@ -139,7 +139,10 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       onRemoteStream: (remoteUserId, stream) => {
         setRemoteStreams(prev => {
           const next = new Map(prev);
-          next.set(remoteUserId, stream);
+          // CRITICAL FIX: Construct a NEW MediaStream instance with the current tracks.
+          // This ensures the object reference changes, which triggers React's useEffect in VideoTile.
+          // Without this, adding a video track to an existing audio stream reference would not render the video.
+          next.set(remoteUserId, new MediaStream(stream.getTracks()));
           return next;
         });
       },

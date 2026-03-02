@@ -4,7 +4,7 @@ import { io, Socket } from "socket.io-client";
 
 type PeerEntry = {
   pc: RTCPeerConnection;
-  stream: MediaStream | null;
+  stream: MediaStream;
   makingOffer: boolean;
   ignoreOffer: boolean;
   isSettingRemoteAnswerPending: boolean;
@@ -105,7 +105,6 @@ export class MeshRTC {
     }
     
     const pc = entry.pc;
-    // Perfect Negotiation: Polite peer logic
     const polite = this.userId > fromId;
     const offerCollision = (offer.type === "offer") && (entry.makingOffer || pc.signalingState !== "stable");
 
@@ -153,22 +152,29 @@ export class MeshRTC {
 
   private createPeerEntry(remoteId: string, isInitiator: boolean): PeerEntry {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
+    // Manually manage a single MediaStream for this peer to handle track collection reliably
     const remoteStream = new MediaStream();
+    
     const entry: PeerEntry = { 
       pc, 
-      stream: null, 
+      stream: remoteStream, 
       makingOffer: false, 
       ignoreOffer: false, 
       isSettingRemoteAnswerPending: false 
     };
 
     pc.ontrack = (ev) => {
+      // Robust attachment: Always add incoming tracks to our manual stream
+      // because ev.streams[0] may be empty or unreliable with addTrack()
       if (ev.track) {
-        remoteStream.addTrack(ev.track);
+        const existingTrack = remoteStream.getTracks().find(t => t.id === ev.track.id);
+        if (!existingTrack) {
+          remoteStream.addTrack(ev.track);
+        }
       }
-      const streamToNotify = ev.streams[0] || remoteStream;
-      entry.stream = streamToNotify;
-      this.onRemoteStream(remoteId, streamToNotify);
+      
+      // Notify the UI logic. We pass the stream that now contains the latest track.
+      this.onRemoteStream(remoteId, remoteStream);
     };
 
     pc.onicecandidate = (ev) => {
@@ -208,7 +214,6 @@ export class MeshRTC {
         if (track.kind === 'video') entry.videoSender = sender;
         else if (track.kind === 'audio') entry.audioSender = sender;
       } else {
-        // If track changed (e.g. after camera restart), replace it
         if (existingSender.track?.id !== track.id) {
             existingSender.replaceTrack(track).catch(e => console.error("[mesh] Track replacement failed", e));
         }
