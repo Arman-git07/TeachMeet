@@ -163,14 +163,13 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       const removedUserId = snapshot.key;
       if (!removedUserId) return;
 
-      // Logic: If I am the host (or primary cleanup agent), I remove them from Firestore.
-      // Firestore removal then triggers the UI update for EVERYONE.
+      // Logic: Firestore removal then triggers the UI update for EVERYONE.
       try {
           const participantRef = doc(db, "meetings", meetingId, "participants", removedUserId);
           await deleteDoc(participantRef);
           console.log(`[Presence] Automatic cleanup of ghost participant: ${removedUserId}`);
       } catch (e) {
-          // Concurrency or permission errors are ignored; someone else might have already deleted it.
+          // Concurrency or permission errors are ignored
       }
     });
 
@@ -181,15 +180,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     };
   }, [user, meetingId, rtdb]);
 
-  // Peer connection safety net: Cleanup MeshRTC peers that are no longer in Firestore
-  useEffect(() => {
-    remoteStreams.forEach((_, id) => {
-      if (!liveParticipants.has(id)) {
-        handleRemoteLeft(id);
-      }
-    });
-  }, [liveParticipants, remoteStreams, handleRemoteLeft]);
-
   useEffect(() => {
     const rtcInstance = new MeshRTC({
       roomId: meetingId,
@@ -197,8 +187,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       onRemoteStream: (remoteUserId, stream) => {
         setRemoteStreams(prev => {
           const next = new Map(prev);
-          // CRITICAL FIX: Construct a NEW MediaStream instance with the current tracks.
-          // This ensures the object reference changes, which triggers React's useEffect in VideoTile.
+          // NEW MediaStream instance forces React reference change
           next.set(remoteUserId, new MediaStream(stream.getTracks()));
           return next;
         });
