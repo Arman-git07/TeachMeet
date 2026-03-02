@@ -92,7 +92,6 @@ export class MeshRTC {
     });
     
     this.socket.on("user-left", (remoteId: string) => {
-      console.log(`[Mesh] received user-left for ${remoteId}`);
       this.cleanupPeer(remoteId);
       if (this.onRemoteLeft) this.onRemoteLeft(remoteId);
     });
@@ -116,7 +115,7 @@ export class MeshRTC {
       await pc.setRemoteDescription(offer);
       if (offer.type === "offer") {
         await pc.setLocalDescription();
-        this.socket.emit("answer", fromId, pc.localDescription);
+        this.socket.emit("offer", fromId, pc.localDescription);
       }
     } catch (err) {
       console.error("[mesh] Offer handling failed:", err);
@@ -154,7 +153,7 @@ export class MeshRTC {
   private createPeerEntry(remoteId: string, isInitiator: boolean): PeerEntry {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
     
-    // FIX: Authoritative stream construction
+    // Authoritative manual stream construction to handle "empty event.streams" bugs
     const remoteStream = new MediaStream();
     
     const entry: PeerEntry = { 
@@ -166,14 +165,13 @@ export class MeshRTC {
     };
 
     pc.ontrack = (ev) => {
-      console.log(`[Mesh] Track received from ${remoteId}: ${ev.track.kind}`);
       if (ev.track) {
         const existingTrack = remoteStream.getTracks().find(t => t.id === ev.track.id);
         if (!existingTrack) {
           remoteStream.addTrack(ev.track);
         }
       }
-      // Notify callback so UI Tile can refresh its srcObject
+      // Authoritative callback - passing the manually built stream
       this.onRemoteStream(remoteId, remoteStream);
     };
 
@@ -206,6 +204,8 @@ export class MeshRTC {
     const pc = entry.pc;
     const senders = pc.getSenders();
 
+    // Iterate through tracks and add/replace. 
+    // This supports "Warm Initialization" where tracks are present but may be disabled.
     this.localStream.getTracks().forEach(track => {
       const existingSender = senders.find(s => s.track?.kind === track.kind);
       
@@ -236,7 +236,6 @@ export class MeshRTC {
   private cleanupPeer(remoteId: string) {
     const entry = this.peers.get(remoteId);
     if (entry) {
-      console.log(`[Mesh] authoritative cleanup for ${remoteId}`);
       entry.pc.close();
       entry.stream.getTracks().forEach(t => t.stop());
       this.peers.delete(remoteId);

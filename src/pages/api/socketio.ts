@@ -140,9 +140,10 @@ export default function handler(
       socket.on("disconnect", async () => {
         const { roomId, userId } = socket.data as { roomId: string, userId: string };
         if (roomId && userId) {
-          console.log(`🧹 Authoritative cleanup for user ${userId} in room ${roomId}`);
-          
-          // AUTHORITATIVE FIX: Use Admin SDK to bypass security rules and prune Firestore immediately
+          // BROADCAST LEAVE SIGNAL TO PEERS
+          socket.to(roomId).emit("user-left", userId);
+
+          // AUTHORITATIVE PRUNING OF FIRESTORE (Handling crashes/drops)
           try {
             await admin.firestore()
               .collection("meetings")
@@ -150,12 +151,9 @@ export default function handler(
               .collection("participants")
               .doc(userId)
               .delete();
-            console.log(`✅ Successfully pruned Firestore for user ${userId}`);
           } catch (err) {
-            console.error("❌ Failed to delete participant doc on server:", err);
+            console.error("❌ Server cleanup failed:", err);
           }
-
-          socket.to(roomId).emit("user-left", userId);
 
           const roomBlockMap = roomBlocks.get(roomId);
           if(roomBlockMap) {
