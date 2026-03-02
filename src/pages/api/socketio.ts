@@ -8,19 +8,27 @@ import type { ChatMessage } from "@/contexts/MeetingRTCContext";
 // Initialize Firebase Admin for authoritative server-side cleanup
 if (!admin.apps.length) {
   try {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      }),
-    });
+    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+    if (projectId && clientEmail && privateKey) {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId,
+          clientEmail,
+          privateKey,
+        }),
+      });
+      console.log("✅ Firebase Admin initialized with Service Account");
+    } else {
+      admin.initializeApp();
+      console.log("⚠️ Firebase Admin initialized with default credentials (check env vars if delete fails)");
+    }
   } catch (error) {
-    console.error("Firebase Admin initialization failed. Server-side Firestore cleanup may fail.", error);
+    console.error("❌ Firebase Admin initialization failed:", error);
   }
 }
-
-const adminDb = admin.apps.length ? admin.firestore() : null;
 
 // A simple in-memory store for block relationships within a room.
 const roomBlocks = new Map<string, Map<string, Set<string>>>(); // Map<roomId, Map<blockerId, Set<blockedId>>>
@@ -30,7 +38,7 @@ export default function handler(
   res: NextApiResponseServerIO
 ) {
   if (!res.socket.server.io) {
-    console.log("🔌 Initializing new Socket.IO server with Admin SDK support...");
+    console.log("🔌 Initializing new Socket.IO server...");
     const io = new IOServer(res.socket.server, {
       path: "/api/socketio",
       addTrailingSlash: false,
@@ -93,7 +101,7 @@ export default function handler(
           
           const unblockedSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === unblockedUserId);
           if (unblockedSocket) {
-              unblockedSocket.emit('user-unblocked-me', unblockerId);
+              blockedSocket.emit('user-unblocked-me', unblockerId);
           }
       });
 
@@ -137,19 +145,17 @@ export default function handler(
         if (roomId && userId) {
           console.log(`🧹 Authoritative cleanup for user ${userId} in room ${roomId}`);
           
-          // 1. Authoritative Deletion from Firestore via Admin SDK
-          if (adminDb) {
-            try {
-              await adminDb
-                .collection("meetings")
-                .doc(roomId)
-                .collection("participants")
-                .doc(userId)
-                .delete();
-              console.log(`✅ Successfully pruned Firestore for user ${userId}`);
-            } catch (err) {
-              console.error("❌ Failed to delete participant doc on server:", err);
-            }
+          // 1. Authoritative Deletion from Firestore via Admin SDK (Bypasses security rules)
+          try {
+            await admin.firestore()
+              .collection("meetings")
+              .doc(roomId)
+              .collection("participants")
+              .doc(userId)
+              .delete();
+            console.log(`✅ Successfully pruned Firestore for user ${userId}`);
+          } catch (err) {
+            console.error("❌ Failed to delete participant doc on server:", err);
           }
 
           // 2. Authoritative Signal Broadcast

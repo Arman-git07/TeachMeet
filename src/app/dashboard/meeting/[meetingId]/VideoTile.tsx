@@ -7,7 +7,6 @@ import {
   Mic,
   VideoOff,
   Video,
-  ScreenShare,
   Pin,
   Maximize2,
   Minimize2,
@@ -174,8 +173,8 @@ const VideoTile: React.FC<Props> = ({
         {!isEffectivelyShowingVideo && (
           <div className="absolute inset-0 flex items-center justify-center z-10 bg-muted/10">
             <Avatar className="w-1/3 aspect-square h-auto max-w-24 max-h-24 md:w-28 md:h-28 border-4 border-background shadow-lg transition-all duration-300">
-              <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
-              <AvatarFallback className="text-3xl md:text-5xl">{name?.charAt(0).toUpperCase() ?? "U"}</AvatarFallback>
+              <AvatarImage src={profileUrl || undefined} alt={name} />
+              <AvatarFallback className="text-3xl md:text-5xl">{name?.trim().charAt(0).toUpperCase() ?? "U"}</AvatarFallback>
             </Avatar>
           </div>
         )}
@@ -188,8 +187,8 @@ const VideoTile: React.FC<Props> = ({
       <div className="absolute bottom-0 left-0 right-0 z-30 p-2 sm:p-3 flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-2 text-white pointer-events-auto" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
           <Avatar className="w-6 h-6 sm:w-7 sm:h-7 shrink-0">
-            <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
-            <AvatarFallback className="text-xs sm:text-sm">{name?.charAt(0).toUpperCase()}</AvatarFallback>
+            <AvatarImage src={profileUrl || undefined} alt={name} />
+            <AvatarFallback className="text-xs sm:text-sm">{name?.trim().charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
           <div className="text-xs sm:text-sm font-medium truncate">{name}</div>
           {isMicOn ? <Mic className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" /> : <MicOff className="h-3 w-3 sm:h-4 sm:w-4 text-red-400" />}
