@@ -112,8 +112,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   }, []);
 
   const handleRemoteLeft = useCallback(async (remoteUserId: string) => {
-    console.log(`[Mesh] Remote ${remoteUserId} left. Triggering cleanup.`);
-    
     setRemoteStreams(prev => {
       const next = new Map(prev);
       next.delete(remoteUserId);
@@ -135,7 +133,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       onRemoteStream: (remoteId, stream) => {
         setRemoteStreams(prev => {
           const next = new Map(prev);
-          // FORCE: Fresh reference to ensure VideoTile detects track additions
+          // Force fresh reference to ensure VideoTile detects track additions
           next.set(remoteId, new MediaStream(stream.getTracks()));
           return next;
         });
@@ -174,7 +172,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     
     const videoTrack = localStream.getVideoTracks()[0];
     if (videoTrack) {
-      // WARM TRACK FIX: Toggle enabled instead of stopping to keep connection active
       videoTrack.enabled = nextState;
     }
     
@@ -342,11 +339,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const onModalConfirm = async (shareAudio: boolean, mode: ShareMode) => {
     setIsScreenShareModalOpen(false);
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
-      toast({
-        variant: "destructive",
-        title: "Screen Share Not Supported",
-        description: "Your browser does not support this feature.",
-      });
+      toast({ variant: "destructive", title: "Screen Share Not Supported", description: "Your browser does not support this feature." });
       return;
     }
     if (!screenShareHelper) return;

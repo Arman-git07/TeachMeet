@@ -49,6 +49,7 @@ export class MeshRTC {
   public async init(localStream: MediaStream, displayName: string, photoURL?: string) {
     this.localStream = localStream;
     
+    // Attach existing tracks to any peers that might have been created while media was loading
     for (const entry of this.peers.values()) {
       this.attachLocalTracksToPeer(entry);
     }
@@ -91,7 +92,7 @@ export class MeshRTC {
     });
     
     this.socket.on("user-left", (remoteId: string) => {
-      console.log(`[Mesh] authoritative user-left signal for ${remoteId}`);
+      console.log(`[Mesh] received user-left for ${remoteId}`);
       this.cleanupPeer(remoteId);
       if (this.onRemoteLeft) this.onRemoteLeft(remoteId);
     });
@@ -153,7 +154,7 @@ export class MeshRTC {
   private createPeerEntry(remoteId: string, isInitiator: boolean): PeerEntry {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
     
-    // FIX: Manual stream construction to handle empty event.streams in addTrack API
+    // FIX: Authoritative stream construction
     const remoteStream = new MediaStream();
     
     const entry: PeerEntry = { 
@@ -172,6 +173,7 @@ export class MeshRTC {
           remoteStream.addTrack(ev.track);
         }
       }
+      // Notify callback so UI Tile can refresh its srcObject
       this.onRemoteStream(remoteId, remoteStream);
     };
 
@@ -234,7 +236,7 @@ export class MeshRTC {
   private cleanupPeer(remoteId: string) {
     const entry = this.peers.get(remoteId);
     if (entry) {
-      console.log(`[Mesh] Cleaning up peer connection for ${remoteId}`);
+      console.log(`[Mesh] authoritative cleanup for ${remoteId}`);
       entry.pc.close();
       entry.stream.getTracks().forEach(t => t.stop());
       this.peers.delete(remoteId);
