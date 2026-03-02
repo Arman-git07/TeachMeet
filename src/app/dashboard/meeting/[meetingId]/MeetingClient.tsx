@@ -116,13 +116,9 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const handleRemoteLeft = useCallback(async (remoteUserId: string) => {
     console.log(`[Mesh] Peer ${remoteUserId} left. Cleaning up local resources.`);
     
-    // 1. Authoritative Cleanup (Host Janitor Logic)
-    // The server-side cleanup in socketio.ts might fail due to Firestore rules.
-    // As the host, we have authoritative permission to prune the list.
     if (isHost && meetingId) {
         try {
             const participantRef = doc(db, "meetings", meetingId, "participants", remoteUserId);
-            // We only attempt to delete if it's not ourselves (failsafe)
             if (remoteUserId !== userId) {
                 await deleteDoc(participantRef);
                 console.log(`[Presence] Host authoritatively pruned ghost participant: ${remoteUserId}`);
@@ -132,17 +128,12 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         }
     }
 
-    // 2. Hardware/Stream Cleanup
     setRemoteStreams(prev => {
       const next = new Map(prev);
       next.delete(remoteUserId);
       return next;
     });
     
-    // We DON'T manually delete from liveParticipants here anymore.
-    // The Firestore onSnapshot listener will handle the UI removal naturally
-    // once the document is deleted, preventing "resurrection" glitches.
-
     const entry = remoteAnalysersRef.current.get(remoteUserId);
     if (entry && entry.rafId) cancelAnimationFrame(entry.rafId);
     remoteAnalysersRef.current.delete(remoteUserId);
@@ -561,7 +552,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     const self: Participant = {
       id: userId,
       name: localUserDetails?.name || user?.displayName || "You",
-      avatar: localUserDetails?.photoURL || user?.photoURL || `https://picsum.photos/seed/1/128/128`,
+      avatar: localUserDetails?.photoURL || user?.photoURL || undefined,
       isCamOff: !camOn, isMicOff: !micOn, isHandRaised, handRaisedAt: localUserDetails?.handRaisedAt,
       isScreenSharing: isSharingScreen, isLocal: true, stream: localStream,
       volumeLevel: volumeLevels.get(userId) ?? 0
@@ -585,7 +576,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         }
 
         return {
-          id, name: data.name || `User ${id.substring(0, 4)}`, avatar: data.photoURL || `https://picsum.photos/seed/2/40/40`,
+          id, name: data.name || `User ${id.substring(0, 4)}`, avatar: data.photoURL || undefined,
           isHandRaised: data.isHandRaised, handRaisedAt: data.handRaisedAt, isScreenSharing: data.isScreenSharing,
           isCamOff: videoBlocked || !data.isCameraOn,
           isMicOff: audioBlocked || !data.isMicOn,
