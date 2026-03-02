@@ -2,6 +2,8 @@
 import type { NextApiRequest } from "next";
 import type { NextApiResponseServerIO } from "@/types";
 import { Server as IOServer, Socket } from "socket.io";
+import { db } from "@/lib/firebase";
+import { doc, deleteDoc } from "firebase/firestore";
 import type { ChatMessage } from "@/contexts/MeetingRTCContext";
 
 // A simple in-memory store for block relationships within a room.
@@ -117,12 +119,23 @@ export default function handler(
         }
       });
 
-      socket.on("disconnect", () => {
+      socket.on("disconnect", async () => {
         const { roomId, userId } = socket.data as { roomId: string, userId: string };
         if (roomId && userId) {
-          // Notify other peers to close WebRTC tracks immediately
+          console.log(`🧹 Authoritative cleanup for user ${userId} in room ${roomId}`);
+          
+          // 1. Authoritative Firestore Cleanup
+          try {
+            const participantRef = doc(db, "meetings", roomId, "participants", userId);
+            await deleteDoc(participantRef);
+          } catch (e) {
+            console.error("Failed to delete participant doc on disconnect:", e);
+          }
+
+          // 2. Notify other peers to close WebRTC tracks immediately
           socket.to(roomId).emit("user-left", userId);
 
+          // 3. Ephemeral State Cleanup
           const roomBlockMap = roomBlocks.get(roomId);
           if(roomBlockMap) {
             roomBlockMap.delete(userId);

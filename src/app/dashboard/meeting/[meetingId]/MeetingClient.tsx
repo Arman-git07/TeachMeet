@@ -8,10 +8,9 @@ import { MeshRTC } from "@/lib/webrtc/mesh";
 import { useAuth } from "@/hooks/useAuth";
 import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, X, Users, Pin, Minimize2, Maximize2 } from "lucide-react";
 import { collection, onSnapshot, doc, updateDoc, getDoc, serverTimestamp, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
-import { db, storage, rtdb } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes } from 'firebase/storage';
 import { getDownloadURL } from "firebase/storage";
-import { ref as rtdbRef, onValue, set, onDisconnect, remove, onChildRemoved } from "firebase/database";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -115,6 +114,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   }, []);
 
   const handleRemoteLeft = useCallback((remoteUserId: string) => {
+    console.log(`[Mesh] Peer ${remoteUserId} left. Cleaning up local resources.`);
     setRemoteStreams(prev => {
       const next = new Map(prev);
       next.delete(remoteUserId);
@@ -133,52 +133,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     setVolumeLevels(prev => { const next = new Map(prev); next.delete(remoteUserId); return next; });
     setPinnedId(prev => prev === remoteUserId ? null : prev);
   }, []);
-
-  // Presence & Cleanup Logic using Realtime Database
-  useEffect(() => {
-    if (!user || !meetingId || !participantDocCreated.current || !rtdb) return;
-
-    const myPresenceRef = rtdbRef(rtdb, `presence/${meetingId}/${user.uid}`);
-    const connectedRef = rtdbRef(rtdb, ".info/connected");
-
-    // 1. Manage my own presence with onDisconnect cleanup
-    const unsubConnected = onValue(connectedRef, (snap) => {
-      if (snap.val() === true) {
-        // Automatic removal from RTDB on disconnect
-        onDisconnect(myPresenceRef).remove();
-        
-        // Register current presence
-        set(myPresenceRef, {
-          name: user.displayName,
-          photoURL: user.photoURL,
-          joinedAt: Date.now()
-        });
-      }
-    });
-
-    // 2. Cleanup ghost users from Firestore
-    // We listen for removals from RTDB. If someone disappears from RTDB, they are gone.
-    const meetingPresenceRef = rtdbRef(rtdb, `presence/${meetingId}`);
-    const unsubRemoved = onChildRemoved(meetingPresenceRef, async (snapshot) => {
-      const removedUserId = snapshot.key;
-      if (!removedUserId) return;
-
-      // Logic: Firestore removal then triggers the UI update for EVERYONE.
-      try {
-          const participantRef = doc(db, "meetings", meetingId, "participants", removedUserId);
-          await deleteDoc(participantRef);
-          console.log(`[Presence] Automatic cleanup of ghost participant: ${removedUserId}`);
-      } catch (e) {
-          // Concurrency or permission errors are ignored
-      }
-    });
-
-    return () => {
-      unsubConnected();
-      unsubRemoved();
-      remove(myPresenceRef);
-    };
-  }, [user, meetingId, rtdb]);
 
   useEffect(() => {
     const rtcInstance = new MeshRTC({
@@ -592,7 +546,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     const self: Participant = {
       id: userId,
       name: localUserDetails?.name || user?.displayName || "You",
-      avatar: localUserDetails?.photoURL || user?.photoURL || `https://placehold.co/128x128.png?text=${(user?.displayName || 'Y').charAt(0)}`,
+      avatar: localUserDetails?.photoURL || user?.photoURL || `https://picsum.photos/seed/1/128/128`,
       isCamOff: !camOn, isMicOff: !micOn, isHandRaised, handRaisedAt: localUserDetails?.handRaisedAt,
       isScreenSharing: isSharingScreen, isLocal: true, stream: localStream,
       volumeLevel: volumeLevels.get(userId) ?? 0
@@ -616,7 +570,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         }
 
         return {
-          id, name: data.name || `User ${id.substring(0, 4)}`, avatar: data.photoURL || `https://placehold.co/40x40.png?text=${(data.name || 'G').charAt(0)}`,
+          id, name: data.name || `User ${id.substring(0, 4)}`, avatar: data.photoURL || `https://picsum.photos/seed/2/40/40`,
           isHandRaised: data.isHandRaised, handRaisedAt: data.handRaisedAt, isScreenSharing: data.isScreenSharing,
           isCamOff: videoBlocked || !data.isCameraOn,
           isMicOff: audioBlocked || !data.isMicOn,
