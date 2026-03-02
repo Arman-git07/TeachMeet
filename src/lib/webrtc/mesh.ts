@@ -50,7 +50,6 @@ export class MeshRTC {
     this.localStream = localStream;
     this._ready = true;
     
-    // Process any pending peer connections now that we have local media
     while (this._pendingSignals.length) {
       const fn = this._pendingSignals.shift();
       fn?.();
@@ -100,8 +99,7 @@ export class MeshRTC {
     const entry = this.createPeerEntry(remoteId);
     this.peers.set(remoteId, entry);
 
-    // 🎯 CRITICAL: Forced Negotiation Logic
-    // Add all local tracks and immediately force an offer.
+    // 🎯 CRITICAL: Add tracks before forcing negotiation
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => {
         const sender = entry.pc.addTrack(track, this.localStream!);
@@ -110,6 +108,7 @@ export class MeshRTC {
       });
     }
 
+    // 🎯 CRITICAL: Forced Negotiation Logic
     try {
       entry.makingOffer = true;
       const offer = await entry.pc.createOffer();
@@ -128,7 +127,6 @@ export class MeshRTC {
       entry = this.createPeerEntry(fromId);
       this.peers.set(fromId, entry);
       
-      // Add local tracks if they aren't already added
       if (this.localStream) {
         this.localStream.getTracks().forEach(track => {
           const sender = entry!.pc.addTrack(track, this.localStream!);
@@ -143,10 +141,7 @@ export class MeshRTC {
     const offerCollision = (offer.type === "offer") && (entry.makingOffer || pc.signalingState !== "stable");
 
     entry.ignoreOffer = !polite && offerCollision;
-    if (entry.ignoreOffer) {
-      console.log(`[Mesh] Ignored offer from ${fromId} (collision handling)`);
-      return;
-    }
+    if (entry.ignoreOffer) return;
 
     try {
       await pc.setRemoteDescription(offer);
@@ -192,11 +187,11 @@ export class MeshRTC {
       isSettingRemoteAnswerPending: false 
     };
 
-    pc.ontrack = (ev) => {
-      console.log(`[Mesh] Track received from ${remoteId}: ${ev.track.kind}`);
-      // 🎯 Standard ontrack logic: use the first stream provided by the event
-      if (ev.streams && ev.streams[0]) {
-        this.onRemoteStream(remoteId, ev.streams[0]);
+    // 🎯 Simplified ontrack as requested
+    pc.ontrack = (event) => {
+      const stream = event.streams[0];
+      if (stream) {
+        this.onRemoteStream(remoteId, stream);
       }
     };
 
@@ -204,8 +199,6 @@ export class MeshRTC {
       if (ev.candidate) this.socket.emit("ice-candidate", remoteId, ev.candidate);
     };
 
-    // Note: We handle initial negotiation explicitly in _initiateNewPeer
-    // but keep this for dynamic track changes (e.g. screen share)
     pc.onnegotiationneeded = async () => {
       if (entry.makingOffer) return;
       try {

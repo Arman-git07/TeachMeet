@@ -89,16 +89,16 @@ export default function handler(
 
       socket.on('unblock-user', ({ unblockedUserId }: { unblockedUserId: string }) => {
           const { userId: unblockerId, roomId } = socket.data as { userId: string, roomId: string };
-          if (!unblockerId || !roomId || !unblockedUserId) return;
-          
-          const roomBlockMap = roomBlocks.get(roomId);
-          if (!roomBlockMap) return;
-          
-          roomBlockMap.get(unblockerId)?.delete(unblockedUserId);
-          
-          const unblockedSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === unblockedUserId);
-          if (unblockedSocket) {
-              blockedSocket.emit('user-unblocked-me', unblockerId);
+          if (unblockerId && roomId && unblockedUserId) {
+              const roomBlockMap = roomBlocks.get(roomId);
+              if (roomBlockMap) {
+                  roomBlockMap.get(unblockerId)?.delete(unblockedUserId);
+              }
+              
+              const unblockedSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === unblockedUserId);
+              if (unblockedSocket) {
+                  unblockedSocket.emit('user-unblocked-me', unblockerId);
+              }
           }
       });
 
@@ -140,11 +140,10 @@ export default function handler(
       socket.on("disconnect", async () => {
         const { roomId, userId } = socket.data as { roomId: string, userId: string };
         if (roomId && userId) {
-          // 1. BROADCAST LEAVE SIGNAL TO PEERS
+          // 1. Notify peers instantly
           socket.to(roomId).emit("user-left", userId);
 
-          // 2. AUTHORITATIVE PRUNING OF FIRESTORE (Handles crashes/drops)
-          // Uses Admin SDK to bypass security rules
+          // 2. Authoritative database cleanup (Firebase Admin SDK)
           try {
             await admin.firestore()
               .collection("meetings")
@@ -157,7 +156,7 @@ export default function handler(
             console.error("❌ Authoritative cleanup failed:", err);
           }
 
-          // 3. CLEANUP MEMORY
+          // 3. Memory cleanup
           const roomBlockMap = roomBlocks.get(roomId);
           if(roomBlockMap) {
             roomBlockMap.delete(userId);
