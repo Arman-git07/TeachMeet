@@ -175,64 +175,31 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     if (!localStream || !rtc) return;
     const nextState = typeof forceState === 'boolean' ? forceState : !camOn;
     
-    // Transitions logic
-    if (nextState === true && isSharingScreen && screenShareHelper?.currentMode === 'replace' && screenShareStream) {
-        await screenShareHelper.stopSharing(); 
-        await screenShareHelper.startSharingWithStream('alongside', screenShareStream);
-        setIsSharingScreen(true);
-    }
-
-    let videoTrack = localStream.getVideoTracks()[0];
-
-    if (nextState) {
-      try {
-        if (!videoTrack || videoTrack.readyState === 'ended') {
-          const freshStream = await navigator.mediaDevices.getUserMedia({ video: true });
-          const freshTrack = freshStream.getVideoTracks()[0];
-          
-          if (videoTrack) {
-            localStream.removeTrack(videoTrack);
-            videoTrack.stop();
-          }
-          localStream.addTrack(freshTrack);
-          videoTrack = freshTrack;
-          setLocalStream(new MediaStream(localStream.getTracks()));
-        }
-        
-        videoTrack.enabled = true;
-        await rtc.replaceTrack(videoTrack, 'video');
-        await rtc.renegotiateAll();
-      } catch (err) {
-        console.error("Camera access failed:", err);
-        toast({ variant: 'destructive', title: "Camera Error", description: "Check permissions." });
-        return;
-      }
-    } else {
-      if (videoTrack) {
-        videoTrack.enabled = false;
-        videoTrack.stop();
-      }
-      await rtc.replaceTrack(null, 'video');
+    // We don't stop the track or replace it with null. 
+    // We simply toggle 'enabled'. This is the standard WebRTC way to mute video.
+    // It keeps the pipeline "warm" so others don't lose the connection reference.
+    const videoTrack = localStream.getVideoTracks()[0];
+    if (videoTrack) {
+      videoTrack.enabled = nextState;
     }
     
     setCamOn(nextState);
     localStorage.setItem('teachmeet-cam-state', String(nextState));
     updateMyStatus({ isCameraOn: nextState });
-  }, [localStream, camOn, updateMyStatus, rtc, isSharingScreen, screenShareHelper, screenShareStream, toast]);
+  }, [localStream, camOn, updateMyStatus, rtc]);
 
   const toggleMic = useCallback(async () => {
     if (!localStream || !rtc) return;
     const audioTrack = localStream.getAudioTracks()[0];
-    if (!audioTrack) return;
+    if (audioTrack) {
+      audioTrack.enabled = !micOn;
+    }
   
     const newState = !micOn;
-    audioTrack.enabled = newState;
-    
     setMicOn(newState);
     localStorage.setItem('teachmeet-mic-state', String(newState));
     
     updateMyStatus({ isMicOn: newState });
-    await rtc.replaceTrack(newState ? audioTrack : null, 'audio');
   }, [localStream, micOn, updateMyStatus, rtc]);
 
   const startRecording = useCallback(async () => {
@@ -670,7 +637,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           <VideoTile
             stream={spotlightParticipant.stream}
             isCameraOn={!spotlightParticipant.isCamOff}
-            isMicOn={!spotlightParticipant.isMicOff}
+            isMicOn={!spotlightParticipant.isMicOn}
             name={spotlightParticipant.name}
             isScreenSharing={spotlightParticipant.isScreenSharing}
             onDoubleClick={() => toggleSpotlight(spotlightParticipant.id)}
