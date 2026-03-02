@@ -177,7 +177,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     
     const videoTrack = localStream.getVideoTracks()[0];
     if (videoTrack) {
-      // Warm track approach: keep hardware running but disable transmission
       videoTrack.enabled = nextState;
     }
     
@@ -496,7 +495,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           ent.analyser.getByteFrequencyData(ent.dataArray);
           let sum = 0;
           for (let i = 0; i < ent.dataArray.length; i++) sum += ent.dataArray[i];
-          const avg = sum / dataArray.length;
+          const avg = sum / ent.dataArray.length;
           if (time - lastRemoteUpdateRef.current > 150) {
             setVolumeLevels(prev => { const next = new Map(prev); next.set(id, Math.min(1, avg / 255)); return next; });
             lastRemoteUpdateRef.current = time;

@@ -5,8 +5,9 @@ import { io, Socket } from "socket.io-client";
 type PeerEntry = {
   pc: RTCPeerConnection;
   stream: MediaStream | null;
-  negotiating: boolean;
-  iceCandidateQueue: RTCIceCandidateInit[];
+  makingOffer: boolean;
+  ignoreOffer: boolean;
+  isSettingRemoteAnswerPending: boolean;
   videoSender?: RTCRtpSender;
   audioSender?: RTCRtpSender;
 };
@@ -102,18 +103,21 @@ export class MeshRTC {
       entry = this.createPeerEntry(fromId, false);
       this.peers.set(fromId, entry);
     }
-    const pc = entry.pc;
     
-    try {
-      await pc.setRemoteDescription(new RTCSessionDescription(offer));
-      while (entry.iceCandidateQueue.length) {
-        const cand = entry.iceCandidateQueue.shift();
-        if (cand) await pc.addIceCandidate(new RTCIceCandidate(cand));
-      }
+    const pc = entry.pc;
+    // Perfect Negotiation: Polite peer logic
+    const polite = this.userId > fromId;
+    const offerCollision = (offer.type === "offer") && (entry.makingOffer || pc.signalingState !== "stable");
 
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      this.socket?.emit("answer", fromId, answer);
+    entry.ignoreOffer = !polite && offerCollision;
+    if (entry.ignoreOffer) return;
+
+    try {
+      await pc.setRemoteDescription(offer);
+      if (offer.type === "offer") {
+        await pc.setLocalDescription();
+        this.socket.emit("answer", fromId, pc.localDescription);
+      }
     } catch (err) {
       console.error("[mesh] Offer handling failed:", err);
     }
@@ -129,7 +133,7 @@ export class MeshRTC {
     const entry = this.peers.get(fromId);
     if (!entry) return;
     try {
-      await entry.pc.setRemoteDescription(new RTCSessionDescription(answer));
+      await entry.pc.setRemoteDescription(answer);
     } catch (e) {
       console.error("[mesh] Answer handling failed:", e);
     }
@@ -139,27 +143,29 @@ export class MeshRTC {
     const entry = this.peers.get(fromId);
     if (!entry) return;
     try {
-      if (entry.pc.remoteDescription) {
-        await entry.pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } else {
-        entry.iceCandidateQueue.push(candidate);
-      }
+      await entry.pc.addIceCandidate(candidate);
     } catch (e) {
-      console.error("[mesh] ICE handling failed:", e);
+      if (!entry.ignoreOffer) {
+        console.error("[mesh] ICE handling failed:", e);
+      }
     }
   }
 
   private createPeerEntry(remoteId: string, isInitiator: boolean): PeerEntry {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
     const remoteStream = new MediaStream();
-    const entry: PeerEntry = { pc, stream: null, negotiating: false, iceCandidateQueue: [] };
+    const entry: PeerEntry = { 
+      pc, 
+      stream: null, 
+      makingOffer: false, 
+      ignoreOffer: false, 
+      isSettingRemoteAnswerPending: false 
+    };
 
     pc.ontrack = (ev) => {
-      // Ensure we catch the track and attach it to our local remoteStream proxy
       if (ev.track) {
         remoteStream.addTrack(ev.track);
       }
-      // Use provided streams or fallback to our proxy
       const streamToNotify = ev.streams[0] || remoteStream;
       entry.stream = streamToNotify;
       this.onRemoteStream(remoteId, streamToNotify);
@@ -170,16 +176,14 @@ export class MeshRTC {
     };
 
     pc.onnegotiationneeded = async () => {
-      if (entry.negotiating) return;
-      entry.negotiating = true;
       try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        this.socket.emit("offer", remoteId, offer);
+        entry.makingOffer = true;
+        await pc.setLocalDescription();
+        this.socket.emit("offer", remoteId, pc.localDescription);
       } catch (err) {
         console.error("[mesh] Negotiation failed:", err);
       } finally {
-        entry.negotiating = false;
+        entry.makingOffer = false;
       }
     };
 
@@ -197,14 +201,17 @@ export class MeshRTC {
     const senders = pc.getSenders();
 
     this.localStream.getTracks().forEach(track => {
-      const existingSender = senders.find(s => s.track?.kind === track.kind || (s as any).kind === track.kind);
+      const existingSender = senders.find(s => s.track?.kind === track.kind);
       
       if (!existingSender) {
         const sender = pc.addTrack(track, this.localStream!);
         if (track.kind === 'video') entry.videoSender = sender;
         else if (track.kind === 'audio') entry.audioSender = sender;
       } else {
-        // Track references for future replaceTrack calls
+        // If track changed (e.g. after camera restart), replace it
+        if (existingSender.track?.id !== track.id) {
+            existingSender.replaceTrack(track).catch(e => console.error("[mesh] Track replacement failed", e));
+        }
         if (track.kind === 'video') entry.videoSender = existingSender;
         else if (track.kind === 'audio') entry.audioSender = existingSender;
       }
