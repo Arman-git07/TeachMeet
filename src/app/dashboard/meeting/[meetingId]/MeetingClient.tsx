@@ -1,3 +1,4 @@
+
 // src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
@@ -6,10 +7,11 @@ import { motion } from "framer-motion";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { useAuth } from "@/hooks/useAuth";
 import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, X, Users, Pin, Minimize2, Maximize2 } from "lucide-react";
-import { collection, onSnapshot, doc, updateDoc, getDoc, serverTimestamp, setDoc, addDoc } from 'firebase/firestore';
-import { db, storage } from '@/lib/firebase';
+import { collection, onSnapshot, doc, updateDoc, getDoc, serverTimestamp, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
+import { db, storage, rtdb } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes } from 'firebase/storage';
 import { getDownloadURL } from "firebase/storage";
+import { ref as rtdbRef, onValue, set, onDisconnect, remove, onChildRemoved } from "firebase/database";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -132,6 +134,62 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     setPinnedId(prev => prev === remoteUserId ? null : prev);
   }, []);
 
+  // Presence & Cleanup Logic using Realtime Database
+  useEffect(() => {
+    if (!user || !meetingId || !participantDocCreated.current || !rtdb) return;
+
+    const myPresenceRef = rtdbRef(rtdb, `presence/${meetingId}/${user.uid}`);
+    const connectedRef = rtdbRef(rtdb, ".info/connected");
+
+    // 1. Manage my own presence with onDisconnect cleanup
+    const unsubConnected = onValue(connectedRef, (snap) => {
+      if (snap.val() === true) {
+        // Automatic removal from RTDB on disconnect
+        onDisconnect(myPresenceRef).remove();
+        
+        // Register current presence
+        set(myPresenceRef, {
+          name: user.displayName,
+          photoURL: user.photoURL,
+          joinedAt: Date.now()
+        });
+      }
+    });
+
+    // 2. Cleanup ghost users from Firestore
+    // We listen for removals from RTDB. If someone disappears from RTDB, they are gone.
+    const meetingPresenceRef = rtdbRef(rtdb, `presence/${meetingId}`);
+    const unsubRemoved = onChildRemoved(meetingPresenceRef, async (snapshot) => {
+      const removedUserId = snapshot.key;
+      if (!removedUserId) return;
+
+      // Logic: If I am the host (or primary cleanup agent), I remove them from Firestore.
+      // Firestore removal then triggers the UI update for EVERYONE.
+      try {
+          const participantRef = doc(db, "meetings", meetingId, "participants", removedUserId);
+          await deleteDoc(participantRef);
+          console.log(`[Presence] Automatic cleanup of ghost participant: ${removedUserId}`);
+      } catch (e) {
+          // Concurrency or permission errors are ignored; someone else might have already deleted it.
+      }
+    });
+
+    return () => {
+      unsubConnected();
+      unsubRemoved();
+      remove(myPresenceRef);
+    };
+  }, [user, meetingId, rtdb]);
+
+  // Peer connection safety net: Cleanup MeshRTC peers that are no longer in Firestore
+  useEffect(() => {
+    remoteStreams.forEach((_, id) => {
+      if (!liveParticipants.has(id)) {
+        handleRemoteLeft(id);
+      }
+    });
+  }, [liveParticipants, remoteStreams, handleRemoteLeft]);
+
   useEffect(() => {
     const rtcInstance = new MeshRTC({
       roomId: meetingId,
@@ -141,7 +199,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           const next = new Map(prev);
           // CRITICAL FIX: Construct a NEW MediaStream instance with the current tracks.
           // This ensures the object reference changes, which triggers React's useEffect in VideoTile.
-          // Without this, adding a video track to an existing audio stream reference would not render the video.
           next.set(remoteUserId, new MediaStream(stream.getTracks()));
           return next;
         });

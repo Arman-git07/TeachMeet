@@ -4,6 +4,7 @@ import { initializeAuth, browserLocalPersistence, getAuth } from 'firebase/auth'
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getFirestore, Firestore, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getMessaging, Messaging } from 'firebase/messaging';
+import { getDatabase } from 'firebase/database';
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -54,6 +55,7 @@ if (typeof window !== 'undefined') {
 }
 
 const storage = getStorage(app);
+const rtdb = getDatabase(app);
 let messaging: Messaging | null = null;
 
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
@@ -65,4 +67,4 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     }
 }
 
-export { app, storage, db, messaging };
+export { app, storage, db, messaging, rtdb };
