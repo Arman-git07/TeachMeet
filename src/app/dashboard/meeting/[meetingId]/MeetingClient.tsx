@@ -108,7 +108,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     if (context && context.state === 'suspended') {
       context.resume().then(() => {
         audioUnlockedRef.current = true;
-        console.log("AudioContext resumed successfully on user interaction.");
       }).catch(e => console.error("Error resuming AudioContext:", e));
     }
   }, []);
@@ -176,8 +175,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     if (!localStream || !rtc) return;
     const nextState = typeof forceState === 'boolean' ? forceState : !camOn;
     
-    // Auto-switch screen share mode if we are turning camera on
-    // If we were in 'replace' mode, we must move the screen to 'alongside' so the camera can be seen
+    // Transitions logic
     if (nextState === true && isSharingScreen && screenShareHelper?.currentMode === 'replace' && screenShareStream) {
         await screenShareHelper.stopSharing(); 
         await screenShareHelper.startSharingWithStream('alongside', screenShareStream);
@@ -188,7 +186,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
     if (nextState) {
       try {
-        // Requirements: Get video track using getUserMedia
         if (!videoTrack || videoTrack.readyState === 'ended') {
           const freshStream = await navigator.mediaDevices.getUserMedia({ video: true });
           const freshTrack = freshStream.getVideoTracks()[0];
@@ -199,22 +196,18 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           }
           localStream.addTrack(freshTrack);
           videoTrack = freshTrack;
-          
-          // Trigger a reference update for local preview reliability
           setLocalStream(new MediaStream(localStream.getTracks()));
         }
         
         videoTrack.enabled = true;
-        // Requirements: For each existing RTCPeerConnection: If sender with kind "video" exists → replaceTrack, Else → addTrack
         await rtc.replaceTrack(videoTrack, 'video');
         await rtc.renegotiateAll();
       } catch (err) {
-        console.error("Camera ON failed:", err);
-        toast({ variant: 'destructive', title: "Camera Error", description: "Could not access your camera." });
+        console.error("Camera access failed:", err);
+        toast({ variant: 'destructive', title: "Camera Error", description: "Check permissions." });
         return;
       }
     } else {
-      // Requirements: Stop video track, Replace track with null
       if (videoTrack) {
         videoTrack.enabled = false;
         videoTrack.stop();
@@ -239,12 +232,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     localStorage.setItem('teachmeet-mic-state', String(newState));
     
     updateMyStatus({ isMicOn: newState });
-    setVolumeLevels(prev => {
-      const next = new Map(prev);
-      next.set(userId, newState ? (next.get(userId) ?? 0) : 0);
-      return next;
-    });
-  }, [localStream, micOn, updateMyStatus, userId, rtc]);
+    await rtc.replaceTrack(newState ? audioTrack : null, 'audio');
+  }, [localStream, micOn, updateMyStatus, rtc]);
 
   const startRecording = useCallback(async () => {
     if (!localStream || !user) {
@@ -287,7 +276,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
               window.URL.revokeObjectURL(url);
             }, 100);
             setIsRecording(false);
-            toast({ title: 'Recording Saved', description: 'The video has been downloaded to your device.' });
             return;
           }
 
@@ -319,7 +307,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
               createdAt: serverTimestamp(),
             });
             
-            toast.update(toastId, { title: 'Recording Saved!', description: `Your recording is available in your ${destination} recordings.` });
+            toast.update(toastId, { title: 'Recording Saved!', description: `Your recording is in your ${destination} folder.` });
           } catch (e: any) {
             toast.update(toastId, { variant: 'destructive', title: 'Upload Failed', description: e.message });
           } finally {
@@ -330,7 +318,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         mediaRecorderRef.current.start(1000); 
         recordingStartRef.current = Date.now();
         setIsRecording(true);
-        toast({ title: 'Recording Started', description: 'Your local audio and video are being recorded.' });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Recording Error', description: e.message });
     }
@@ -342,20 +329,16 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           saveDestinationRef.current = destination;
           mediaRecorderRef.current.stop();
           setIsRecording(false);
-          if (destination !== 'device') {
-            toast({ title: 'Recording Stopped', description: 'Finalizing and uploading your recording...' });
-          }
       }
-  }, [setIsRecording, toast]);
+  }, [setIsRecording]);
 
   const discardRecording = useCallback(async () => {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
           shouldDiscardRef.current = true;
           mediaRecorderRef.current.stop();
           setIsRecording(false);
-          toast({ title: 'Recording Discarded', description: 'The current recording has been deleted.' });
       }
-  }, [setIsRecording, toast]);
+  }, [setIsRecording]);
 
   useEffect(() => {
     setRecordingControls({ start: startRecording, stop: stopRecording, discard: discardRecording });
@@ -371,7 +354,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           setIsHost(userId === hostId);
         }
       } catch (err) {
-        console.error("Meeting doc fetch failed (likely offline):", err);
+        console.error("Meeting doc fetch failed:", err);
       } finally {
         setIsLoadingRole(false);
       }
@@ -400,7 +383,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       toast({
         variant: "destructive",
         title: "Screen Share Not Supported",
-        description: "Your browser does not support screen sharing or you are not in a secure (HTTPS) environment.",
+        description: "Your browser does not support this feature.",
       });
       return;
     }
@@ -413,15 +396,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       setIsSharingScreen(true);
       updateMyStatus({ isScreenSharing: true });
     } catch (err) {
-      console.error("Screen share cancelled or failed:", err);
       setScreenShareStream(null);
-      if (err instanceof Error && err.name === 'NotAllowedError') {
-         toast({ variant: "default", title: "Screen Share Canceled", description: "You did not grant permission to share your screen." });
-      } else if (err instanceof Error) {
-        toast({ variant: "destructive", title: "Screen Share Failed", description: err.message });
-      } else {
-        toast({ variant: "destructive", title: "Screen Share Failed", description: "An unknown error occurred." });
-      }
       setIsSharingScreen(false);
       updateMyStatus({ isScreenSharing: false });
     }
@@ -455,13 +430,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         setLocalStream(stream);
       } catch (err: any) { 
         console.error("Media init error:", err); 
-        let description = "An unknown error occurred while accessing your camera and microphone.";
-        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-            description = "Permission to access camera and microphone was denied. Please check your browser settings.";
-        } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
-            description = "No camera or microphone was found on your device.";
-        }
-        toast({ variant: "destructive", title: "Media Error", description });
+        toast({ variant: "destructive", title: "Media Error", description: "Could not access hardware." });
       } 
       finally { if (mounted) setLoadingMedia(false); }
     };
@@ -476,28 +445,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       screenShareHelper?.stopSharing();
     };
   }, [toast, screenShareHelper]);
-
-  const previousRaisedHands = useRef<Set<string>>(new Set());
-  const firstParticipantsSnapshot = useRef(true);
-
-  useEffect(() => {
-    if (!liveParticipants || liveParticipants.size === 0) return;
-    if (firstParticipantsSnapshot.current) {
-        const initial = new Set<string>();
-        liveParticipants.forEach((meta, id) => { if (meta?.isHandRaised) initial.add(id); });
-        previousRaisedHands.current = initial;
-        firstParticipantsSnapshot.current = false;
-        return;
-    }
-    liveParticipants.forEach((meta, id) => {
-        const nowRaised = !!meta?.isHandRaised;
-        const wasRaised = previousRaisedHands.current.has(id);
-        if (nowRaised && !wasRaised) { toast({ title: "Hand Raised", description: `${meta?.name || 'Someone'} raised their hand.` }); }
-    });
-    const nextSet = new Set<string>();
-    liveParticipants.forEach((meta, id) => { if (meta?.isHandRaised) nextSet.add(id); });
-    previousRaisedHands.current = nextSet;
-  }, [liveParticipants, toast]);
 
   useEffect(() => {
     if (!meetingId) return;
@@ -520,8 +467,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       }
 
       setLiveParticipants(newParticipants);
-    }, (err) => {
-        console.warn("Meeting participants snapshot error (likely offline):", err);
     });
     return () => unsubscribe();
   }, [meetingId, userId, camOn, toast, toggleCamera]);
@@ -545,7 +490,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
             audioContextRef.current = audioContext;
           }
         } catch(e) {
-            console.error("Could not create AudioContext for local stream", e);
             return;
         }
     }
@@ -595,7 +539,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           entry.rafId = requestAnimationFrame(stepRemote);
         };
         entry.rafId = requestAnimationFrame(stepRemote);
-      } catch (err) { console.error("Failed to create analyser for remote stream", id, err); }
+      } catch (err) { console.error("Failed to create analyser", id, err); }
     });
     const existingIds = Array.from(remoteAnalysersRef.current.keys());
     existingIds.forEach(id => {
@@ -694,11 +638,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
             const [pinnedItem] = all.splice(pinnedIndex, 1);
             all.unshift(pinnedItem);
         }
-        const remotePinnedIndex = remoteOnly.findIndex(p => p.id === pinnedId);
-        if (remotePinnedIndex > -1) {
-            const [pinnedItem] = remoteOnly.splice(remotePinnedIndex, 1);
-            remoteOnly.unshift(pinnedItem);
-        }
     }
     
     const firstHandRaised = all.filter(p => p.isHandRaised && p.handRaisedAt).sort((a, b) => (a.handRaisedAt ?? 0) - (b.handRaisedAt ?? 0))[0];
@@ -713,13 +652,9 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     setPinnedId(newPinnedId);
     
     const url = new URL(window.location.href);
-    if (newPinnedId) {
-        url.searchParams.set('pin', newPinnedId);
-    } else {
-        url.searchParams.delete('pin');
-    }
+    if (newPinnedId) url.searchParams.set('pin', newPinnedId);
+    else url.searchParams.delete('pin');
     window.history.pushState({}, '', url);
-
   }, [pinnedId]);
   
   const toggleSpotlight = useCallback((id: string) => {
@@ -813,65 +748,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       );
     }
     
-    if (count >= 3 && count <= 5 && localParticipant) {
-      return (
-        <div className="w-full h-full flex flex-col gap-2 relative" ref={mainContainerRef}>
-          <div className="flex-1 flex gap-2 min-h-0">
-            <div className="flex-1 min-w-0"><VideoTile stream={remotes[0].stream} isCameraOn={!remotes[0].isCamOff} isMicOn={!remotes[0].isMicOff} isHandRaised={remotes[0].isHandRaised||false} isFirstHand={remotes[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[0].volumeLevel} profileUrl={remotes[0].avatar} name={remotes[0].name} isPinned={remotes[0].id === pinnedId} onDoubleClick={() => togglePin(remotes[0].id)} onUnpin={() => togglePin(remotes[0].id)} onSpotlightClick={() => toggleSpotlight(remotes[0].id)} className="w-full h-full" /></div>
-            {remotes[1] && <div className="flex-1 min-w-0"><VideoTile stream={remotes[1].stream} isCameraOn={!remotes[1].isCamOff} isMicOn={!remotes[1].isMicOff} isHandRaised={remotes[1].isHandRaised||false} isFirstHand={remotes[1].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[1].volumeLevel} profileUrl={remotes[1].avatar} name={remotes[1].name} isPinned={remotes[1].id === pinnedId} onDoubleClick={() => togglePin(remotes[1].id)} onUnpin={() => togglePin(remotes[1].id)} onSpotlightClick={() => toggleSpotlight(remotes[1].id)} className="w-full h-full" /></div>}
-          </div>
-          <div className="flex-1 flex gap-2 min-h-0">
-            {remotes[2] && <div className="flex-1 min-w-0"><VideoTile stream={remotes[2].stream} isCameraOn={!remotes[2].isCamOff} isMicOn={!remotes[2].isMicOff} isHandRaised={remotes[2].isHandRaised||false} isFirstHand={remotes[2].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[2].volumeLevel} profileUrl={remotes[2].avatar} name={remotes[2].name} isPinned={remotes[2].id === pinnedId} onDoubleClick={() => togglePin(remotes[2].id)} onUnpin={() => togglePin(remotes[2].id)} onSpotlightClick={() => toggleSpotlight(remotes[2].id)} className="w-full h-full" /></div>}
-            {remotes[3] && <div className="flex-1 min-w-0"><VideoTile stream={remotes[3].stream} isCameraOn={!remotes[3].isCamOff} isMicOn={!remotes[3].isMicOff} isHandRaised={remotes[3].isHandRaised||false} isFirstHand={remotes[3].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[3].volumeLevel} profileUrl={remotes[3].avatar} name={remotes[3].name} isPinned={remotes[3].id === pinnedId} onDoubleClick={() => togglePin(remotes[3].id)} onUnpin={() => togglePin(remotes[3].id)} onSpotlightClick={() => toggleSpotlight(remotes[3].id)} className="w-full h-full" /></div>}
-          </div>
-          <motion.div drag dragConstraints={mainContainerRef} dragMomentum={false} className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-30">
-            <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} className="w-full h-full" onDoubleClick={() => togglePin(localParticipant.id)} onUnpin={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} draggable={true} />
-          </motion.div>
-        </div>
-      );
-    }
-    
-    if (count > 5 && localParticipant) {
-      return (
-        <div className="w-full h-full flex flex-col gap-2 relative" ref={mainContainerRef}>
-          <div className="flex-1 flex gap-2 min-h-0">
-            <div className="flex-1 min-w-0"><VideoTile stream={remotes[0].stream} isCameraOn={!remotes[0].isCamOff} isMicOn={!remotes[0].isMicOff} isHandRaised={remotes[0].isHandRaised||false} isFirstHand={remotes[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[0].volumeLevel} profileUrl={remotes[0].avatar} name={remotes[0].name} isPinned={remotes[0].id === pinnedId} onDoubleClick={() => togglePin(remotes[0].id)} onUnpin={() => togglePin(remotes[0].id)} onSpotlightClick={() => toggleSpotlight(remotes[0].id)} className="w-full h-full" /></div>
-            <div className="flex-1 min-w-0"><VideoTile stream={remotes[1].stream} isCameraOn={!remotes[1].isCamOff} isMicOn={!remotes[1].isMicOff} isHandRaised={remotes[1].isHandRaised||false} isFirstHand={remotes[1].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[1].volumeLevel} profileUrl={remotes[1].avatar} name={remotes[1].name} isPinned={remotes[1].id === pinnedId} onDoubleClick={() => togglePin(remotes[1].id)} onUnpin={() => togglePin(remotes[1].id)} onSpotlightClick={() => toggleSpotlight(remotes[1].id)} className="w-full h-full" /></div>
-          </div>
-          <div className="flex-1 flex gap-2 min-h-0">
-            <div className="flex-1 min-w-0"><VideoTile stream={remotes[2].stream} isCameraOn={!remotes[2].isCamOff} isMicOn={!remotes[2].isMicOff} isHandRaised={remotes[2].isHandRaised||false} isFirstHand={remotes[2].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[2].volumeLevel} profileUrl={remotes[2].avatar} name={remotes[2].name} isPinned={remotes[2].id === pinnedId} onDoubleClick={() => togglePin(remotes[2].id)} onUnpin={() => togglePin(remotes[2].id)} onSpotlightClick={() => toggleSpotlight(remotes[2].id)} className="w-full h-full" /></div>
-            <div className="flex-1 min-w-0 relative">
-              {remotes[3] && (
-                <VideoTile
-                  stream={remotes[3].stream}
-                  isCameraOn={!remotes[3].isCamOff}
-                  isMicOn={!remotes[3].isMicOff}
-                  isHandRaised={remotes[3].isHandRaised || false}
-                  isFirstHand={remotes[3].id === firstHandRaisedId}
-                  raisedCount={raisedCount}
-                  volumeLevel={remotes[3].volumeLevel}
-                  profileUrl={remotes[3].avatar}
-                  name={remotes[3].name}
-                  isPinned={remotes[3].id === pinnedId}
-                  onDoubleClick={() => togglePin(remotes[3].id)}
-                  onUnpin={() => togglePin(remotes[3].id)}
-                  onSpotlightClick={() => toggleSpotlight(remotes[3].id)}
-                  className="w-full h-full"
-                />
-              )}
-              <Link href={`/dashboard/meeting/${meetingId}/participants?topic=${encodeURIComponent(topic)}`} className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center text-white hover:bg-black/50 transition-colors cursor-pointer z-20">
-                  <Users className="h-10 w-10" />
-                  <p className="font-bold text-xl mt-2">+{allParticipants.length - 5} more</p>
-              </Link>
-            </div>
-          </div>
-          <motion.div drag dragConstraints={mainContainerRef} dragMomentum={false} className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-30">
-            <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} className="w-full h-full" onDoubleClick={() => togglePin(localParticipant.id)} onUnpin={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} draggable={true} />
-          </motion.div>
-        </div>
-      );
-    }
-    
     if (remotes.length > 0 && localParticipant) {
         const gridCols = Math.ceil(Math.sqrt(remotes.length));
         return (
@@ -911,7 +787,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           {isSharingScreen && (
             <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center justify-center pointer-events-none">
               <div className="bg-background/80 backdrop-blur-sm rounded-2xl p-4 flex flex-col items-center gap-3 pointer-events-auto">
-                <p className="text-foreground font-medium">You're sharing your screen with everyone</p>
+                <p className="text-foreground font-medium">You're sharing your screen</p>
                 <Button onClick={handleStopSharing} variant="destructive" size="sm" className="rounded-full px-4">
                   <ScreenShareOff className="mr-2 h-4 w-4" />
                   Stop sharing
@@ -923,29 +799,24 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
       <footer className="p-2 sm:p-4 bg-background shrink-0 relative z-10">
         <div className="flex items-center justify-center gap-2 sm:gap-4">
-            <Button onClick={() => toggleMic()} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", micOn ? "bg-primary/80 hover:bg-primary" : "bg-destructive hover:bg-destructive/90")} aria-label={micOn ? "Mute" : "Unmute"}>{micOn ? <Mic className="h-5 w-5 sm:h-6 sm:w-6" /> : <MicOff className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
-            <Button onClick={() => toggleCamera()} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", camOn ? "bg-primary/80 hover:bg-primary" : "bg-destructive hover:bg-destructive/90")} aria-label={camOn ? "Stop Camera" : "Start Camera"}>{camOn ? <Video className="h-5 w-5 sm:h-6 sm:w-6" /> : <VideoOff className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
-            <Button onClick={handleShareClick} variant="ghost" className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", isSharingScreen ? "bg-red-600 text-white hover:bg-red-700" : "bg-secondary/50 hover:bg-secondary/70 text-foreground")} aria-label={isSharingScreen ? "Stop Sharing" : "Share Screen"}>{isSharingScreen ? <ScreenShareOff className="h-5 w-5 sm:h-6 sm:w-6" /> : <ScreenShare className="h-5 w-5 sm:h-6 sm:w-6" />}</Button>
-            <Button onClick={handleToggleHandRaise} className={cn("rounded-full flex items-center justify-center transition-colors h-12 w-12 sm:h-14 sm:w-14", isHandRaised ? "bg-primary/80 hover:bg-primary" : "bg-destructive hover:bg-destructive/90")} aria-label={isHandRaised ? "Lower Hand" : "Raise Hand"}><Hand className="h-5 w-5 sm:h-6 sm:w-6" /></Button>
+            <Button onClick={() => toggleMic()} className={cn("rounded-full flex items-center justify-center h-12 w-12 sm:h-14 sm:w-14", micOn ? "bg-primary/80" : "bg-destructive")} aria-label={micOn ? "Mute" : "Unmute"}>{micOn ? <Mic /> : <MicOff />}</Button>
+            <Button onClick={() => toggleCamera()} className={cn("rounded-full flex items-center justify-center h-12 w-12 sm:h-14 sm:w-14", camOn ? "bg-primary/80" : "bg-destructive")} aria-label={camOn ? "Stop Camera" : "Start Camera"}>{camOn ? <Video /> : <VideoOff />}</Button>
+            <Button onClick={handleShareClick} variant="ghost" className={cn("rounded-full flex items-center justify-center h-12 w-12 sm:h-14 sm:w-14", isSharingScreen ? "bg-red-600 text-white" : "bg-secondary/50")} aria-label={isSharingScreen ? "Stop Sharing" : "Share Screen"}>{isSharingScreen ? <ScreenShareOff /> : <ScreenShare />}</Button>
+            <Button onClick={handleToggleHandRaise} className={cn("rounded-full flex items-center justify-center h-12 w-12 sm:h-14 sm:w-14", isHandRaised ? "bg-primary/80" : "bg-destructive")} aria-label={isHandRaised ? "Lower" : "Raise"}><Hand /></Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button className="h-12 sm:h-14 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-colors px-4 sm:px-6" aria-label="Leave Meeting"><PhoneOff className="h-5 w-5 sm:h-6 sm:6" /><span className="ml-2 font-semibold hidden sm:inline">Leave</span></Button>
+                <Button className="h-12 sm:h-14 rounded-full bg-red-600 px-4 sm:px-6"><PhoneOff className="h-5 w-5 sm:h-6 sm:6" /><span className="ml-2 font-semibold hidden sm:inline">Leave</span></Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>{isHost ? 'End or Leave Meeting?' : 'Leave Meeting?'}</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {isHost 
-                      ? "As the host, you can end the meeting for all participants or just leave yourself."
-                      : "Are you sure you want to leave the meeting?"
-                    }
-                  </AlertDialogDescription>
+                  <AlertDialogTitle>{isHost ? 'End or Leave?' : 'Leave?'}</AlertDialogTitle>
+                  <AlertDialogDescription>Are you sure you want to exit?</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   {isHost ? (
                     <>
-                      <AlertDialogAction onClick={() => onLeave(false)} className={cn(buttonVariants({variant: "outline"}))}>Leave Meeting</AlertDialogAction>
+                      <AlertDialogAction onClick={() => onLeave(false)} className={cn(buttonVariants({variant: "outline"}))}>Leave</AlertDialogAction>
                       <AlertDialogAction onClick={() => onLeave(true)} className={cn(buttonVariants({variant: "destructive"}))}>End for All</AlertDialogAction>
                     </>
                   ) : (

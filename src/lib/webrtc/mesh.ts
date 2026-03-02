@@ -46,50 +46,33 @@ export class MeshRTC {
   }
 
   public async init(localStream: MediaStream, displayName: string, photoURL?: string) {
-    const isReinit = !!this.localStream;
     this.localStream = localStream;
     
-    if (isReinit) {
-        console.log("[mesh] Re-initializing tracks for existing peers...");
-    } else {
-        console.log("[mesh] Initializing with local stream. Count of existing peers to sync:", this.peers.size);
-    }
-    
-    // Attach tracks to any peers that were created before the stream was ready or during re-init
+    // Attach tracks to any peers that were created before the stream was ready
     for (const entry of this.peers.values()) {
       const pc = entry.pc;
       const senders = pc.getSenders();
       
       this.localStream.getTracks().forEach(track => {
-        const existingSender = senders.find(s => {
-            // Find by kind if track is missing (due to replaceTrack(null))
-            if (s.track) return s.track.kind === track.kind;
-            // Fallback: assume the sender without a track of the other kind is our target
-            // But storing explicitly in entry is better, which we do below.
-            return false;
-        });
+        const existingSender = senders.find(s => s.track?.kind === track.kind);
+        const storedSender = track.kind === 'video' ? entry.videoSender : entry.audioSender;
 
-        // We check our explicit trackers first
-        const typedSender = track.kind === 'video' ? entry.videoSender : entry.audioSender;
-
-        if (!typedSender && !existingSender) {
+        if (!storedSender && !existingSender) {
           const sender = pc.addTrack(track, this.localStream!);
           if (track.kind === 'video') entry.videoSender = sender;
           else if (track.kind === 'audio') entry.audioSender = sender;
         } else {
-          // Sync tracker if it was missing but sender existed
-          if (track.kind === 'video') entry.videoSender = typedSender || existingSender;
-          else if (track.kind === 'audio') entry.audioSender = typedSender || existingSender;
+          // Sync internal references if they were missing
+          if (track.kind === 'video') entry.videoSender = storedSender || existingSender;
+          else if (track.kind === 'audio') entry.audioSender = storedSender || existingSender;
         }
       });
     }
 
-    if (!isReinit) {
-        this._ready = true;
-        while (this._pendingSignals.length) {
-          const fn = this._pendingSignals.shift();
-          fn?.();
-        }
+    this._ready = true;
+    while (this._pendingSignals.length) {
+      const fn = this._pendingSignals.shift();
+      fn?.();
     }
   }
 
@@ -237,57 +220,29 @@ export class MeshRTC {
     }
   }
 
-  public async replaceTrack(newTrack: MediaStreamTrack | null, kind?: 'video' | 'audio') {
-    const targetKind = kind || (newTrack ? newTrack.kind as 'video' | 'audio' : null);
-    if (!targetKind) return;
-
+  public async replaceTrack(newTrack: MediaStreamTrack | null, kind: 'video' | 'audio') {
     for (const entry of this.peers.values()) {
-      const sender = targetKind === 'video' ? entry.videoSender : entry.audioSender;
-      
+      const sender = kind === 'video' ? entry.videoSender : entry.audioSender;
       if (sender) {
         try {
           await sender.replaceTrack(newTrack);
         } catch (e) {
-          console.error(`[mesh] replaceTrack failed for ${targetKind}:`, e);
+          console.error(`[mesh] replaceTrack failed for ${kind}:`, e);
         }
       } else if (newTrack && this.localStream) {
+        // Fallback: if sender was somehow lost, add the track fresh
         try {
           const newSender = entry.pc.addTrack(newTrack, this.localStream);
-          if (targetKind === 'video') entry.videoSender = newSender;
-          else if (targetKind === 'audio') entry.audioSender = newSender;
+          if (kind === 'video') entry.videoSender = newSender;
+          else if (kind === 'audio') entry.audioSender = newSender;
         } catch (e) {
-          console.error(`[mesh] addTrack fallback failed for ${targetKind}:`, e);
+          console.error(`[mesh] addTrack fallback failed for ${kind}:`, e);
         }
-      }
-    }
-  }
-
-  public async addTrack(track: MediaStreamTrack, stream: MediaStream) {
-    for (const entry of this.peers.values()) {
-      const pc = entry.pc;
-      const exists = pc.getSenders().some(s => s.track === track);
-      if (!exists) {
-        const sender = pc.addTrack(track, stream);
-        if (track.kind === 'video') entry.videoSender = sender;
-        else if (track.kind === 'audio') entry.audioSender = sender;
-      }
-    }
-  }
-
-  public async removeTrack(track: MediaStreamTrack) {
-    for (const entry of this.peers.values()) {
-      const pc = entry.pc;
-      const sender = pc.getSenders().find(s => s.track === track);
-      if (sender) {
-        pc.removeTrack(sender);
-        if (track.kind === 'video') entry.videoSender = undefined;
-        else if (track.kind === 'audio') entry.audioSender = undefined;
       }
     }
   }
 
   public async renegotiateAll() {
-    console.log("[mesh] Manually triggering renegotiation for all peers...");
     for (const [remoteId, entry] of this.peers.entries()) {
       if (!entry.negotiating) {
         try {
@@ -302,11 +257,6 @@ export class MeshRTC {
         }
       }
     }
-  }
-
-  public async restoreCameraTrack() {
-    const track = this.localStream?.getVideoTracks()[0];
-    if (track) await this.replaceTrack(track, 'video');
   }
 
   public getLocalVideoTrack() {
