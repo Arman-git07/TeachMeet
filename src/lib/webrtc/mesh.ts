@@ -4,7 +4,7 @@ import { io, Socket } from "socket.io-client";
 
 type PeerEntry = {
   pc: RTCPeerConnection;
-  stream: MediaStream;
+  stream: MediaStream | null;
   makingOffer: boolean;
   ignoreOffer: boolean;
   isSettingRemoteAnswerPending: boolean;
@@ -48,13 +48,9 @@ export class MeshRTC {
 
   public async init(localStream: MediaStream, displayName: string, photoURL?: string) {
     this.localStream = localStream;
-    
-    // Attach existing tracks to any peers that might have been created while media was loading
-    for (const entry of this.peers.values()) {
-      this.attachLocalTracksToPeer(entry);
-    }
-
     this._ready = true;
+    
+    // Process any pending peer connections now that we have local media
     while (this._pendingSignals.length) {
       const fn = this._pendingSignals.shift();
       fn?.();
@@ -68,7 +64,7 @@ export class MeshRTC {
     });
 
     this.socket.on("user-joined", (remoteId: string) => {
-      const handler = () => this._handleUserJoined(remoteId);
+      const handler = () => this._initiateNewPeer(remoteId);
       if (!this._ready) this._pendingSignals.push(handler);
       else handler();
     });
@@ -97,11 +93,49 @@ export class MeshRTC {
     });
   }
 
+  private async _initiateNewPeer(remoteId: string) {
+    if (!remoteId || remoteId === this.userId || this.peers.has(remoteId)) return;
+    
+    console.log(`[Mesh] Initiating peer connection to ${remoteId}`);
+    const entry = this.createPeerEntry(remoteId);
+    this.peers.set(remoteId, entry);
+
+    // 🎯 CRITICAL: Forced Negotiation Logic
+    // Add all local tracks and immediately force an offer.
+    if (this.localStream) {
+      this.localStream.getTracks().forEach(track => {
+        const sender = entry.pc.addTrack(track, this.localStream!);
+        if (track.kind === 'video') entry.videoSender = sender;
+        else if (track.kind === 'audio') entry.audioSender = sender;
+      });
+    }
+
+    try {
+      entry.makingOffer = true;
+      const offer = await entry.pc.createOffer();
+      await entry.pc.setLocalDescription(offer);
+      this.socket.emit("offer", remoteId, entry.pc.localDescription);
+    } catch (err) {
+      console.error("[Mesh] Failed to create forced offer:", err);
+    } finally {
+      entry.makingOffer = false;
+    }
+  }
+
   private async _handleOffer(fromId: string, offer: RTCSessionDescriptionInit) {
     let entry = this.peers.get(fromId);
     if (!entry) {
-      entry = this.createPeerEntry(fromId, false);
+      entry = this.createPeerEntry(fromId);
       this.peers.set(fromId, entry);
+      
+      // Add local tracks if they aren't already added
+      if (this.localStream) {
+        this.localStream.getTracks().forEach(track => {
+          const sender = entry!.pc.addTrack(track, this.localStream!);
+          if (track.kind === 'video') entry!.videoSender = sender;
+          else if (track.kind === 'audio') entry!.audioSender = sender;
+        });
+      }
     }
     
     const pc = entry.pc;
@@ -109,23 +143,20 @@ export class MeshRTC {
     const offerCollision = (offer.type === "offer") && (entry.makingOffer || pc.signalingState !== "stable");
 
     entry.ignoreOffer = !polite && offerCollision;
-    if (entry.ignoreOffer) return;
+    if (entry.ignoreOffer) {
+      console.log(`[Mesh] Ignored offer from ${fromId} (collision handling)`);
+      return;
+    }
 
     try {
       await pc.setRemoteDescription(offer);
       if (offer.type === "offer") {
         await pc.setLocalDescription();
-        this.socket.emit("offer", fromId, pc.localDescription);
+        this.socket.emit("answer", fromId, pc.localDescription);
       }
     } catch (err) {
-      console.error("[mesh] Offer handling failed:", err);
+      console.error("[Mesh] Offer handling failed:", err);
     }
-  }
-
-  private async _handleUserJoined(remoteId: string) {
-    if (!remoteId || remoteId === this.userId || this.peers.has(remoteId)) return;
-    const entry = this.createPeerEntry(remoteId, true);
-    this.peers.set(remoteId, entry);
   }
 
   private async _handleAnswer(fromId: string, answer: RTCSessionDescriptionInit) {
@@ -134,7 +165,7 @@ export class MeshRTC {
     try {
       await entry.pc.setRemoteDescription(answer);
     } catch (e) {
-      console.error("[mesh] Answer handling failed:", e);
+      console.error("[Mesh] Answer handling failed:", e);
     }
   }
 
@@ -145,88 +176,55 @@ export class MeshRTC {
       await entry.pc.addIceCandidate(candidate);
     } catch (e) {
       if (!entry.ignoreOffer) {
-        console.error("[mesh] ICE handling failed:", e);
+        console.error("[Mesh] ICE handling failed:", e);
       }
     }
   }
 
-  private createPeerEntry(remoteId: string, isInitiator: boolean): PeerEntry {
+  private createPeerEntry(remoteId: string): PeerEntry {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
-    
-    // Authoritative manual stream construction to handle "empty event.streams" bugs
-    const remoteStream = new MediaStream();
     
     const entry: PeerEntry = { 
       pc, 
-      stream: remoteStream, 
+      stream: null, 
       makingOffer: false, 
       ignoreOffer: false, 
       isSettingRemoteAnswerPending: false 
     };
 
     pc.ontrack = (ev) => {
-      if (ev.track) {
-        const existingTrack = remoteStream.getTracks().find(t => t.id === ev.track.id);
-        if (!existingTrack) {
-          remoteStream.addTrack(ev.track);
-        }
+      console.log(`[Mesh] Track received from ${remoteId}: ${ev.track.kind}`);
+      // 🎯 Standard ontrack logic: use the first stream provided by the event
+      if (ev.streams && ev.streams[0]) {
+        this.onRemoteStream(remoteId, ev.streams[0]);
       }
-      // Authoritative callback - passing the manually built stream
-      this.onRemoteStream(remoteId, remoteStream);
     };
 
     pc.onicecandidate = (ev) => {
       if (ev.candidate) this.socket.emit("ice-candidate", remoteId, ev.candidate);
     };
 
+    // Note: We handle initial negotiation explicitly in _initiateNewPeer
+    // but keep this for dynamic track changes (e.g. screen share)
     pc.onnegotiationneeded = async () => {
+      if (entry.makingOffer) return;
       try {
         entry.makingOffer = true;
         await pc.setLocalDescription();
         this.socket.emit("offer", remoteId, pc.localDescription);
       } catch (err) {
-        console.error("[mesh] Negotiation failed:", err);
+        console.error("[Mesh] Renegotiation failed:", err);
       } finally {
         entry.makingOffer = false;
       }
     };
 
-    if (this.localStream) {
-      this.attachLocalTracksToPeer(entry);
-    }
-
     return entry;
   }
 
-  private attachLocalTracksToPeer(entry: PeerEntry) {
-    if (!this.localStream) return;
-    
-    const pc = entry.pc;
-    const senders = pc.getSenders();
-
-    // Iterate through tracks and add/replace. 
-    // This supports "Warm Initialization" where tracks are present but may be disabled.
-    this.localStream.getTracks().forEach(track => {
-      const existingSender = senders.find(s => s.track?.kind === track.kind);
-      
-      if (!existingSender) {
-        const sender = pc.addTrack(track, this.localStream!);
-        if (track.kind === 'video') entry.videoSender = sender;
-        else if (track.kind === 'audio') entry.audioSender = sender;
-      } else {
-        if (existingSender.track?.id !== track.id) {
-            existingSender.replaceTrack(track).catch(e => console.error("[mesh] Track replacement failed", e));
-        }
-        if (track.kind === 'video') entry.videoSender = existingSender;
-        else if (track.kind === 'audio') entry.audioSender = existingSender;
-      }
-    });
-  }
-
   public leave() {
-    this.peers.forEach(({ pc, stream }) => {
+    this.peers.forEach(({ pc }) => {
         pc.close();
-        stream.getTracks().forEach(t => t.stop());
     });
     this.peers.clear();
     if (this.socket.connected) this.socket.disconnect();
@@ -237,7 +235,6 @@ export class MeshRTC {
     const entry = this.peers.get(remoteId);
     if (entry) {
       entry.pc.close();
-      entry.stream.getTracks().forEach(t => t.stop());
       this.peers.delete(remoteId);
     }
   }
