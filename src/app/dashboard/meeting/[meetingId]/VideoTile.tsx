@@ -1,4 +1,3 @@
-
 // src/app/dashboard/meeting/[meetingId]/VideoTile.tsx
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -92,6 +91,7 @@ const VideoTile: React.FC<Props> = ({
       videoEl.srcObject = stream;
     }
     
+    // Check if there's actually a video track to show
     const hasVideo = stream.getVideoTracks().length > 0;
     setHasVideoTrack(hasVideo);
 
@@ -107,6 +107,7 @@ const VideoTile: React.FC<Props> = ({
   useEffect(() => {
     syncStream();
 
+    // CRITICAL: Listen for track changes on the stream object itself
     if (stream) {
       stream.addEventListener('addtrack', syncStream);
       stream.addEventListener('removetrack', syncStream);
@@ -122,6 +123,7 @@ const VideoTile: React.FC<Props> = ({
 
   const isSpeaking = (volumeLevel ?? 0) > 0.1 && isMicOn;
   
+  // A participant is "showing video" if the hardware toggle is on AND we have a valid track.
   const isEffectivelyShowingVideo = (isCameraOn || isScreenSharing) && hasVideoTrack;
 
   return (

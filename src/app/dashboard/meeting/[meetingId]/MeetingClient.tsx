@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
@@ -173,7 +172,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   }, [rtc]);
 
   const toggleCamera = useCallback(async (forceState?: boolean) => {
-    if (!localStream || !rtc) return;
+    if (!localStream) return;
     const nextState = typeof forceState === 'boolean' ? forceState : !camOn;
     
     const videoTrack = localStream.getVideoTracks()[0];
@@ -184,10 +183,10 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     setCamOn(nextState);
     localStorage.setItem('teachmeet-cam-state', String(nextState));
     updateMyStatus({ isCameraOn: nextState });
-  }, [localStream, camOn, updateMyStatus, rtc]);
+  }, [localStream, camOn, updateMyStatus]);
 
   const toggleMic = useCallback(async () => {
-    if (!localStream || !rtc) return;
+    if (!localStream) return;
     const audioTrack = localStream.getAudioTracks()[0];
     if (audioTrack) {
       audioTrack.enabled = !micOn;
@@ -198,7 +197,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     localStorage.setItem('teachmeet-mic-state', String(newState));
     
     updateMyStatus({ isMicOn: newState });
-  }, [localStream, micOn, updateMyStatus, rtc]);
+  }, [localStream, micOn, updateMyStatus]);
 
   const startRecording = useCallback(async () => {
     if (!localStream || !user) {
@@ -389,6 +388,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         setCamOn(desiredCamState);
         setMicOn(desiredMicState);
         
+        // WARM TRACK PATTERN: Always keep the hardware pipeline active but toggle track.enabled
         stream.getVideoTracks().forEach(track => { track.enabled = desiredCamState; });
         stream.getAudioTracks().forEach(track => { track.enabled = desiredMicState; });
         

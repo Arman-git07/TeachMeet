@@ -1,4 +1,3 @@
-
 "use client";
 
 import { io, Socket } from "socket.io-client";
@@ -155,7 +154,7 @@ export class MeshRTC {
   private createPeerEntry(remoteId: string, isInitiator: boolean): PeerEntry {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
     
-    // Authoritative stream construction for modern addTrack
+    // CRITICAL: Manually construct stream to handle cases where event.streams is empty
     const remoteStream = new MediaStream();
     
     const entry: PeerEntry = { 
@@ -169,7 +168,6 @@ export class MeshRTC {
     pc.ontrack = (ev) => {
       console.log(`[Mesh] Track received from ${remoteId}: ${ev.track.kind}`);
       if (ev.track) {
-        // Build the stream manually to avoid event.streams being empty
         const existingTrack = remoteStream.getTracks().find(t => t.id === ev.track.id);
         if (!existingTrack) {
           remoteStream.addTrack(ev.track);
