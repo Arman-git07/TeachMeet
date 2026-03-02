@@ -114,41 +114,34 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   }, []);
 
   const handleRemoteLeft = useCallback(async (remoteUserId: string) => {
-    console.log(`[Mesh] Peer ${remoteUserId} left. Cleaning up local resources.`);
+    console.log(`[Mesh] Remote ${remoteUserId} left. Triggering cleanup.`);
     
-    if (isHost && meetingId) {
-        try {
-            const participantRef = doc(db, "meetings", meetingId, "participants", remoteUserId);
-            if (remoteUserId !== userId) {
-                await deleteDoc(participantRef);
-                console.log(`[Presence] Host authoritatively pruned ghost participant: ${remoteUserId}`);
-            }
-        } catch (err) {
-            console.warn("[Presence] Host pruning attempt failed (likely already gone):", err);
-        }
-    }
-
+    // Clear stream references immediately
     setRemoteStreams(prev => {
       const next = new Map(prev);
       next.delete(remoteUserId);
       return next;
     });
     
+    // Clear audio processing
     const entry = remoteAnalysersRef.current.get(remoteUserId);
     if (entry && entry.rafId) cancelAnimationFrame(entry.rafId);
     remoteAnalysersRef.current.delete(remoteUserId);
     setVolumeLevels(prev => { const next = new Map(prev); next.delete(remoteUserId); return next; });
+    
+    // Reset pinned UI if needed
     setPinnedId(prev => prev === remoteUserId ? null : prev);
-  }, [isHost, meetingId, userId]);
+  }, []);
 
   useEffect(() => {
     const rtcInstance = new MeshRTC({
       roomId: meetingId,
       userId,
-      onRemoteStream: (remoteUserId, stream) => {
+      onRemoteStream: (remoteId, stream) => {
         setRemoteStreams(prev => {
           const next = new Map(prev);
-          next.set(remoteUserId, new MediaStream(stream.getTracks()));
+          // Crucial: Use a new reference to force React UI update in grid
+          next.set(remoteId, new MediaStream(stream.getTracks()));
           return next;
         });
       },
@@ -186,6 +179,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     
     const videoTrack = localStream.getVideoTracks()[0];
     if (videoTrack) {
+      // Warm track standard: only toggle enabled property
       videoTrack.enabled = nextState;
     }
     
@@ -646,6 +640,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
             isMicOn={!spotlightParticipant.isMicOn}
             name={spotlightParticipant.name}
             isScreenSharing={spotlightParticipant.isScreenSharing}
+            profileUrl={spotlightParticipant.avatar}
             onDoubleClick={() => toggleSpotlight(spotlightParticipant.id)}
             onSpotlightClick={() => toggleSpotlight(spotlightParticipant.id)}
             onUnpin={() => togglePin(spotlightParticipant.id)}
@@ -671,6 +666,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                                 isCameraOn={!p.isCamOff} 
                                 isMicOn={!p.isMicOff} 
                                 name={p.name}
+                                profileUrl={p.avatar}
                                 isScreenSharing={true}
                                 onDoubleClick={() => togglePin(p.id)}
                                 onUnpin={() => togglePin(p.id)}
@@ -728,7 +724,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                 <div className="w-full h-full grid gap-2 overflow-auto" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}>
                     {remotes.map((p) => (
                         <div key={p.id} className="w-full h-full rounded-lg relative aspect-[9/16] md:aspect-video">
-                            <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} onUnpin={() => togglePin(p.id)} onSpotlightClick={() => toggleSpotlight(p.id)} />
+                            <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOn} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} onUnpin={() => togglePin(p.id)} onSpotlightClick={() => toggleSpotlight(p.id)} />
                         </div>
                     ))}
                 </div>

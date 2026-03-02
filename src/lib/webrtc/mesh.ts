@@ -1,3 +1,4 @@
+
 "use client";
 
 import { io, Socket } from "socket.io-client";
@@ -20,7 +21,7 @@ export class MeshRTC {
   private peers: Map<string, PeerEntry> = new Map();
   private iceServers = [{ urls: "stun:stun.l.google.com:19302" }];
   private onRemoteStream: (userId: string, stream: MediaStream) => void;
-  private onRemoteLeft?: (socketId: string) => void;
+  private onRemoteLeft?: (remoteId: string) => void;
   public socketId: string | null = null;
 
   private _ready = false; 
@@ -29,8 +30,8 @@ export class MeshRTC {
   constructor(opts: {
     roomId: string;
     userId: string;
-    onRemoteStream: (socketId: string, stream: MediaStream) => void;
-    onRemoteLeft?: (socketId: string) => void;
+    onRemoteStream: (userId: string, stream: MediaStream) => void;
+    onRemoteLeft?: (remoteId: string) => void;
   }) {
     this.roomId = opts.roomId;
     this.userId = opts.userId;
@@ -92,6 +93,7 @@ export class MeshRTC {
     });
     
     this.socket.on("user-left", (remoteId: string) => {
+      console.log(`[Mesh] authoritative user-left signal for ${remoteId}`);
       this.cleanupPeer(remoteId);
       if (this.onRemoteLeft) this.onRemoteLeft(remoteId);
     });
@@ -152,7 +154,8 @@ export class MeshRTC {
 
   private createPeerEntry(remoteId: string, isInitiator: boolean): PeerEntry {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
-    // Manually manage a single MediaStream for this peer to handle track collection reliably
+    
+    // Authoritative stream construction for modern addTrack
     const remoteStream = new MediaStream();
     
     const entry: PeerEntry = { 
@@ -164,16 +167,16 @@ export class MeshRTC {
     };
 
     pc.ontrack = (ev) => {
-      // Robust attachment: Always add incoming tracks to our manual stream
-      // because ev.streams[0] may be empty or unreliable with addTrack()
+      console.log(`[Mesh] Track received from ${remoteId}: ${ev.track.kind}`);
       if (ev.track) {
+        // Build the stream manually to avoid event.streams being empty
         const existingTrack = remoteStream.getTracks().find(t => t.id === ev.track.id);
         if (!existingTrack) {
           remoteStream.addTrack(ev.track);
         }
       }
       
-      // Notify the UI logic. We pass the stream that now contains the latest track.
+      // Notify UI with the constructed stream
       this.onRemoteStream(remoteId, remoteStream);
     };
 
@@ -224,7 +227,10 @@ export class MeshRTC {
   }
 
   public leave() {
-    this.peers.forEach(({ pc }) => pc.close());
+    this.peers.forEach(({ pc, stream }) => {
+        pc.close();
+        stream.getTracks().forEach(t => t.stop());
+    });
     this.peers.clear();
     if (this.socket.connected) this.socket.disconnect();
     this.localStream?.getTracks().forEach(track => track.stop());
@@ -233,7 +239,9 @@ export class MeshRTC {
   private cleanupPeer(remoteId: string) {
     const entry = this.peers.get(remoteId);
     if (entry) {
+      console.log(`[Mesh] Cleaning up peer connection for ${remoteId}`);
       entry.pc.close();
+      entry.stream.getTracks().forEach(t => t.stop());
       this.peers.delete(remoteId);
     }
   }

@@ -2,9 +2,25 @@
 import type { NextApiRequest } from "next";
 import type { NextApiResponseServerIO } from "@/types";
 import { Server as IOServer, Socket } from "socket.io";
-import { db } from "@/lib/firebase";
-import { doc, deleteDoc } from "firebase/firestore";
+import * as admin from "firebase-admin";
 import type { ChatMessage } from "@/contexts/MeetingRTCContext";
+
+// Initialize Firebase Admin for authoritative server-side cleanup
+if (!admin.apps.length) {
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      }),
+    });
+  } catch (error) {
+    console.error("Firebase Admin initialization failed. Server-side Firestore cleanup may fail.", error);
+  }
+}
+
+const adminDb = admin.apps.length ? admin.firestore() : null;
 
 // A simple in-memory store for block relationships within a room.
 const roomBlocks = new Map<string, Map<string, Set<string>>>(); // Map<roomId, Map<blockerId, Set<blockedId>>>
@@ -122,23 +138,26 @@ export default function handler(
       socket.on("disconnect", async () => {
         const { roomId, userId } = socket.data as { roomId: string, userId: string };
         if (roomId && userId) {
-          console.log(`🧹 Disconnect detected for user ${userId} in room ${roomId}`);
+          console.log(`🧹 Authoritative cleanup for user ${userId} in room ${roomId}`);
           
-          // 1. Authoritative Deletion Broadcast
-          // We broadcast the 'user-left' event immediately. 
-          // Clients (specifically the Host) will use this signal to prune Firestore.
-          socket.to(roomId).emit("user-left", userId);
-
-          // 2. Best-effort server-side cleanup
-          // This might fail due to firestore rules (no request.auth), 
-          // but the Host client will perform the reliable cleanup.
-          try {
-            const participantRef = doc(db, "meetings", roomId, "participants", userId);
-            await deleteDoc(participantRef);
-          } catch (e) {
-            // Logged but expected to fail in some environments without Admin SDK
-            console.debug("Server-side doc delete skipped (Host will handle it).");
+          // 1. Authoritative Deletion from Firestore via Admin SDK
+          if (adminDb) {
+            try {
+              await adminDb
+                .collection("meetings")
+                .doc(roomId)
+                .collection("participants")
+                .doc(userId)
+                .delete();
+              console.log(`✅ Successfully pruned Firestore for user ${userId}`);
+            } catch (err) {
+              console.error("❌ Failed to delete participant doc on server:", err);
+            }
           }
+
+          // 2. Authoritative Signal Broadcast
+          // Peer clients will use this to close WebRTC connections instantly
+          socket.to(roomId).emit("user-left", userId);
 
           // 3. Ephemeral State Cleanup
           const roomBlockMap = roomBlocks.get(roomId);
