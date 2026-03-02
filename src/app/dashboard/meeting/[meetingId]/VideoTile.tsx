@@ -10,6 +10,8 @@ import {
   Pin,
   Maximize2,
   Minimize2,
+  Pencil,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import HandRaiseIcon from "./HandRaiseIcon";
@@ -69,6 +71,7 @@ const VideoTile: React.FC<Props> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isMirrored, setIsMirrored] = useState(false);
+  const [hasVideoTrack, setHasVideoTrack] = useState(false);
 
   useEffect(() => {
     if (isLocal && !isScreenSharing) {
@@ -80,15 +83,44 @@ const VideoTile: React.FC<Props> = ({
 
   useEffect(() => {
     const videoEl = videoRef.current;
-    if (videoEl && stream) {
+    if (!videoEl || !stream) {
+      setHasVideoTrack(false);
+      return;
+    }
+
+    const syncStream = () => {
       if (videoEl.srcObject !== stream) {
         videoEl.srcObject = stream;
       }
-      videoEl.play().catch(e => console.warn(`[VideoTile] Autoplay pending interaction for ${name}`));
-    }
+      
+      const hasVideo = stream.getVideoTracks().length > 0;
+      setHasVideoTrack(hasVideo);
+
+      if (hasVideo || stream.getAudioTracks().length > 0) {
+        videoEl.play().catch(e => {
+          if (e.name !== 'AbortError') {
+            console.warn(`[VideoTile] Playback issue for ${name}:`, e);
+          }
+        });
+      }
+    };
+
+    syncStream();
+
+    // Listen for tracks being added to the stream (WebRTC often adds audio then video)
+    stream.addEventListener('addtrack', syncStream);
+    stream.addEventListener('removetrack', syncStream);
+
+    return () => {
+      stream.removeEventListener('addtrack', syncStream);
+      stream.removeEventListener('removetrack', syncStream);
+    };
   }, [stream, name]);
 
   const isSpeaking = (volumeLevel ?? 0) > 0.1 && isMicOn;
+  
+  // A tile is effectively showing video if the UI thinks it's on AND the stream actually has a track.
+  const isEffectivelyShowingVideo = (isCameraOn || isScreenSharing) && hasVideoTrack;
 
   return (
     <div
@@ -128,16 +160,16 @@ const VideoTile: React.FC<Props> = ({
           ref={videoRef}
           autoPlay
           playsInline
-          muted={isLocal}
+          muted={isLocal || !isMicOn}
           className={cn(
             "w-full h-full object-cover transition-opacity duration-200 rounded-lg",
-            (isCameraOn || isScreenSharing) && stream ? "opacity-100" : "opacity-0",
+            isEffectivelyShowingVideo ? "opacity-100" : "opacity-0",
             isMirrored && "transform -scale-x-100"
           )}
         />
 
-        {(!isCameraOn && !isScreenSharing || !stream) && (
-          <div className="absolute inset-0 flex items-center justify-center z-10">
+        {!isEffectivelyShowingVideo && (
+          <div className="absolute inset-0 flex items-center justify-center z-10 bg-muted/10">
             <Avatar className="w-1/3 aspect-square h-auto max-w-24 max-h-24 md:w-28 md:h-28 border-4 border-background shadow-lg transition-all duration-300">
               <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
               <AvatarFallback className="text-3xl md:text-5xl">{name?.charAt(0) ?? "U"}</AvatarFallback>
