@@ -68,20 +68,70 @@ export class MeshRTC {
       else handler();
     });
 
-    this.socket.on("offer", (fromId: string, offer: RTCSessionDescriptionInit) => {
-      const handler = () => this._handleOffer(fromId, offer);
+    this.socket.on("offer", async (fromId: string, offer: RTCSessionDescriptionInit) => {
+      const handler = async () => {
+        let entry = this.peers.get(fromId);
+        if (!entry) {
+          entry = this.createPeerEntry(fromId);
+          this.peers.set(fromId, entry);
+          
+          if (this.localStream) {
+            this.localStream.getTracks().forEach(track => {
+              const sender = entry!.pc.addTrack(track, this.localStream!);
+              if (track.kind === 'video') entry!.videoSender = sender;
+              else if (track.kind === 'audio') entry!.audioSender = sender;
+            });
+          }
+        }
+        
+        const pc = entry.pc;
+        const polite = this.userId > fromId;
+        const offerCollision = (offer.type === "offer") && (entry.makingOffer || pc.signalingState !== "stable");
+
+        entry.ignoreOffer = !polite && offerCollision;
+        if (entry.ignoreOffer) return;
+
+        try {
+          await pc.setRemoteDescription(offer);
+          if (offer.type === "offer") {
+            await pc.setLocalDescription();
+            this.socket.emit("answer", fromId, pc.localDescription);
+          }
+        } catch (err) {
+          console.error("[Mesh] Offer handling failed:", err);
+        }
+      };
+
       if (!this._ready) this._pendingSignals.push(handler);
       else handler();
     });
 
-    this.socket.on("answer", (fromId: string, answer: RTCSessionDescriptionInit) => {
-      const handler = () => this._handleAnswer(fromId, answer);
+    this.socket.on("answer", async (fromId: string, answer: RTCSessionDescriptionInit) => {
+      const handler = async () => {
+        const entry = this.peers.get(fromId);
+        if (!entry) return;
+        try {
+          await entry.pc.setRemoteDescription(answer);
+        } catch (e) {
+          console.error("[Mesh] Answer handling failed:", e);
+        }
+      };
       if (!this._ready) this._pendingSignals.push(handler);
       else handler();
     });
 
     this.socket.on("ice-candidate", (fromId: string, candidate: RTCIceCandidateInit) => {
-      const handler = () => this._handleIceCandidate(fromId, candidate);
+      const handler = async () => {
+        const entry = this.peers.get(fromId);
+        if (!entry) return;
+        try {
+          await entry.pc.addIceCandidate(candidate);
+        } catch (e) {
+          if (!entry.ignoreOffer) {
+            console.error("[Mesh] ICE handling failed:", e);
+          }
+        }
+      };
       if (!this._ready) this._pendingSignals.push(handler);
       else handler();
     });
@@ -95,11 +145,9 @@ export class MeshRTC {
   private async _initiateNewPeer(remoteId: string) {
     if (!remoteId || remoteId === this.userId || this.peers.has(remoteId)) return;
     
-    console.log(`[Mesh] Initiating peer connection to ${remoteId}`);
     const entry = this.createPeerEntry(remoteId);
     this.peers.set(remoteId, entry);
 
-    // 🎯 CRITICAL: Add tracks before forcing negotiation
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => {
         const sender = entry.pc.addTrack(track, this.localStream!);
@@ -108,7 +156,6 @@ export class MeshRTC {
       });
     }
 
-    // 🎯 CRITICAL: Forced Negotiation Logic
     try {
       entry.makingOffer = true;
       const offer = await entry.pc.createOffer();
@@ -118,61 +165,6 @@ export class MeshRTC {
       console.error("[Mesh] Failed to create forced offer:", err);
     } finally {
       entry.makingOffer = false;
-    }
-  }
-
-  private async _handleOffer(fromId: string, offer: RTCSessionDescriptionInit) {
-    let entry = this.peers.get(fromId);
-    if (!entry) {
-      entry = this.createPeerEntry(fromId);
-      this.peers.set(fromId, entry);
-      
-      if (this.localStream) {
-        this.localStream.getTracks().forEach(track => {
-          const sender = entry!.pc.addTrack(track, this.localStream!);
-          if (track.kind === 'video') entry!.videoSender = sender;
-          else if (track.kind === 'audio') entry!.audioSender = sender;
-        });
-      }
-    }
-    
-    const pc = entry.pc;
-    const polite = this.userId > fromId;
-    const offerCollision = (offer.type === "offer") && (entry.makingOffer || pc.signalingState !== "stable");
-
-    entry.ignoreOffer = !polite && offerCollision;
-    if (entry.ignoreOffer) return;
-
-    try {
-      await pc.setRemoteDescription(offer);
-      if (offer.type === "offer") {
-        await pc.setLocalDescription();
-        this.socket.emit("answer", fromId, pc.localDescription);
-      }
-    } catch (err) {
-      console.error("[Mesh] Offer handling failed:", err);
-    }
-  }
-
-  private async _handleAnswer(fromId: string, answer: RTCSessionDescriptionInit) {
-    const entry = this.peers.get(fromId);
-    if (!entry) return;
-    try {
-      await entry.pc.setRemoteDescription(answer);
-    } catch (e) {
-      console.error("[Mesh] Answer handling failed:", e);
-    }
-  }
-
-  private async _handleIceCandidate(fromId: string, candidate: RTCIceCandidateInit) {
-    const entry = this.peers.get(fromId);
-    if (!entry) return;
-    try {
-      await entry.pc.addIceCandidate(candidate);
-    } catch (e) {
-      if (!entry.ignoreOffer) {
-        console.error("[Mesh] ICE handling failed:", e);
-      }
     }
   }
 
@@ -187,7 +179,6 @@ export class MeshRTC {
       isSettingRemoteAnswerPending: false 
     };
 
-    // 🎯 Simplified ontrack as requested
     pc.ontrack = (event) => {
       const stream = event.streams[0];
       if (stream) {
