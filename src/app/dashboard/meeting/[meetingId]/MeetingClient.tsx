@@ -1,5 +1,4 @@
 
-// src/app/dashboard/meeting/[meetingId]/MeetingClient.tsx
 "use client";
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
@@ -140,7 +139,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       onRemoteStream: (remoteId, stream) => {
         setRemoteStreams(prev => {
           const next = new Map(prev);
-          // Crucial: Use a new reference to force React UI update in grid
+          // Force a new stream reference so child components detect the update
           next.set(remoteId, new MediaStream(stream.getTracks()));
           return next;
         });
@@ -179,7 +178,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     
     const videoTrack = localStream.getVideoTracks()[0];
     if (videoTrack) {
-      // Warm track standard: only toggle enabled property
       videoTrack.enabled = nextState;
     }
     

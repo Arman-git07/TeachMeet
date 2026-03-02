@@ -1,7 +1,7 @@
 
 import type { NextApiRequest } from "next";
 import type { NextApiResponseServerIO } from "@/types";
-import { Server as IOServer, Socket } from "socket.io";
+import { Server as IOServer } from "socket.io";
 import * as admin from "firebase-admin";
 import type { ChatMessage } from "@/contexts/MeetingRTCContext";
 
@@ -30,7 +30,7 @@ export default function handler(
   res: NextApiResponseServerIO
 ) {
   if (!res.socket.server.io) {
-    console.log("🔌 Initializing new Socket.IO server...");
+    console.log("🔌 Initializing new Socket.IO server with Admin SDK support...");
     const io = new IOServer(res.socket.server, {
       path: "/api/socketio",
       addTrailingSlash: false,
@@ -44,19 +44,16 @@ export default function handler(
     io.on("connection", (socket) => {
       socket.on("join-room", (roomId: string, userId: string) => {
         socket.join(roomId);
-        // @ts-ignore
+        // Store session metadata on the socket instance
         socket.data.userId = userId;
-        // @ts-ignore
         socket.data.roomId = roomId;
         
         if (!roomBlocks.has(roomId)) {
             roomBlocks.set(roomId, new Map());
         }
         
-        // Notify others that a new user has joined
         socket.to(roomId).emit("user-joined", userId);
 
-        // Tell the new user who has blocked them
         const roomBlockMap = roomBlocks.get(roomId);
         const usersWhoBlockedMe: string[] = [];
         roomBlockMap?.forEach((blockedSet, blockerId) => {
@@ -156,7 +153,6 @@ export default function handler(
           }
 
           // 2. Authoritative Signal Broadcast
-          // Peer clients will use this to close WebRTC connections instantly
           socket.to(roomId).emit("user-left", userId);
 
           // 3. Ephemeral State Cleanup
