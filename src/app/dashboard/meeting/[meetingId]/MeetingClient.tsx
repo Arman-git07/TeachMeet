@@ -29,7 +29,7 @@ type Participant = {
   isCamOff: boolean;
   isMicOff: boolean;
   isHandRaised?: boolean;
-  handRaisedAt?: number | null; // For sorting
+  handRaisedAt?: number | null; 
   isLocal?: boolean;
   stream: MediaStream | null;
   isScreenSharing?: boolean;
@@ -114,20 +114,17 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const handleRemoteLeft = useCallback(async (remoteUserId: string) => {
     console.log(`[Mesh] Remote ${remoteUserId} left. Triggering cleanup.`);
     
-    // Clear stream references immediately
     setRemoteStreams(prev => {
       const next = new Map(prev);
       next.delete(remoteUserId);
       return next;
     });
     
-    // Clear audio processing
     const entry = remoteAnalysersRef.current.get(remoteUserId);
     if (entry && entry.rafId) cancelAnimationFrame(entry.rafId);
     remoteAnalysersRef.current.delete(remoteUserId);
     setVolumeLevels(prev => { const next = new Map(prev); next.delete(remoteUserId); return next; });
     
-    // Reset pinned UI if needed
     setPinnedId(prev => prev === remoteUserId ? null : prev);
   }, []);
 
@@ -138,7 +135,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       onRemoteStream: (remoteId, stream) => {
         setRemoteStreams(prev => {
           const next = new Map(prev);
-          // Force a new stream reference so child components detect the update
+          // FORCE: Fresh reference to ensure VideoTile detects track additions
           next.set(remoteId, new MediaStream(stream.getTracks()));
           return next;
         });
@@ -177,6 +174,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     
     const videoTrack = localStream.getVideoTracks()[0];
     if (videoTrack) {
+      // WARM TRACK FIX: Toggle enabled instead of stopping to keep connection active
       videoTrack.enabled = nextState;
     }
     
@@ -388,7 +386,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         setCamOn(desiredCamState);
         setMicOn(desiredMicState);
         
-        // WARM TRACK PATTERN: Always keep the hardware pipeline active but toggle track.enabled
         stream.getVideoTracks().forEach(track => { track.enabled = desiredCamState; });
         stream.getAudioTracks().forEach(track => { track.enabled = desiredMicState; });
         

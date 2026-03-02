@@ -49,7 +49,6 @@ export class MeshRTC {
   public async init(localStream: MediaStream, displayName: string, photoURL?: string) {
     this.localStream = localStream;
     
-    // For all existing peers, ensure they get the tracks
     for (const entry of this.peers.values()) {
       this.attachLocalTracksToPeer(entry);
     }
@@ -154,7 +153,7 @@ export class MeshRTC {
   private createPeerEntry(remoteId: string, isInitiator: boolean): PeerEntry {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
     
-    // CRITICAL: Manually construct stream to handle cases where event.streams is empty
+    // FIX: Manual stream construction to handle empty event.streams in addTrack API
     const remoteStream = new MediaStream();
     
     const entry: PeerEntry = { 
@@ -173,8 +172,6 @@ export class MeshRTC {
           remoteStream.addTrack(ev.track);
         }
       }
-      
-      // Notify UI with the constructed stream
       this.onRemoteStream(remoteId, remoteStream);
     };
 

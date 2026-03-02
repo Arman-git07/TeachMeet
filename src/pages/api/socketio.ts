@@ -1,11 +1,10 @@
-
 import type { NextApiRequest } from "next";
 import type { NextApiResponseServerIO } from "@/types";
 import { Server as IOServer } from "socket.io";
 import * as admin from "firebase-admin";
 import type { ChatMessage } from "@/contexts/MeetingRTCContext";
 
-// Initialize Firebase Admin for authoritative server-side cleanup
+// Authoritative Admin SDK Initialization
 if (!admin.apps.length) {
   try {
     const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
@@ -23,15 +22,14 @@ if (!admin.apps.length) {
       console.log("✅ Firebase Admin initialized with Service Account");
     } else {
       admin.initializeApp();
-      console.log("⚠️ Firebase Admin initialized with default credentials (check env vars if delete fails)");
+      console.log("⚠️ Firebase Admin initialized with default credentials");
     }
   } catch (error) {
     console.error("❌ Firebase Admin initialization failed:", error);
   }
 }
 
-// A simple in-memory store for block relationships within a room.
-const roomBlocks = new Map<string, Map<string, Set<string>>>(); // Map<roomId, Map<blockerId, Set<blockedId>>>
+const roomBlocks = new Map<string, Map<string, Set<string>>>();
 
 export default function handler(
   req: NextApiRequest,
@@ -52,7 +50,6 @@ export default function handler(
     io.on("connection", (socket) => {
       socket.on("join-room", (roomId: string, userId: string) => {
         socket.join(roomId);
-        // Store session metadata on the socket instance
         socket.data.userId = userId;
         socket.data.roomId = roomId;
         
@@ -145,7 +142,7 @@ export default function handler(
         if (roomId && userId) {
           console.log(`🧹 Authoritative cleanup for user ${userId} in room ${roomId}`);
           
-          // 1. Authoritative Deletion from Firestore via Admin SDK (Bypasses security rules)
+          // AUTHORITATIVE FIX: Use Admin SDK to bypass security rules and prune Firestore immediately
           try {
             await admin.firestore()
               .collection("meetings")
@@ -158,10 +155,8 @@ export default function handler(
             console.error("❌ Failed to delete participant doc on server:", err);
           }
 
-          // 2. Authoritative Signal Broadcast
           socket.to(roomId).emit("user-left", userId);
 
-          // 3. Ephemeral State Cleanup
           const roomBlockMap = roomBlocks.get(roomId);
           if(roomBlockMap) {
             roomBlockMap.delete(userId);
