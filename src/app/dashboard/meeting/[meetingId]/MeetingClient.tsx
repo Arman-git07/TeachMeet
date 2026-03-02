@@ -113,26 +113,42 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
   }, []);
 
-  const handleRemoteLeft = useCallback((remoteUserId: string) => {
+  const handleRemoteLeft = useCallback(async (remoteUserId: string) => {
     console.log(`[Mesh] Peer ${remoteUserId} left. Cleaning up local resources.`);
+    
+    // 1. Authoritative Cleanup (Host Janitor Logic)
+    // The server-side cleanup in socketio.ts might fail due to Firestore rules.
+    // As the host, we have authoritative permission to prune the list.
+    if (isHost && meetingId) {
+        try {
+            const participantRef = doc(db, "meetings", meetingId, "participants", remoteUserId);
+            // We only attempt to delete if it's not ourselves (failsafe)
+            if (remoteUserId !== userId) {
+                await deleteDoc(participantRef);
+                console.log(`[Presence] Host authoritatively pruned ghost participant: ${remoteUserId}`);
+            }
+        } catch (err) {
+            console.warn("[Presence] Host pruning attempt failed (likely already gone):", err);
+        }
+    }
+
+    // 2. Hardware/Stream Cleanup
     setRemoteStreams(prev => {
       const next = new Map(prev);
       next.delete(remoteUserId);
       return next;
     });
     
-    setLiveParticipants(prev => {
-        const next = new Map(prev);
-        next.delete(remoteUserId);
-        return next;
-    });
+    // We DON'T manually delete from liveParticipants here anymore.
+    // The Firestore onSnapshot listener will handle the UI removal naturally
+    // once the document is deleted, preventing "resurrection" glitches.
 
     const entry = remoteAnalysersRef.current.get(remoteUserId);
     if (entry && entry.rafId) cancelAnimationFrame(entry.rafId);
     remoteAnalysersRef.current.delete(remoteUserId);
     setVolumeLevels(prev => { const next = new Map(prev); next.delete(remoteUserId); return next; });
     setPinnedId(prev => prev === remoteUserId ? null : prev);
-  }, []);
+  }, [isHost, meetingId, userId]);
 
   useEffect(() => {
     const rtcInstance = new MeshRTC({
@@ -141,7 +157,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       onRemoteStream: (remoteUserId, stream) => {
         setRemoteStreams(prev => {
           const next = new Map(prev);
-          // NEW MediaStream instance forces React reference change
           next.set(remoteUserId, new MediaStream(stream.getTracks()));
           return next;
         });

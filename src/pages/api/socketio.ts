@@ -122,18 +122,23 @@ export default function handler(
       socket.on("disconnect", async () => {
         const { roomId, userId } = socket.data as { roomId: string, userId: string };
         if (roomId && userId) {
-          console.log(`🧹 Authoritative cleanup for user ${userId} in room ${roomId}`);
+          console.log(`🧹 Disconnect detected for user ${userId} in room ${roomId}`);
           
-          // 1. Authoritative Firestore Cleanup
+          // 1. Authoritative Deletion Broadcast
+          // We broadcast the 'user-left' event immediately. 
+          // Clients (specifically the Host) will use this signal to prune Firestore.
+          socket.to(roomId).emit("user-left", userId);
+
+          // 2. Best-effort server-side cleanup
+          // This might fail due to firestore rules (no request.auth), 
+          // but the Host client will perform the reliable cleanup.
           try {
             const participantRef = doc(db, "meetings", roomId, "participants", userId);
             await deleteDoc(participantRef);
           } catch (e) {
-            console.error("Failed to delete participant doc on disconnect:", e);
+            // Logged but expected to fail in some environments without Admin SDK
+            console.debug("Server-side doc delete skipped (Host will handle it).");
           }
-
-          // 2. Notify other peers to close WebRTC tracks immediately
-          socket.to(roomId).emit("user-left", userId);
 
           // 3. Ephemeral State Cleanup
           const roomBlockMap = roomBlocks.get(roomId);
