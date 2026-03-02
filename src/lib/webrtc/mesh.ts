@@ -157,6 +157,7 @@ export class MeshRTC {
     }
 
     try {
+      // 🎯 FORCED NEGOTIATION
       entry.makingOffer = true;
       const offer = await entry.pc.createOffer();
       await entry.pc.setLocalDescription(offer);
@@ -180,6 +181,7 @@ export class MeshRTC {
     };
 
     pc.ontrack = (event) => {
+      // 🎯 Simplified ontrack: Single source of truth for the stream
       const stream = event.streams[0];
       if (stream) {
         this.onRemoteStream(remoteId, stream);

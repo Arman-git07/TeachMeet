@@ -144,6 +144,8 @@ export default function handler(
           socket.to(roomId).emit("user-left", userId);
 
           // 2. Authoritative database cleanup (Firebase Admin SDK)
+          // This fixes the ghost participant problem by ensuring the doc is deleted
+          // even if the user crashes or loses connection.
           try {
             await admin.firestore()
               .collection("meetings")
