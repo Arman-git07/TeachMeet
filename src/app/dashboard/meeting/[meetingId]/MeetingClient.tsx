@@ -133,8 +133,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       onRemoteStream: (remoteId, stream) => {
         setRemoteStreams(prev => {
           const next = new Map(prev);
-          // Force fresh reference to ensure VideoTile detects track additions
-          next.set(remoteId, new MediaStream(stream.getTracks()));
+          next.set(remoteId, stream);
           return next;
         });
       },
@@ -426,7 +425,12 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     return () => unsubscribe();
   }, [meetingId, userId, camOn, toast, toggleCamera]);
 
-  useEffect(() => { if (localStream && rtc && user) { rtc.init(localStream, user.displayName || 'User', user.photoURL || undefined); } }, [rtc, localStream, user]);
+  useEffect(() => { 
+    if (localStream && rtc && user) { 
+      rtc.init(localStream, user.displayName || 'User', user.photoURL || undefined); 
+      rtc.markReady(); // 🎯 Signal readiness after stream is captured
+    } 
+  }, [rtc, localStream, user]);
 
   useEffect(() => {
     if (!localStream || localStream.getAudioTracks().length === 0 || !micOn) {

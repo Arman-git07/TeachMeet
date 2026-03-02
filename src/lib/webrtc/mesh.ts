@@ -48,11 +48,14 @@ export class MeshRTC {
 
   public async init(localStream: MediaStream, displayName: string, photoURL?: string) {
     this.localStream = localStream;
+  }
+
+  public markReady() {
     this._ready = true;
-    
+    console.log("[Mesh] RTC Marked Ready. Processing pending signals:", this._pendingSignals.length);
     while (this._pendingSignals.length) {
       const fn = this._pendingSignals.shift();
-      fn?.();
+      if (fn) fn();
     }
   }
 
@@ -70,6 +73,19 @@ export class MeshRTC {
 
     this.socket.on("offer", async (fromId: string, offer: RTCSessionDescriptionInit) => {
       const handler = async () => {
+        // 🔒 Protect against answering before local tracks are ready
+        if (!this.localStream) {
+          console.warn("[Mesh] Offer received before local stream ready, waiting...");
+          await new Promise<void>((resolve) => {
+            const interval = setInterval(() => {
+              if (this.localStream) {
+                clearInterval(interval);
+                resolve();
+              }
+            }, 100);
+          });
+        }
+
         let entry = this.peers.get(fromId);
         if (!entry) {
           entry = this.createPeerEntry(fromId);
@@ -145,16 +161,28 @@ export class MeshRTC {
   private async _initiateNewPeer(remoteId: string) {
     if (!remoteId || remoteId === this.userId || this.peers.has(remoteId)) return;
     
+    // 🔒 HARD BLOCK UNTIL MEDIA READY
+    if (!this.localStream) {
+      console.warn("[Mesh] Waiting for local stream before initiating peer:", remoteId);
+      await new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          if (this.localStream) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 100);
+      });
+    }
+
     const entry = this.createPeerEntry(remoteId);
     this.peers.set(remoteId, entry);
 
-    if (this.localStream) {
-      this.localStream.getTracks().forEach(track => {
-        const sender = entry.pc.addTrack(track, this.localStream!);
-        if (track.kind === 'video') entry.videoSender = sender;
-        else if (track.kind === 'audio') entry.audioSender = sender;
-      });
-    }
+    // 🔥 ALWAYS add tracks before handshake
+    this.localStream!.getTracks().forEach(track => {
+      const sender = entry.pc.addTrack(track, this.localStream!);
+      if (track.kind === 'video') entry.videoSender = sender;
+      else if (track.kind === 'audio') entry.audioSender = sender;
+    });
 
     try {
       // 🎯 FORCED NEGOTIATION
@@ -181,7 +209,6 @@ export class MeshRTC {
     };
 
     pc.ontrack = (event) => {
-      // 🎯 Simplified ontrack: Single source of truth for the stream
       const stream = event.streams[0];
       if (stream) {
         this.onRemoteStream(remoteId, stream);
