@@ -657,7 +657,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                             <VideoTile 
                                 stream={p.stream} 
                                 isCameraOn={!p.isCamOff} 
-                                isMicOn={!p.isMicOff} 
+                                isMicOn={!p.isMicOn} 
                                 name={p.name}
                                 profileUrl={p.avatar}
                                 isScreenSharing={true}
@@ -694,24 +694,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
     if (count === 1) return <div className="w-full h-full flex items-center justify-center p-2"><div className="w-full h-full"><VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} onUnpin={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} className="w-full h-full" /></div></div>;
 
-    if (count === 2 && remotes.length === 1 && localParticipant) {
-      return (
-        <div className="w-full h-full relative" ref={mainContainerRef}>
-            <VideoTile stream={remotes[0].stream} isCameraOn={!remotes[0].isCamOff} isMicOn={!remotes[0].isMicOff} isHandRaised={remotes[0].isHandRaised||false} isFirstHand={remotes[0].id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={remotes[0].volumeLevel} profileUrl={remotes[0].avatar} name={remotes[0].name} isScreenSharing={remotes[0].isScreenSharing} isPinned={remotes[0].id === pinnedId} onDoubleClick={() => togglePin(remotes[0].id)} onUnpin={() => togglePin(remotes[0].id)} onSpotlightClick={() => toggleSpotlight(remotes[0].id)} className="w-full h-full" />
-            <motion.div
-              drag
-              dragConstraints={mainContainerRef}
-              dragMomentum={false}
-              className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing"
-            >
-              <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} className="w-full h-full" onDoubleClick={() => togglePin(localParticipant.id)} onUnpin={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} draggable={true} />
-            </motion.div>
-        </div>
-      );
-    }
-    
     if (remotes.length > 0 && localParticipant) {
-        // RESTORED STYLE: Remote grid + local floating tile as per user preference
+        // Restored grid for remotes with floating local tile
         const gridCols = Math.ceil(Math.sqrt(remotes.length));
         return (
             <div className="w-full h-full relative" ref={mainContainerRef}>
@@ -738,7 +722,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                         </div>
                     ))}
                 </div>
-                {/* Floating Local Tile for 3+ people */}
+                {/* Floating Local Tile */}
                 <motion.div
                   drag
                   dragConstraints={mainContainerRef}

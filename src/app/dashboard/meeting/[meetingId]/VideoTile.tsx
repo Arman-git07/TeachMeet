@@ -106,6 +106,7 @@ const VideoTile: React.FC<Props> = ({
     syncStream();
 
     if (stream) {
+      // Listen for browser-added tracks
       stream.addEventListener('addtrack', syncStream);
       stream.addEventListener('removetrack', syncStream);
     }

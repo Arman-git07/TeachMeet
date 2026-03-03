@@ -201,18 +201,26 @@ export class MeshRTC {
   private createPeerEntry(remoteId: string): PeerEntry {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
     
+    // Maintain a persistent stream for this peer to handle track updates
+    const remoteStream = new MediaStream();
+
     const entry: PeerEntry = { 
       pc, 
-      stream: null, 
+      stream: remoteStream, 
       makingOffer: false, 
       ignoreOffer: false, 
       isSettingRemoteAnswerPending: false 
     };
 
     pc.ontrack = (event) => {
-      const stream = event.streams[0];
-      if (stream) {
-        this.onRemoteStream(remoteId, stream);
+      if (event.track) {
+        // Add the new track to our persistent stream container
+        remoteStream.addTrack(event.track);
+        
+        // 🔥 TRIGGER UPDATE: Pass a shallow clone to ensure React state 
+        // detects a reference change and re-checks the stream content.
+        const updatedStream = new MediaStream(remoteStream.getTracks());
+        this.onRemoteStream(remoteId, updatedStream);
       }
     };
 
