@@ -71,6 +71,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [liveParticipants, setLiveParticipants] = useState<Map<string, LiveParticipantInfo>>(new Map());
+  const [realtimeOverrides, setRealtimeOverrides] = useState<Map<string, { isCameraOn?: boolean; isMicOn?: boolean }>>(new Map());
   const [isHandRaised, setIsHandRaised] = useState(false);
   
   const [isScreenShareModalOpen, setIsScreenShareModalOpen] = useState(false);
@@ -138,6 +139,13 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         });
       },
       onRemoteLeft: handleRemoteLeft,
+      onRemoteStateUpdate: (remoteId, state) => {
+        setRealtimeOverrides(prev => {
+          const next = new Map(prev);
+          next.set(remoteId, { ...next.get(remoteId), ...state });
+          return next;
+        });
+      }
     });
 
     setRtc(rtcInstance);
@@ -150,6 +158,9 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
 
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
+    if (rtc) {
+        rtc.updateMyState(status);
+    }
     if (user && meetingId && participantDocCreated.current) {
       const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
       try {
@@ -158,7 +169,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         console.error("Error updating participant status:", err);
       }
     }
-  }, [user, meetingId]);
+  }, [user, meetingId, rtc]);
   
   const screenShareHelper = useMemo(() => {
     if (!rtc) return null;
@@ -428,7 +439,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   useEffect(() => { 
     if (localStream && rtc && user) { 
       rtc.init(localStream, user.displayName || 'User', user.photoURL || undefined); 
-      // 🎯 Signaling only after hardware confirmed
       rtc.markReady();
     } 
   }, [rtc, localStream, user]);
@@ -555,7 +565,13 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         const videoBlocked = isBlockedByMe(id, 'video');
         const audioBlocked = isBlockedByMe(id, 'audio');
         const remoteStream = remoteStreams.get(id) || null;
+        const override = realtimeOverrides.get(id);
         
+        // 🎯 CRITICAL UI GATING FIX: Default to Camera ON if field is missing or overridden
+        // This ensures the VideoTile displays the stream immediately.
+        const cameraOn = override?.isCameraOn ?? (data.isCameraOn !== false);
+        const micOn = override?.isMicOn ?? (data.isMicOn !== false);
+
         if (remoteStream && audioBlocked) {
             remoteStream.getAudioTracks().forEach(t => t.enabled = false);
         } else if (remoteStream && !audioBlocked) {
@@ -565,8 +581,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         return {
           id, name: data.name || `User ${id.substring(0, 4)}`, avatar: data.photoURL || undefined,
           isHandRaised: data.isHandRaised, handRaisedAt: data.handRaisedAt, isScreenSharing: data.isScreenSharing,
-          isCamOff: videoBlocked || !data.isCameraOn,
-          isMicOff: audioBlocked || !data.isMicOn,
+          isCamOff: videoBlocked || !cameraOn,
+          isMicOff: audioBlocked || !micOn,
           stream: remoteStream, 
           volumeLevel: audioBlocked ? 0 : (volumeLevels.get(id) ?? 0),
         };
@@ -603,7 +619,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     const firstHandRaised = all.filter(p => p.isHandRaised && p.handRaisedAt).sort((a, b) => (a.handRaisedAt ?? 0) - (b.handRaisedAt ?? 0))[0];
     const raisedCount = all.filter(p => p.isHandRaised).length;
     return { allParticipants: all, localParticipant: self, remoteParticipants: remoteOnly, firstHandRaisedId: firstHandRaised?.id || null, raisedCount };
-  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised, isSharingScreen, pinnedId, isBlockedByMe, screenShareHelper, screenShareStream]);
+  }, [user, micOn, camOn, liveParticipants, userId, localStream, remoteStreams, volumeLevels, isHandRaised, isSharingScreen, pinnedId, isBlockedByMe, screenShareHelper, screenShareStream, realtimeOverrides]);
 
   const handleToggleHandRaise = useCallback(() => { const next = !isHandRaised; setIsHandRaised(next); updateMyStatus({ isHandRaised: next, handRaisedAt: next ? Date.now() : null }); }, [isHandRaised, updateMyStatus]);
   

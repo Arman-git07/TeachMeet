@@ -21,6 +21,7 @@ export class MeshRTC {
   private iceServers = [{ urls: "stun:stun.l.google.com:19302" }];
   private onRemoteStream: (userId: string, stream: MediaStream) => void;
   private onRemoteLeft?: (remoteId: string) => void;
+  private onRemoteStateUpdate?: (userId: string, state: { isCameraOn?: boolean; isMicOn?: boolean }) => void;
   public socketId: string | null = null;
 
   private _ready = false; 
@@ -31,11 +32,13 @@ export class MeshRTC {
     userId: string;
     onRemoteStream: (userId: string, stream: MediaStream) => void;
     onRemoteLeft?: (remoteId: string) => void;
+    onRemoteStateUpdate?: (userId: string, state: { isCameraOn?: boolean; isMicOn?: boolean }) => void;
   }) {
     this.roomId = opts.roomId;
     this.userId = opts.userId;
     this.onRemoteStream = opts.onRemoteStream;
     this.onRemoteLeft = opts.onRemoteLeft;
+    this.onRemoteStateUpdate = opts.onRemoteStateUpdate;
     
     this.socket = io({
       path: "/api/socketio",
@@ -52,7 +55,6 @@ export class MeshRTC {
 
   public markReady() {
     this._ready = true;
-    console.log("[Mesh] RTC Marked Ready. Processing pending signals:", this._pendingSignals.length);
     while (this._pendingSignals.length) {
       const fn = this._pendingSignals.shift();
       if (fn) fn();
@@ -71,10 +73,15 @@ export class MeshRTC {
       else handler();
     });
 
+    this.socket.on("participant-state-update", ({ userId, state }: { userId: string, state: any }) => {
+      if (this.onRemoteStateUpdate) {
+        this.onRemoteStateUpdate(userId, state);
+      }
+    });
+
     this.socket.on("offer", async (fromId: string, offer: RTCSessionDescriptionInit) => {
       const handler = async () => {
         if (!this.localStream) {
-          console.warn("[Mesh] Offer received before local stream ready, waiting...");
           await new Promise<void>((resolve) => {
             const interval = setInterval(() => {
               if (this.localStream) {
@@ -155,11 +162,14 @@ export class MeshRTC {
     });
   }
 
+  public updateMyState(state: { isCameraOn?: boolean; isMicOn?: boolean }) {
+    this.socket.emit("participant-state-update", { roomId: this.roomId, state });
+  }
+
   private async _initiateNewPeer(remoteId: string) {
     if (!remoteId || remoteId === this.userId || this.peers.has(remoteId)) return;
     
     if (!this.localStream) {
-      console.warn("[Mesh] Waiting for local stream before initiating peer:", remoteId);
       await new Promise<void>((resolve) => {
         const interval = setInterval(() => {
           if (this.localStream) {
@@ -193,25 +203,17 @@ export class MeshRTC {
 
   private createPeerEntry(remoteId: string): PeerEntry {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
-    
-    const remoteStream = new MediaStream();
-
     const entry: PeerEntry = { 
       pc, 
-      stream: remoteStream, 
+      stream: null, 
       makingOffer: false, 
       ignoreOffer: false, 
       isSettingRemoteAnswerPending: false 
     };
 
     pc.ontrack = (event) => {
-      if (event.track) {
-        remoteStream.addTrack(event.track);
-        
-        // 🔥 ROBUST SYNC: Pass a shallow clone to force React to detect 
-        // a reference change and re-scan the stream for the new video track.
-        const updatedStream = new MediaStream(remoteStream.getTracks());
-        this.onRemoteStream(remoteId, updatedStream);
+      if (event.streams[0]) {
+        this.onRemoteStream(remoteId, event.streams[0]);
       }
     };
 
@@ -219,26 +221,11 @@ export class MeshRTC {
       if (ev.candidate) this.socket.emit("ice-candidate", remoteId, ev.candidate);
     };
 
-    pc.onnegotiationneeded = async () => {
-      if (entry.makingOffer) return;
-      try {
-        entry.makingOffer = true;
-        await pc.setLocalDescription();
-        this.socket.emit("offer", remoteId, pc.localDescription);
-      } catch (err) {
-        console.error("[Mesh] Renegotiation failed:", err);
-      } finally {
-        entry.makingOffer = false;
-      }
-    };
-
     return entry;
   }
 
   public leave() {
-    this.peers.forEach(({ pc }) => {
-        pc.close();
-    });
+    this.peers.forEach(({ pc }) => pc.close());
     this.peers.clear();
     if (this.socket.connected) this.socket.disconnect();
     this.localStream?.getTracks().forEach(track => track.stop());

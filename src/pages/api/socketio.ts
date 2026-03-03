@@ -69,6 +69,13 @@ export default function handler(
         socket.emit('initial-block-list', usersWhoBlockedMe);
       });
       
+      socket.on('participant-state-update', ({ roomId, state }: { roomId: string, state: any }) => {
+        const userId = (socket.data as any).userId;
+        if (roomId && userId) {
+          socket.to(roomId).emit('participant-state-update', { userId, state });
+        }
+      });
+
       socket.on('block-user', ({ blockedUserId }: { blockedUserId: string }) => {
           const { userId: blockerId, roomId } = socket.data as { userId: string, roomId: string };
           if (!blockerId || !roomId || !blockedUserId) return;
@@ -140,12 +147,9 @@ export default function handler(
       socket.on("disconnect", async () => {
         const { roomId, userId } = socket.data as { roomId: string, userId: string };
         if (roomId && userId) {
-          // 1. Notify peers instantly
           socket.to(roomId).emit("user-left", userId);
 
-          // 2. Authoritative database cleanup (Firebase Admin SDK)
-          // This fixes the ghost participant problem by ensuring the doc is deleted
-          // even if the user crashes or loses connection.
+          // Authoritative database cleanup (Firebase Admin SDK)
           try {
             await admin.firestore()
               .collection("meetings")
@@ -158,7 +162,6 @@ export default function handler(
             console.error("❌ Authoritative cleanup failed:", err);
           }
 
-          // 3. Memory cleanup
           const roomBlockMap = roomBlocks.get(roomId);
           if(roomBlockMap) {
             roomBlockMap.delete(userId);
