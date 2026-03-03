@@ -114,7 +114,8 @@ export class MeshRTC {
         try {
           await pc.setRemoteDescription(offer);
           if (offer.type === "offer") {
-            await pc.setLocalDescription();
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
             this.socket.emit("answer", fromId, pc.localDescription);
           }
         } catch (err) {
@@ -191,7 +192,10 @@ export class MeshRTC {
 
     try {
       entry.makingOffer = true;
-      const offer = await entry.pc.createOffer();
+      const offer = await entry.pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      });
       await entry.pc.setLocalDescription(offer);
       this.socket.emit("offer", remoteId, entry.pc.localDescription);
     } catch (err) {
@@ -212,6 +216,7 @@ export class MeshRTC {
     };
 
     pc.ontrack = (event) => {
+      console.log("TRACK KIND:", event.track.kind);
       if (event.streams[0]) {
         this.onRemoteStream(remoteId, event.streams[0]);
       }
