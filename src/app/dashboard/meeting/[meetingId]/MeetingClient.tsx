@@ -690,39 +690,21 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
 
     const count = allParticipants.length;
-    const remotes = remoteParticipants;
-
-    if (count === 1) return <div className="w-full h-full flex items-center justify-center p-2"><div className="w-full h-full"><VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} onUnpin={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} className="w-full h-full" /></div></div>;
-
-    if (remotes.length > 0 && localParticipant) {
-        // Restored grid for remotes with floating local tile
-        const gridCols = Math.ceil(Math.sqrt(remotes.length));
+    
+    // 🎯 PERFECT 2-PERSON LAYOUT: 1 remote in grid + 1 local floating
+    if (count === 2 && remoteParticipants.length === 1 && localParticipant) {
+        const p = remoteParticipants[0];
         return (
             <div className="w-full h-full relative" ref={mainContainerRef}>
-                <div className="w-full h-full grid gap-2 overflow-auto" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}>
-                    {remotes.map((p) => (
-                        <div key={p.id} className="w-full h-full rounded-lg relative aspect-[9/16] md:aspect-video">
-                            <VideoTile 
-                                stream={p.stream} 
-                                isCameraOn={!p.isCamOff} 
-                                isMicOn={!p.isMicOn} 
-                                isHandRaised={p.isHandRaised || false} 
-                                isFirstHand={p.id === firstHandRaisedId} 
-                                raisedCount={raisedCount} 
-                                volumeLevel={p.volumeLevel} 
-                                isLocal={false} 
-                                profileUrl={p.avatar} 
-                                name={p.name} 
-                                isScreenSharing={p.isScreenSharing} 
-                                isPinned={p.id === pinnedId} 
-                                onDoubleClick={() => togglePin(p.id)} 
-                                onUnpin={() => togglePin(p.id)} 
-                                onSpotlightClick={() => toggleSpotlight(p.id)} 
-                            />
-                        </div>
-                    ))}
-                </div>
-                {/* Floating Local Tile */}
+                <VideoTile 
+                    stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOn} 
+                    isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} 
+                    volumeLevel={p.volumeLevel} isLocal={false} profileUrl={p.avatar} name={p.name} 
+                    isScreenSharing={p.isScreenSharing} isPinned={p.id === pinnedId} 
+                    onDoubleClick={() => togglePin(p.id)} onUnpin={() => togglePin(p.id)} 
+                    onSpotlightClick={() => toggleSpotlight(p.id)}
+                    className="w-full h-full"
+                />
                 <motion.div
                   drag
                   dragConstraints={mainContainerRef}
@@ -730,30 +712,38 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                   className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-20"
                 >
                   <VideoTile 
-                    stream={localParticipant.stream} 
-                    isCameraOn={!localParticipant.isCamOff} 
-                    isMicOn={!localParticipant.isMicOff} 
-                    isHandRaised={localParticipant.isHandRaised || false} 
-                    isFirstHand={localParticipant.id === firstHandRaisedId} 
-                    raisedCount={raisedCount} 
-                    volumeLevel={localParticipant.volumeLevel} 
-                    isLocal={true} 
-                    profileUrl={localParticipant.avatar} 
-                    name={localParticipant.name} 
-                    isScreenSharing={localParticipant.isScreenSharing} 
-                    isPinned={localParticipant.id === pinnedId} 
-                    className="w-full h-full" 
-                    onDoubleClick={() => togglePin(localParticipant.id)} 
-                    onUnpin={() => togglePin(localParticipant.id)} 
-                    onSpotlightClick={() => toggleSpotlight(localParticipant.id)} 
-                    draggable={true} 
+                    stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOn} 
+                    isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} 
+                    raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} 
+                    profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} 
+                    isPinned={localParticipant.id === pinnedId} className="w-full h-full" 
+                    onDoubleClick={() => togglePin(localParticipant.id)} onUnpin={() => togglePin(localParticipant.id)} 
+                    onSpotlightClick={() => toggleSpotlight(localParticipant.id)} draggable={true} 
                   />
                 </motion.div>
             </div>
         );
     }
 
-    return null;
+    // 🎯 STANDARD GRID FOR EVERYONE ELSE (1 person or 3+ people)
+    const gridCols = Math.ceil(Math.sqrt(count));
+    return (
+        <div className="w-full h-full grid gap-2 overflow-auto" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}>
+            {allParticipants.map((p) => (
+                <div key={p.id} className="w-full h-full rounded-lg relative aspect-[9/16] md:aspect-video">
+                    <VideoTile 
+                        stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOn} 
+                        isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} 
+                        raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} 
+                        profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} 
+                        isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} 
+                        onUnpin={() => togglePin(p.id)} onSpotlightClick={() => toggleSpotlight(p.id)}
+                        className="w-full h-full"
+                    />
+                </div>
+            ))}
+        </div>
+    );
   };
 
   return (

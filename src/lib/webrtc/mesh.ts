@@ -50,9 +50,6 @@ export class MeshRTC {
     this.localStream = localStream;
   }
 
-  /**
-   * 🎯 markReady - Only call this once media hardware is confirmed captured.
-   */
   public markReady() {
     this._ready = true;
     console.log("[Mesh] RTC Marked Ready. Processing pending signals:", this._pendingSignals.length);
@@ -76,7 +73,6 @@ export class MeshRTC {
 
     this.socket.on("offer", async (fromId: string, offer: RTCSessionDescriptionInit) => {
       const handler = async () => {
-        // 🔒 HARD BLOCK: Ensure localStream exists before answering
         if (!this.localStream) {
           console.warn("[Mesh] Offer received before local stream ready, waiting...");
           await new Promise<void>((resolve) => {
@@ -162,7 +158,6 @@ export class MeshRTC {
   private async _initiateNewPeer(remoteId: string) {
     if (!remoteId || remoteId === this.userId || this.peers.has(remoteId)) return;
     
-    // 🔒 HARD BLOCK: Ensure localStream exists before starting handshake
     if (!this.localStream) {
       console.warn("[Mesh] Waiting for local stream before initiating peer:", remoteId);
       await new Promise<void>((resolve) => {
@@ -178,7 +173,6 @@ export class MeshRTC {
     const entry = this.createPeerEntry(remoteId);
     this.peers.set(remoteId, entry);
 
-    // 🔥 ADD TRACKS BEFORE HANDSHAKE
     this.localStream!.getTracks().forEach(track => {
       const sender = entry.pc.addTrack(track, this.localStream!);
       if (track.kind === 'video') entry.videoSender = sender;
@@ -186,7 +180,6 @@ export class MeshRTC {
     });
 
     try {
-      // 🎯 FORCED NEGOTIATION
       entry.makingOffer = true;
       const offer = await entry.pc.createOffer();
       await entry.pc.setLocalDescription(offer);
@@ -201,7 +194,6 @@ export class MeshRTC {
   private createPeerEntry(remoteId: string): PeerEntry {
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
     
-    // Maintain a persistent stream for this peer to handle track updates
     const remoteStream = new MediaStream();
 
     const entry: PeerEntry = { 
@@ -214,11 +206,10 @@ export class MeshRTC {
 
     pc.ontrack = (event) => {
       if (event.track) {
-        // Add the new track to our persistent stream container
         remoteStream.addTrack(event.track);
         
-        // 🔥 TRIGGER UPDATE: Pass a shallow clone to ensure React state 
-        // detects a reference change and re-checks the stream content.
+        // 🔥 ROBUST SYNC: Pass a shallow clone to force React to detect 
+        // a reference change and re-scan the stream for the new video track.
         const updatedStream = new MediaStream(remoteStream.getTracks());
         this.onRemoteStream(remoteId, updatedStream);
       }
