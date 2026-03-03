@@ -82,6 +82,7 @@ export class MeshRTC {
 
     this.socket.on("offer", async (fromId: string, offer: RTCSessionDescriptionInit) => {
       const handler = async () => {
+        // 🔒 BLOCK UNTIL MEDIA READY: Receiver side
         if (!this.localStream) {
           await new Promise<void>((resolve) => {
             const interval = setInterval(() => {
@@ -171,6 +172,7 @@ export class MeshRTC {
   private async _initiateNewPeer(remoteId: string) {
     if (!remoteId || remoteId === this.userId || this.peers.has(remoteId)) return;
     
+    // 🔒 BLOCK UNTIL MEDIA READY: Initiator side
     if (!this.localStream) {
       await new Promise<void>((resolve) => {
         const interval = setInterval(() => {
@@ -193,6 +195,7 @@ export class MeshRTC {
 
     try {
       entry.makingOffer = true;
+      // 🎯 FORCE TRANSCEIVERS: Ensures video section is always in SDP
       const offer = await entry.pc.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: true,
@@ -217,7 +220,8 @@ export class MeshRTC {
     };
 
     pc.ontrack = (event) => {
-      console.log("TRACK KIND:", event.track.kind);
+      // 🎯 VERIFICATION LOG: Confirm video track arrival in console
+      console.log("TRACK KIND RECEIVED:", event.track.kind);
       if (event.streams[0]) {
         this.onRemoteStream(remoteId, event.streams[0]);
       }
@@ -227,6 +231,8 @@ export class MeshRTC {
       if (ev.candidate) this.socket.emit("ice-candidate", remoteId, ev.candidate);
     };
 
+    // 🎯 DETERMINISTIC SIGNALING: Removed onnegotiationneeded to prevent race conditions
+    
     return entry;
   }
 

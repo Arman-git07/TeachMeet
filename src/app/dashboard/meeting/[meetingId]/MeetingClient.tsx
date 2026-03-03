@@ -135,7 +135,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       onRemoteStream: (remoteId, stream) => {
         setRemoteStreams(prev => {
           const next = new Map(prev);
-          next.set(remoteId, stream);
+          // Force a new stream reference to trigger React re-scan for tracks
+          next.set(remoteId, new MediaStream(stream.getTracks()));
           return next;
         });
       },
@@ -440,7 +441,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   useEffect(() => { 
     if (localStream && rtc && user) { 
       rtc.init(localStream, user.displayName || 'User', user.photoURL || undefined); 
-      rtc.markReady();
+      rtc.markReady(); // 🎯 DETERMINISTIC SIGNALING: Only process signals after media ready
     } 
   }, [rtc, localStream, user]);
 
@@ -568,6 +569,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         const remoteStream = remoteStreams.get(id) || null;
         const override = realtimeOverrides.get(id);
         
+        // 🎯 UI LOGIC: Default to "On" if state is unknown to prevent hiding remote footage
         const cameraOn = override?.isCameraOn ?? (data.isCameraOn !== false);
         const micOn = override?.isMicOn ?? (data.isMicOn !== false);
 
