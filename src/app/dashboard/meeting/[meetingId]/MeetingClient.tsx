@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
@@ -46,6 +45,8 @@ type LiveParticipantInfo = {
     isHost?: boolean;
     isCameraOn?: boolean;
     isMicOn?: boolean;
+    isActive?: boolean;
+    lastSeen?: any;
 };
 
 type Props = { 
@@ -129,6 +130,9 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   }, []);
 
   useEffect(() => {
+    // 💡 REUSE RTC INSTANCE: Support internal navigation without re-initializing
+    if (rtc && rtc.roomId === meetingId) return;
+
     const rtcInstance = new MeshRTC({
       roomId: meetingId,
       userId,
@@ -151,11 +155,10 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
     setRtc(rtcInstance);
 
-    return () => {
-      rtcInstance?.leave();
-      setRtc(null);
-    }
-  }, [meetingId, userId, setRtc, handleRemoteLeft]);
+    // 💡 PERSISTENT CONNECTION: We no longer tear down the socket on component unmount
+    // because the user might just be navigating to Chat or Whiteboard.
+    // Teardown is now managed by the explicit Leave function or the global Context.
+  }, [meetingId, userId, setRtc, handleRemoteLeft, rtc]);
 
 
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
@@ -281,6 +284,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           } catch (e: any) {
             toast.update(toastId, { variant: 'destructive', title: 'Upload Failed', description: e.message });
           } finally {
+            setIsUploading(true);
             setIsUploading(false);
           }
         };
@@ -415,16 +419,32 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   useEffect(() => {
     if (!meetingId) return;
     const participantsCol = collection(db, "meetings", meetingId, "participants");
+    
+    // 🔔 JOIN/LEAVE NOTIFICATIONS: Detect doc changes to show toasts
     const unsubscribe = onSnapshot(participantsCol, (snapshot) => {
       const newParticipants = new Map<string, LiveParticipantInfo>();
       let localParticipantData: LiveParticipantInfo | undefined;
       
+      snapshot.docChanges().forEach(change => {
+          if (change.type === 'added' && change.doc.id !== userId) {
+              const data = change.doc.data();
+              toast({ title: `${data.name} joined the meeting` });
+          }
+          if (change.type === 'removed' && change.doc.id !== userId) {
+              const data = change.doc.data();
+              toast({ title: `${data.name} left the meeting` });
+          }
+      });
+
       snapshot.forEach(doc => { 
         const data = doc.data() as LiveParticipantInfo;
         if (doc.id === userId) {
           localParticipantData = data;
         }
-        newParticipants.set(doc.id, data); 
+        // Authoritative isActive check
+        if (data.isActive !== false) {
+            newParticipants.set(doc.id, data); 
+        }
       });
 
       if (localParticipantData && localParticipantData.isCameraOn === false && camOn) {
@@ -534,7 +554,9 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                     isHost: isHost,
                     isCameraOn: camOn,
                     isMicOn: micOn,
+                    isActive: true, // 🟢 Set active status
                     joinedAt: serverTimestamp(),
+                    lastSeen: serverTimestamp(),
                 }, { merge: true });
                 participantDocCreated.current = true;
             } catch (error) {

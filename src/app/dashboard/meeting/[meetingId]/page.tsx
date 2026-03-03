@@ -105,7 +105,7 @@ function MeetingPageContent() {
   const { toast } = useToast();
   const { setHeaderContent, setHeaderAction } = useDynamicHeader();
   const { user, loading: authLoading } = useAuth();
-  const { rtc, isRecording, isUploading, recordingControls, isSaveRecordingDialogOpen, setIsSaveRecordingDialogOpen } = useMeetingRTC();
+  const { rtc, setRtc, isRecording, isUploading, recordingControls, isSaveRecordingDialogOpen, setIsSaveRecordingDialogOpen } = useMeetingRTC();
   
   const meetingId = params.meetingId as string;
   const topic = searchParams.get('topic') || "TeachMeet Meeting";
@@ -131,6 +131,7 @@ function MeetingPageContent() {
     if (!meetingId || !user) return;
 
     rtc?.leave();
+    setRtc(null); // 🟢 CLEAR CONTEXT
 
     if (isHost && endForAll) {
         try {
@@ -167,7 +168,7 @@ function MeetingPageContent() {
     }
   
     router.push("/");
-  }, [meetingId, user, isHost, router, toast, rtc]);
+  }, [meetingId, user, isHost, router, toast, rtc, setRtc]);
 
   useEffect(() => {
     const camState = localStorage.getItem('teachmeet-cam-state') !== 'false';
@@ -212,9 +213,9 @@ function MeetingPageContent() {
     });
     
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      handleLeave(false);
-      e.preventDefault(); 
-      e.returnValue = '';
+      // 🟢 SILENT LEAVE: Clean up DB but allow socket authoritative logic to handle it if browser closes
+      const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
+      deleteDoc(participantRef).catch(() => {});
     };
     
     window.addEventListener('beforeunload', handleBeforeUnload);

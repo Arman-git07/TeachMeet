@@ -1,4 +1,3 @@
-
 import type { NextApiRequest } from "next";
 import type { NextApiResponseServerIO } from "@/types";
 import { Server as IOServer } from "socket.io";
@@ -71,7 +70,7 @@ export default function handler(
       });
       
       socket.on('participant-state-update', ({ roomId, state }: { roomId: string, state: any }) => {
-        const userId = (socket.data as any).userId;
+        const userId = socket.data.userId;
         if (roomId && userId) {
           socket.to(roomId).emit('participant-state-update', { userId, state });
         }
@@ -89,7 +88,7 @@ export default function handler(
           }
           roomBlockMap.get(blockerId)!.add(blockedUserId);
           
-          const blockedSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === blockedUserId);
+          const blockedSocket = Array.from(io.sockets.sockets.values()).find(s => s.data.userId === blockedUserId);
           if (blockedSocket) {
               blockedSocket.emit('user-blocked-me', blockerId);
           }
@@ -103,7 +102,7 @@ export default function handler(
                   roomBlockMap.get(unblockerId)?.delete(unblockedUserId);
               }
               
-              const unblockedSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === unblockedUserId);
+              const unblockedSocket = Array.from(io.sockets.sockets.values()).find(s => s.data.userId === unblockedUserId);
               if (unblockedSocket) {
                   unblockedSocket.emit('user-unblocked-me', unblockerId);
               }
@@ -115,7 +114,7 @@ export default function handler(
         if (!roomId) return;
         
         if (message.isPrivate && message.recipientId) {
-            const recipientSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === message.recipientId);
+            const recipientSocket = Array.from(io.sockets.sockets.values()).find(s => s.data.userId === message.recipientId);
             if (recipientSocket) {
                 recipientSocket.emit('chat-message', message);
             }
@@ -125,21 +124,21 @@ export default function handler(
       });
 
       socket.on("offer", (remoteId: string, offer: any) => {
-        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === remoteId);
+        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => s.data.userId === remoteId);
         if (targetSocket) {
           targetSocket.emit("offer", socket.data.userId, offer);
         }
       });
       
       socket.on("answer", (remoteId: string, answer: any) => {
-        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === remoteId);
+        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => s.data.userId === remoteId);
         if (targetSocket) {
           targetSocket.emit("answer", socket.data.userId, answer);
         }
       });
 
       socket.on("ice-candidate", (remoteId: string, candidate: any) => {
-        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => (s.data as any).userId === remoteId);
+        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => s.data.userId === remoteId);
         if (targetSocket) {
           targetSocket.emit("ice-candidate", socket.data.userId, candidate);
         }
@@ -150,7 +149,8 @@ export default function handler(
         if (roomId && userId) {
           socket.to(roomId).emit("user-left", userId);
 
-          // Authoritative database cleanup (Firebase Admin SDK)
+          // 🛡️ Authoritative database cleanup (Firebase Admin SDK)
+          // This removes the user from the participants collection instantly upon disconnection
           try {
             await admin.firestore()
               .collection("meetings")
