@@ -731,7 +731,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                     style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gridTemplateRows: `repeat(${gridRows}, 1fr)` }}
                 >
                     {remoteParticipants.map((p) => (
-                        <div key={p.id} className="w-full h-full relative overflow-hidden rounded-xl">
+                        <div key={p.id} className={cn("w-full h-full relative overflow-hidden", !isTwoPeople && "rounded-xl")}>
                             <VideoTile 
                                 stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
                                 isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} 
@@ -739,7 +739,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                                 profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} 
                                 isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} 
                                 onUnpin={() => togglePin(p.id)} onSpotlightClick={() => toggleSpotlight(p.id)}
-                                className="w-full h-full"
+                                className={cn("w-full h-full", isTwoPeople && "rounded-none")}
                             />
                         </div>
                     ))}
@@ -765,13 +765,21 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
 
     return (
-        <div className="w-full h-full">
+        <div className="w-full h-full fixed inset-0 z-0">
             <VideoTile 
-                stream={localParticipant?.stream || null} isCameraOn={!localParticipant?.isCamOff} isMicOn={!localParticipant?.isMicOff} 
-                isHandRaised={localParticipant?.isHandRaised || false} isFirstHand={localParticipant?.id === firstHandRaisedId} 
-                raisedCount={raisedCount} volumeLevel={localParticipant?.volumeLevel || 0} isLocal={true} 
-                profileUrl={localParticipant?.avatar} name={localParticipant?.name || "You"} isScreenSharing={localParticipant?.isScreenSharing} 
-                isPinned={localParticipant?.id === pinnedId} className="w-full h-full" 
+                stream={localParticipant?.stream || null} 
+                isCameraOn={!localParticipant?.isCamOff} 
+                isMicOn={!localParticipant?.isMicOff} 
+                isHandRaised={localParticipant?.isHandRaised || false} 
+                isFirstHand={localParticipant?.id === firstHandRaisedId} 
+                raisedCount={raisedCount} 
+                volumeLevel={localParticipant?.volumeLevel || 0} 
+                isLocal={true} 
+                profileUrl={localParticipant?.avatar} 
+                name={localParticipant?.name || "You"} 
+                isScreenSharing={localParticipant?.isScreenSharing} 
+                isPinned={localParticipant?.id === pinnedId} 
+                className="w-full h-full rounded-none" 
                 onDoubleClick={() => localParticipant && togglePin(localParticipant.id)} 
                 onUnpin={() => localParticipant && togglePin(localParticipant.id)} 
                 onSpotlightClick={() => localParticipant && toggleSpotlight(localParticipant.id)} 

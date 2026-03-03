@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -122,12 +121,14 @@ const VideoTile: React.FC<Props> = ({
 
   const isSpeaking = (volumeLevel ?? 0) > 0.1 && isMicOn;
   const isEffectivelyShowingVideo = (isCameraOn || isScreenSharing) && hasVideoTrack;
+  const hasNoRounding = className?.includes('rounded-none');
 
   return (
     <div
       onDoubleClick={onDoubleClick}
       className={cn(
-        "relative bg-black rounded-lg overflow-hidden transition-all duration-300",
+        "relative bg-black overflow-hidden transition-all duration-300",
+        !hasNoRounding && "rounded-lg",
         isSpeaking ? "ring-2 sm:ring-4 ring-primary" : "",
         className,
         draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
@@ -163,7 +164,8 @@ const VideoTile: React.FC<Props> = ({
           playsInline
           muted={isLocal || !isMicOn}
           className={cn(
-            "w-full h-full object-cover transition-opacity duration-200 rounded-lg",
+            "w-full h-full object-cover transition-opacity duration-200",
+            !hasNoRounding && "rounded-lg",
             isEffectivelyShowingVideo ? "opacity-100" : "opacity-0",
             isMirrored && "transform -scale-x-100"
           )}
