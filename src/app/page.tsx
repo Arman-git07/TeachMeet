@@ -54,6 +54,7 @@ interface BaseActivityItem {
   isImportant?: boolean;
   link?: string;
   endTs?: number;
+  role?: 'host' | 'participant';
 }
 
 export interface JoinRequestActivityItem extends BaseActivityItem {
@@ -78,6 +79,7 @@ interface FallenLetter {
 
 const DISMISSED_ITEMS_KEY_PREFIX = 'teachmeet-dismissed-items-';
 const STARTED_MEETINGS_KEY_PREFIX = 'teachmeet-started-meetings-';
+const JOINED_MEETINGS_KEY_PREFIX = 'teachmeet-joined-meetings-';
 const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000;
 
 const itemIcons: Record<ActivityItemType, React.ElementType> = {
@@ -96,7 +98,7 @@ const itemIcons: Record<ActivityItemType, React.ElementType> = {
 };
 
 const itemLinks: Record<ActivityItemType, (id: string, item: any) => string> = {
-  meeting: (id, item) => `/dashboard/meeting/prejoin?meetingId=${id}&topic=${encodeURIComponent(item.title)}&role=host`,
+  meeting: (id, item) => `/dashboard/meeting/prejoin?meetingId=${id}&topic=${encodeURIComponent(item.title)}&role=${item.role || 'host'}`,
   document: () => `/dashboard/documents`,
   recording: () => `/dashboard/recordings`,
   chatMention: () => `/dashboard/classrooms`,
@@ -116,6 +118,7 @@ export default function HomePage() {
   const [activityChunks, setActivityChunks] = useState<Record<string, ActivityItem[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [validMeetings] = useState<Record<string, boolean>>({});
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   const [fallenLetters, setFallenLetters] = useState<FallenLetter[]>([]);
   const [showBubble, setShowBubble] = useState(false);
@@ -131,12 +134,22 @@ export default function HomePage() {
 
   const [allClassroomIds, setAllClassroomIds] = useState<Record<string, { title: string, role: 'teacher' | 'student' }>>({});
 
+  // Local Storage Change Listener
+  useEffect(() => {
+    const handleRefresh = () => setRefreshTrigger(prev => prev + 1);
+    window.addEventListener('teachmeet_meeting_started', handleRefresh);
+    window.addEventListener('teachmeet_meeting_joined', handleRefresh);
+    window.addEventListener('teachmeet_meeting_ended', handleRefresh);
+    return () => {
+      window.removeEventListener('teachmeet_meeting_started', handleRefresh);
+      window.removeEventListener('teachmeet_meeting_joined', handleRefresh);
+      window.removeEventListener('teachmeet_meeting_ended', handleRefresh);
+    };
+  }, []);
+
   // Logo Animation & Visibility Logic
   useEffect(() => {
-    // Show bubble immediately on mount
     setShowBubble(true);
-
-    // Auto-dismiss after 6 seconds as requested
     const bubbleTimer = setTimeout(() => {
       setShowBubble(false);
       bubbleDismissedRef.current = true;
@@ -144,17 +157,14 @@ export default function HomePage() {
 
     const wrapper = logoWrapperRef.current;
     if (!wrapper) return;
-    
     const h1 = wrapper.querySelector('h1');
     if (!h1) return;
 
-    // Force visibility reset for the original h1
     h1.style.opacity = '1';
     h1.style.visibility = 'visible';
     h1.style.transform = 'none';
 
     const originalText = h1.textContent || "";
-    // Wrap each character dynamically for measuring and visibility
     h1.innerHTML = originalText.split('').map((char, i) => 
       `<span class="logo-letter-trigger" data-index="${i}" style="display: inline-block; position: relative; cursor: pointer; transition: opacity 0.2s; opacity: 1; visibility: visible !important; background: linear-gradient(to top, #32CD32, #00FFFF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; color: #32CD32;">${char}</span>`
     ).join('');
@@ -163,7 +173,6 @@ export default function HomePage() {
       const target = e.target as HTMLElement;
       if (target.classList.contains('logo-letter-trigger')) {
         const index = parseInt(target.getAttribute('data-index') || '0');
-        
         if (target.style.opacity === '0') return;
 
         if (!bubbleDismissedRef.current) {
@@ -179,23 +188,8 @@ export default function HomePage() {
         const latestRect = latestCard.getBoundingClientRect();
 
         const fallY = latestRect.top - letterRect.top - letterRect.height - 12;
-
         const computed = window.getComputedStyle(h1);
-        const letterStyle = {
-          fontFamily: computed.fontFamily,
-          fontSize: computed.fontSize,
-          fontWeight: computed.fontWeight,
-          letterSpacing: computed.letterSpacing,
-          display: 'inline-block',
-          transform: computed.transform, 
-          transformOrigin: 'center',
-          pointerEvents: 'auto',
-          background: 'linear-gradient(to top, #32CD32, #00FFFF)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          color: '#32CD32',
-        };
-
+        
         const newFallen: FallenLetter = {
           id: `fallen-${index}-${Date.now()}`,
           char: target.textContent || "",
@@ -204,7 +198,20 @@ export default function HomePage() {
           width: letterRect.width,
           height: letterRect.height,
           fallY,
-          style: letterStyle,
+          style: {
+            fontFamily: computed.fontFamily,
+            fontSize: computed.fontSize,
+            fontWeight: computed.fontWeight,
+            letterSpacing: computed.letterSpacing,
+            display: 'inline-block',
+            transform: computed.transform, 
+            transformOrigin: 'center',
+            pointerEvents: 'auto',
+            background: 'linear-gradient(to top, #32CD32, #00FFFF)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            color: '#32CD32',
+          },
           index,
           isDragging: false
         };
@@ -231,7 +238,6 @@ export default function HomePage() {
   };
 
   const handleDragEnd = (letter: FallenLetter, info: any) => {
-    // If close to original position (within 50px), snap back
     if (Math.abs(info.offset.y + letter.fallY) < 50) {
       setFallenLetters(prev => prev.filter(l => l.id !== letter.id));
       setFallenIndices(prev => {
@@ -436,27 +442,32 @@ export default function HomePage() {
     
     const DISMISSED_KEY = `${DISMISSED_ITEMS_KEY_PREFIX}${user.uid}`;
     const STARTED_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
+    const JOINED_KEY = `${JOINED_MEETINGS_KEY_PREFIX}${user.uid}`;
 
     const dismissed = JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]');
     const started = JSON.parse(localStorage.getItem(STARTED_KEY) || '[]');
+    const joined = JSON.parse(localStorage.getItem(JOINED_KEY) || '[]');
 
     const firestoreActivity = Object.values(activityChunks).flat();
 
-    const ongoingMeetings = started
-        .filter((m: any) => m && Date.now() - m.startedAt < TWO_HOURS_IN_MS && validMeetings[m.id] !== false)
-        .map((m: any) => ({ 
-            type: 'meeting' as ActivityItemType, 
-            id: m.id, 
-            title: m.title || "Meeting", 
-            timestamp: m.startedAt 
-        }));
+    const ongoingMeetings = [
+        ...started.map((m: any) => ({ ...m, role: 'host' as const })),
+        ...joined.map((m: any) => ({ ...m, role: 'participant' as const }))
+    ]
+    .filter((m: any) => m && Date.now() - m.startedAt < TWO_HOURS_IN_MS && validMeetings[m.id] !== false)
+    .map((m: any) => ({ 
+        type: 'meeting' as ActivityItemType, 
+        id: m.id, 
+        title: m.title || "Meeting", 
+        timestamp: m.startedAt,
+        role: m.role
+    }));
     
     const combined = [...ongoingMeetings, ...firestoreActivity]
         .filter(item => item && !dismissed.includes(item.id))
         .sort((a,b) => (b.updatedAt || b.timestamp) - (a.updatedAt || a.timestamp));
 
     const unique = combined.reduce((acc: ActivityItem[], current) => {
-        // Robust deduplication: For meetings, normalize the ID (consistent with or without 'meeting-' prefix)
         const currentCompareId = current.type === 'meeting' 
             ? (current.id.startsWith('meeting-') ? current.id : `meeting-${current.id}`)
             : current.id;
@@ -473,7 +484,7 @@ export default function HomePage() {
     }, []);
 
     return unique.slice(0, 15);
-  }, [user, activityChunks, validMeetings]);
+  }, [user, activityChunks, validMeetings, refreshTrigger]);
 
   useEffect(() => {
     if (!authLoading) setIsLoading(false);
@@ -499,7 +510,7 @@ export default function HomePage() {
       <main className="flex-grow flex flex-col items-center justify-center pt-16 sm:pt-4 relative pb-[18rem]">
         <div className="relative z-10 flex w-full flex-col items-center text-center px-4">
           
-          {/* Logo Section with Animation */}
+          {/* Logo Section */}
           <div ref={logoWrapperRef} className="relative inline-block mb-8">
             <AnimatePresence>
               {showBubble && (
@@ -547,7 +558,6 @@ export default function HomePage() {
                   }}
                 >
                   <span style={letter.style}>{letter.char}</span>
-                  
                   {!letter.isDragging && (
                     <div className="absolute top-[-35px] left-1/2 -translate-x-1/2 px-3 py-1 bg-gradient-to-br from-white to-[#ececec] rounded-full text-[10px] font-bold text-gray-800 shadow-lg whitespace-nowrap pointer-events-none border border-white/50 animate-fade-in">
                       Pick me up!
@@ -593,6 +603,8 @@ export default function HomePage() {
                             displayTitle = `${(item as JoinRequestActivityItem).requesterName} wants to join "${item.title}"`;
                         } else if (item.classroomName) {
                             displayTitle = `${label} ${item.type} in ${item.classroomName}`;
+                        } else if (item.type === 'meeting' && item.role === 'participant') {
+                            displayTitle = `Rejoin: ${item.title}`;
                         }
 
                         return (

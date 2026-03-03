@@ -39,7 +39,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
 const STARTED_MEETINGS_KEY_PREFIX = 'teachmeet-started-meetings-';
-const THIRTY_MINUTES_IN_MS = 30 * 60 * 1000;
+const JOINED_MEETINGS_KEY_PREFIX = 'teachmeet-joined-meetings-';
+const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000;
 
 
 function PreJoinPageContent() {
@@ -50,12 +51,9 @@ function PreJoinPageContent() {
 
   const [topic, setTopic] = useState('Untitled Meeting');
   const [isHost, setIsHost] = useState(false);
-  
   const [meetingId, setMeetingId] = useState('');
-
   const [meetingLink, setMeetingLink] = useState('');
   const [meetingCode, setMeetingCode] = useState('');
-  
   const [requestStatus, setRequestStatus] = useState<"idle" | "pending" | "approved" | "denied">("idle");
 
   const [agreed, setAgreed] = useState(false);
@@ -64,7 +62,6 @@ function PreJoinPageContent() {
   const [videoFilter, setVideoFilter] = useState('brightclear');
   const [startError, setStartError] = useState<string | null>(null);
   const [isSharePanelOpen, setIsSharePanelOpen] = useState(false);
-  
   const [isCreatingMeeting, setIsCreatingMeeting] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -88,7 +85,6 @@ function PreJoinPageContent() {
     setIsHost(isHostRole);
 
     const rawId = idFromParams.trim();
-    // Normalize ID with prefix for consistent storage/history
     const finalMeetingId = rawId.startsWith('meeting-') ? rawId : `meeting-${rawId}`;
     const finalTopic = topicFromParams || (isHostRole ? 'Untitled Meeting' : 'Joining a Meeting');
     const finalCode = finalMeetingId.replace('meeting-', '');
@@ -103,7 +99,6 @@ function PreJoinPageContent() {
       );
     }
 
-    // Failsafe: if host lands here and meeting isn't in localStorage, add it.
     if (isHostRole && typeof window !== 'undefined' && user) {
         const STARTED_MEETINGS_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
         const storedMeetingsRaw = localStorage.getItem(STARTED_MEETINGS_KEY);
@@ -113,7 +108,7 @@ function PreJoinPageContent() {
         const meetingExists = meetings.some((m: any) => m.id === finalMeetingId);
         if (!meetingExists) {
             const now = Date.now();
-            meetings = meetings.filter(m => m && m.startedAt && (now - m.startedAt < THIRTY_MINUTES_IN_MS));
+            meetings = meetings.filter(m => m && m.startedAt && (now - m.startedAt < TWO_HOURS_IN_MS));
             meetings.unshift({ id: finalMeetingId, title: finalTopic, startedAt: now });
             localStorage.setItem(STARTED_MEETINGS_KEY, JSON.stringify(meetings.slice(0, 5)));
             window.dispatchEvent(new CustomEvent('teachmeet_meeting_started'));
@@ -166,62 +161,76 @@ function PreJoinPageContent() {
      };
   }, [toast]);
   
-useEffect(() => {
-  if (!meetingId || isHost || !user) return;
+  useEffect(() => {
+    if (!meetingId || isHost || !user) return;
 
-  let mounted = true;
-  const didRedirectRef = { current: false };
-  const unsubRefs: { req?: () => void; part?: () => void } = {};
+    let mounted = true;
+    const didRedirectRef = { current: false };
+    const unsubRefs: { req?: () => void; part?: () => void } = {};
 
-  const cleanupAll = () => {
-    try { unsubRefs.req?.(); } catch {}
-    try { unsubRefs.part?.(); } catch {}
-  };
+    const cleanupAll = () => {
+      try { unsubRefs.req?.(); } catch {}
+      try { unsubRefs.part?.(); } catch {}
+    };
 
-  const redirectToMeeting = () => {
-    if (didRedirectRef.current || !mounted) return;
-    didRedirectRef.current = true;
-    cleanupAll();
-    setRequestStatus('approved');
-    const destination = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
-    router.replace(destination);
-  };
-  
-  const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
-  const partRef = doc(db, "meetings", meetingId, "participants", user.uid);
+    const redirectToMeeting = () => {
+      if (didRedirectRef.current || !mounted) return;
+      didRedirectRef.current = true;
+      cleanupAll();
+      setRequestStatus('approved');
 
-  // Participant listener
-  unsubRefs.part = onSnapshot(partRef, (snap) => {
-    if (snap.exists()) {
-      redirectToMeeting();
-    }
-  });
+      // PERSIST JOINED MEETING FOR REJOIN ON DASHBOARD
+      if (user && !isHost) {
+          const JOINED_KEY = `${JOINED_MEETINGS_KEY_PREFIX}${user.uid}`;
+          const storedMeetingsRaw = localStorage.getItem(JOINED_KEY);
+          let meetings = storedMeetingsRaw ? JSON.parse(storedMeetingsRaw) : [];
+          if (!Array.isArray(meetings)) meetings = [];
 
-  // Join Request listener
-  unsubRefs.req = onSnapshot(reqRef, (snap) => {
-      if (!mounted) return;
-      if (snap.exists()) {
-          const data = snap.data();
-          if (data.status === "approved") {
-              redirectToMeeting();
-          } else if (data.status === "denied") {
-              setRequestStatus("denied");
-          } else if (data.status === "pending") {
-              setRequestStatus("pending");
+          const now = Date.now();
+          meetings = meetings.filter(m => m && m.startedAt && (now - m.startedAt < TWO_HOURS_IN_MS));
+          
+          if (!meetings.some((m: any) => m.id === meetingId)) {
+              meetings.unshift({ id: meetingId, title: topic.trim(), startedAt: now });
+              localStorage.setItem(JOINED_KEY, JSON.stringify(meetings.slice(0, 5)));
+              window.dispatchEvent(new CustomEvent('teachmeet_meeting_joined'));
           }
-      } else {
-        // If doc doesn't exist, we are idle (can make a request)
-        setRequestStatus("idle");
       }
-  });
 
-  return () => {
-    mounted = false;
-    cleanupAll();
-  };
-}, [meetingId, isHost, user, router, topic, isCameraOn, isMicOn]);
+      const destination = `/dashboard/meeting/${meetingId}?topic=${encodeURIComponent(topic.trim())}&cam=${isCameraOn}&mic=${isMicOn}`;
+      router.replace(destination);
+    };
+    
+    const reqRef = doc(db, "meetings", meetingId, "joinRequests", user.uid);
+    const partRef = doc(db, "meetings", meetingId, "participants", user.uid);
 
-  // Join Request Heartbeat Logic
+    unsubRefs.part = onSnapshot(partRef, (snap) => {
+      if (snap.exists()) {
+        redirectToMeeting();
+      }
+    });
+
+    unsubRefs.req = onSnapshot(reqRef, (snap) => {
+        if (!mounted) return;
+        if (snap.exists()) {
+            const data = snap.data();
+            if (data.status === "approved") {
+                redirectToMeeting();
+            } else if (data.status === "denied") {
+                setRequestStatus("denied");
+            } else if (data.status === "pending") {
+                setRequestStatus("pending");
+            }
+        } else {
+          setRequestStatus("idle");
+        }
+    });
+
+    return () => {
+      mounted = false;
+      cleanupAll();
+    };
+  }, [meetingId, isHost, user, router, topic, isCameraOn, isMicOn]);
+
   useEffect(() => {
     if (!meetingId || !user || isHost || requestStatus !== 'pending') return;
 
@@ -303,7 +312,6 @@ useEffect(() => {
         }
         
         setRequestStatus("pending");
-        // On re-request, update status back to pending. On first request, create it.
         await setDoc(reqRef, {
             userId: user.uid,
             userName: user.displayName || "Guest User",
@@ -340,7 +348,6 @@ useEffect(() => {
       return <Button onClick={handleCreateAndJoinMeeting} disabled={!agreed || isCreatingMeeting} className={cn("w-full py-3 text-lg font-semibold rounded-xl", agreed ? "btn-gel" : "bg-green-900/50 text-green-100/70 cursor-not-allowed")}>{isCreatingMeeting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null} Join Now as Host</Button>
     }
 
-    // Participant flow
     switch (requestStatus) {
       case 'pending':
       case 'approved':
@@ -427,7 +434,7 @@ useEffect(() => {
                         <Button variant="outline" className="w-full rounded-lg" onClick={() => setIsSharePanelOpen(true)}><Share2 className="mr-2 h-4 w-4" /> Share Full Invite</Button>
                     </CardContent>
                 </Card>
-                <div className="flex items-center space-x-2 pt-2"><Checkbox id="terms" agreed={agreed} onCheckedChange={(checked) => setAgreed(!!checked)}/><label htmlFor="terms" className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">I agree to the <Link href="/terms-of-service" target="_blank" className="text-primary hover:underline">Terms of Service</Link> and <Link href="/community-guidelines" target="_blank" className="text-primary hover:underline">Community Guidelines</Link>.</label></div>
+                <div className="flex items-center space-x-2 pt-2"><Checkbox id="terms" checked={agreed} onCheckedChange={(checked) => setAgreed(!!checked)}/><label htmlFor="terms" className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">I agree to the <Link href="/terms-of-service" target="_blank" className="text-primary hover:underline">Terms of Service</Link> and <Link href="/community-guidelines" target="_blank" className="text-primary hover:underline">Community Guidelines</Link>.</label></div>
                 {renderJoinButton()}
             </div>
         </main>
