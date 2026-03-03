@@ -130,7 +130,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   }, []);
 
   useEffect(() => {
-    // 💡 REUSE RTC INSTANCE: Support internal navigation without re-initializing
     if (rtc && rtc.roomId === meetingId) return;
 
     const rtcInstance = new MeshRTC({
@@ -154,10 +153,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     });
 
     setRtc(rtcInstance);
-
-    // 💡 PERSISTENT CONNECTION: We no longer tear down the socket on component unmount
-    // because the user might just be navigating to Chat or Whiteboard.
-    // Teardown is now managed by the explicit Leave function or the global Context.
   }, [meetingId, userId, setRtc, handleRemoteLeft, rtc]);
 
 
@@ -284,7 +279,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           } catch (e: any) {
             toast.update(toastId, { variant: 'destructive', title: 'Upload Failed', description: e.message });
           } finally {
-            setIsUploading(true);
             setIsUploading(false);
           }
         };
@@ -420,7 +414,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     if (!meetingId) return;
     const participantsCol = collection(db, "meetings", meetingId, "participants");
     
-    // 🔔 JOIN/LEAVE NOTIFICATIONS: Detect doc changes to show toasts
     const unsubscribe = onSnapshot(participantsCol, (snapshot) => {
       const newParticipants = new Map<string, LiveParticipantInfo>();
       let localParticipantData: LiveParticipantInfo | undefined;
@@ -441,7 +434,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         if (doc.id === userId) {
           localParticipantData = data;
         }
-        // Authoritative isActive check
         if (data.isActive !== false) {
             newParticipants.set(doc.id, data); 
         }
@@ -554,7 +546,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                     isHost: isHost,
                     isCameraOn: camOn,
                     isMicOn: micOn,
-                    isActive: true, // 🟢 Set active status
+                    isActive: true, 
                     joinedAt: serverTimestamp(),
                     lastSeen: serverTimestamp(),
                 }, { merge: true });
@@ -591,7 +583,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         const override = realtimeOverrides.get(id);
         
         const cameraOn = override?.isCameraOn ?? (data.isCameraOn !== false);
-        const micOn = override?.isMicOn ?? (data.isMicOn !== false);
+        const micOnState = override?.isMicOn ?? (data.isMicOn !== false);
 
         if (remoteStream && audioBlocked) {
             remoteStream.getAudioTracks().forEach(t => t.enabled = false);
@@ -603,7 +595,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           id, name: data.name || `User ${id.substring(0, 4)}`, avatar: data.photoURL || undefined,
           isHandRaised: data.isHandRaised, handRaisedAt: data.handRaisedAt, isScreenSharing: data.isScreenSharing,
           isCamOff: videoBlocked || !cameraOn,
-          isMicOff: audioBlocked || !micOn,
+          isMicOff: audioBlocked || !micOnState,
           stream: remoteStream, 
           volumeLevel: audioBlocked ? 0 : (volumeLevels.get(id) ?? 0),
         };
@@ -728,11 +720,16 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
 
     if (remoteParticipants.length > 0 && localParticipant) {
+        const isTwoPeople = remoteParticipants.length === 1;
         const gridCols = Math.ceil(Math.sqrt(remoteParticipants.length));
         const gridRows = Math.ceil(remoteParticipants.length / gridCols);
+        
         return (
             <div className="w-full h-full relative" ref={mainContainerRef}>
-                <div className="w-full h-full grid gap-2 p-2" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gridTemplateRows: `repeat(${gridRows}, 1fr)` }}>
+                <div 
+                    className={cn("w-full h-full grid", !isTwoPeople && "gap-2 p-2")} 
+                    style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gridTemplateRows: `repeat(${gridRows}, 1fr)` }}
+                >
                     {remoteParticipants.map((p) => (
                         <div key={p.id} className="w-full h-full relative overflow-hidden rounded-xl">
                             <VideoTile 
@@ -768,19 +765,17 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
 
     return (
-        <div className="w-full h-full flex items-center justify-center p-4">
-            <div className="w-full max-w-4xl aspect-video rounded-xl overflow-hidden shadow-2xl">
-                <VideoTile 
-                    stream={localParticipant?.stream || null} isCameraOn={!localParticipant?.isCamOff} isMicOn={!localParticipant?.isMicOff} 
-                    isHandRaised={localParticipant?.isHandRaised || false} isFirstHand={localParticipant?.id === firstHandRaisedId} 
-                    raisedCount={raisedCount} volumeLevel={localParticipant?.volumeLevel || 0} isLocal={true} 
-                    profileUrl={localParticipant?.avatar} name={localParticipant?.name || "You"} isScreenSharing={localParticipant?.isScreenSharing} 
-                    isPinned={localParticipant?.id === pinnedId} className="w-full h-full" 
-                    onDoubleClick={() => localParticipant && togglePin(localParticipant.id)} 
-                    onUnpin={() => localParticipant && togglePin(localParticipant.id)} 
-                    onSpotlightClick={() => localParticipant && toggleSpotlight(localParticipant.id)} 
-                />
-            </div>
+        <div className="w-full h-full">
+            <VideoTile 
+                stream={localParticipant?.stream || null} isCameraOn={!localParticipant?.isCamOff} isMicOn={!localParticipant?.isMicOff} 
+                isHandRaised={localParticipant?.isHandRaised || false} isFirstHand={localParticipant?.id === firstHandRaisedId} 
+                raisedCount={raisedCount} volumeLevel={localParticipant?.volumeLevel || 0} isLocal={true} 
+                profileUrl={localParticipant?.avatar} name={localParticipant?.name || "You"} isScreenSharing={localParticipant?.isScreenSharing} 
+                isPinned={localParticipant?.id === pinnedId} className="w-full h-full" 
+                onDoubleClick={() => localParticipant && togglePin(localParticipant.id)} 
+                onUnpin={() => localParticipant && togglePin(localParticipant.id)} 
+                onSpotlightClick={() => localParticipant && toggleSpotlight(localParticipant.id)} 
+            />
         </div>
     );
   };
