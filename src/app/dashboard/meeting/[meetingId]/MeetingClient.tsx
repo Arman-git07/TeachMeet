@@ -428,7 +428,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   useEffect(() => { 
     if (localStream && rtc && user) { 
       rtc.init(localStream, user.displayName || 'User', user.photoURL || undefined); 
-      rtc.markReady(); // 🎯 Signal readiness after stream is captured
+      // 🎯 SIGNaling READY only after hardware confirmed
+      rtc.markReady();
     } 
   }, [rtc, localStream, user]);
 
@@ -710,19 +711,33 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
     
     if (remotes.length > 0 && localParticipant) {
-        const gridCols = Math.ceil(Math.sqrt(remotes.length));
+        // 🎯 USER GRID: Ensure everyone is in the grid for 3+ people
+        const gridCols = Math.ceil(Math.sqrt(allParticipants.length));
         return (
             <div className="w-full h-full relative" ref={mainContainerRef}>
                 <div className="w-full h-full grid gap-2 overflow-auto" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}>
-                    {remotes.map((p) => (
+                    {allParticipants.map((p) => (
                         <div key={p.id} className="w-full h-full rounded-lg relative aspect-[9/16] md:aspect-video">
-                            <VideoTile stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOn} isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} onUnpin={() => togglePin(p.id)} onSpotlightClick={() => toggleSpotlight(p.id)} />
+                            <VideoTile 
+                                stream={p.stream} 
+                                isCameraOn={!p.isCamOff} 
+                                isMicOn={!p.isMicOn} 
+                                isHandRaised={p.isHandRaised || false} 
+                                isFirstHand={p.id === firstHandRaisedId} 
+                                raisedCount={raisedCount} 
+                                volumeLevel={p.volumeLevel} 
+                                isLocal={!!p.isLocal} 
+                                profileUrl={p.avatar} 
+                                name={p.name} 
+                                isScreenSharing={p.isScreenSharing} 
+                                isPinned={p.id === pinnedId} 
+                                onDoubleClick={() => togglePin(p.id)} 
+                                onUnpin={() => togglePin(p.id)} 
+                                onSpotlightClick={() => toggleSpotlight(p.id)} 
+                            />
                         </div>
                     ))}
                 </div>
-                 <motion.div drag dragConstraints={mainContainerRef} dragMomentum={false} className="absolute bottom-4 right-4 sm:right-6 w-1/4 sm:w-1/5 max-w-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-30">
-                    <VideoTile stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} isPinned={localParticipant.id === pinnedId} className="w-full h-full" onDoubleClick={() => togglePin(localParticipant.id)} onUnpin={() => togglePin(localParticipant.id)} onSpotlightClick={() => toggleSpotlight(localParticipant.id)} draggable={true} />
-                </motion.div>
             </div>
         );
     }

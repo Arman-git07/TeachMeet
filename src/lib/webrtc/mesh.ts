@@ -50,6 +50,9 @@ export class MeshRTC {
     this.localStream = localStream;
   }
 
+  /**
+   * 🎯 markReady - Only call this once media hardware is confirmed captured.
+   */
   public markReady() {
     this._ready = true;
     console.log("[Mesh] RTC Marked Ready. Processing pending signals:", this._pendingSignals.length);
