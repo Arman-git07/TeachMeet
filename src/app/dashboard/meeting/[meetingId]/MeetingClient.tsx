@@ -428,7 +428,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   useEffect(() => { 
     if (localStream && rtc && user) { 
       rtc.init(localStream, user.displayName || 'User', user.photoURL || undefined); 
-      // 🎯 SIGNaling READY only after hardware confirmed
+      // 🎯 Signaling only after hardware confirmed
       rtc.markReady();
     } 
   }, [rtc, localStream, user]);
@@ -581,7 +581,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
             name: `${self.name}'s Screen`,
             avatar: self.avatar,
             isCamOff: false,
-            isMicOff: true,
+            isMicOn: true,
             isLocal: true,
             stream: screenShareStream,
             isScreenSharing: true,
@@ -711,12 +711,12 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
     
     if (remotes.length > 0 && localParticipant) {
-        // 🎯 USER GRID: Ensure everyone is in the grid for 3+ people
-        const gridCols = Math.ceil(Math.sqrt(allParticipants.length));
+        // RESTORED STYLE: Remote grid + local floating tile as per user preference
+        const gridCols = Math.ceil(Math.sqrt(remotes.length));
         return (
             <div className="w-full h-full relative" ref={mainContainerRef}>
                 <div className="w-full h-full grid gap-2 overflow-auto" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}>
-                    {allParticipants.map((p) => (
+                    {remotes.map((p) => (
                         <div key={p.id} className="w-full h-full rounded-lg relative aspect-[9/16] md:aspect-video">
                             <VideoTile 
                                 stream={p.stream} 
@@ -726,7 +726,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                                 isFirstHand={p.id === firstHandRaisedId} 
                                 raisedCount={raisedCount} 
                                 volumeLevel={p.volumeLevel} 
-                                isLocal={!!p.isLocal} 
+                                isLocal={false} 
                                 profileUrl={p.avatar} 
                                 name={p.name} 
                                 isScreenSharing={p.isScreenSharing} 
@@ -738,6 +738,33 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                         </div>
                     ))}
                 </div>
+                {/* Floating Local Tile for 3+ people */}
+                <motion.div
+                  drag
+                  dragConstraints={mainContainerRef}
+                  dragMomentum={false}
+                  className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-20"
+                >
+                  <VideoTile 
+                    stream={localParticipant.stream} 
+                    isCameraOn={!localParticipant.isCamOff} 
+                    isMicOn={!localParticipant.isMicOff} 
+                    isHandRaised={localParticipant.isHandRaised || false} 
+                    isFirstHand={localParticipant.id === firstHandRaisedId} 
+                    raisedCount={raisedCount} 
+                    volumeLevel={localParticipant.volumeLevel} 
+                    isLocal={true} 
+                    profileUrl={localParticipant.avatar} 
+                    name={localParticipant.name} 
+                    isScreenSharing={localParticipant.isScreenSharing} 
+                    isPinned={localParticipant.id === pinnedId} 
+                    className="w-full h-full" 
+                    onDoubleClick={() => togglePin(localParticipant.id)} 
+                    onUnpin={() => togglePin(localParticipant.id)} 
+                    onSpotlightClick={() => toggleSpotlight(localParticipant.id)} 
+                    draggable={true} 
+                  />
+                </motion.div>
             </div>
         );
     }

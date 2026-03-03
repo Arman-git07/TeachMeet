@@ -76,7 +76,7 @@ export class MeshRTC {
 
     this.socket.on("offer", async (fromId: string, offer: RTCSessionDescriptionInit) => {
       const handler = async () => {
-        // 🔒 Protect against answering before local tracks are ready
+        // 🔒 HARD BLOCK: Ensure localStream exists before answering
         if (!this.localStream) {
           console.warn("[Mesh] Offer received before local stream ready, waiting...");
           await new Promise<void>((resolve) => {
@@ -94,13 +94,11 @@ export class MeshRTC {
           entry = this.createPeerEntry(fromId);
           this.peers.set(fromId, entry);
           
-          if (this.localStream) {
-            this.localStream.getTracks().forEach(track => {
-              const sender = entry!.pc.addTrack(track, this.localStream!);
-              if (track.kind === 'video') entry!.videoSender = sender;
-              else if (track.kind === 'audio') entry!.audioSender = sender;
-            });
-          }
+          this.localStream!.getTracks().forEach(track => {
+            const sender = entry!.pc.addTrack(track, this.localStream!);
+            if (track.kind === 'video') entry!.videoSender = sender;
+            else if (track.kind === 'audio') entry!.audioSender = sender;
+          });
         }
         
         const pc = entry.pc;
@@ -164,7 +162,7 @@ export class MeshRTC {
   private async _initiateNewPeer(remoteId: string) {
     if (!remoteId || remoteId === this.userId || this.peers.has(remoteId)) return;
     
-    // 🔒 HARD BLOCK UNTIL MEDIA READY
+    // 🔒 HARD BLOCK: Ensure localStream exists before starting handshake
     if (!this.localStream) {
       console.warn("[Mesh] Waiting for local stream before initiating peer:", remoteId);
       await new Promise<void>((resolve) => {
@@ -180,7 +178,7 @@ export class MeshRTC {
     const entry = this.createPeerEntry(remoteId);
     this.peers.set(remoteId, entry);
 
-    // 🔥 ALWAYS add tracks before handshake
+    // 🔥 ADD TRACKS BEFORE HANDSHAKE
     this.localStream!.getTracks().forEach(track => {
       const sender = entry.pc.addTrack(track, this.localStream!);
       if (track.kind === 'video') entry.videoSender = sender;
