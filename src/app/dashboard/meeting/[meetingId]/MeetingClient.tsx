@@ -135,7 +135,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       onRemoteStream: (remoteId, stream) => {
         setRemoteStreams(prev => {
           const next = new Map(prev);
-          next.set(remoteId, new MediaStream(stream.getTracks()));
+          next.set(remoteId, stream);
           return next;
         });
       },
@@ -663,12 +663,13 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     if (screenSharingParticipants.length > 0) {
         const otherTiles = allParticipants.filter(p => !p.isScreenSharing);
         const gridCols = Math.ceil(Math.sqrt(screenSharingParticipants.length));
+        const gridRows = Math.ceil(screenSharingParticipants.length / gridCols);
         
         return (
             <div className="w-full h-full flex flex-col md:flex-row gap-2">
-                <div className="flex-1 min-h-0 grid gap-2" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)`}}>
+                <div className="flex-1 min-h-0 grid gap-2" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gridTemplateRows: `repeat(${gridRows}, 1fr)` }}>
                     {screenSharingParticipants.map(p => (
-                        <div key={p.id} className="w-full h-full relative">
+                        <div key={p.id} className="w-full h-full relative overflow-hidden rounded-xl">
                             <VideoTile 
                                 stream={p.stream} 
                                 isCameraOn={!p.isCamOff} 
@@ -688,7 +689,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                 {otherTiles.length > 0 && (
                     <div className="w-full md:w-48 flex md:flex-col gap-2 overflow-auto">
                     {otherTiles.map(p => (
-                        <div key={p.id} className="aspect-[9/16] md:h-32 md:aspect-auto">
+                        <div key={p.id} className="aspect-[9/16] md:h-32 md:aspect-auto shrink-0">
                         <VideoTile
                             stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
                             isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} 
@@ -706,11 +707,12 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
     if (remoteParticipants.length > 0 && localParticipant) {
         const gridCols = Math.ceil(Math.sqrt(remoteParticipants.length));
+        const gridRows = Math.ceil(remoteParticipants.length / gridCols);
         return (
             <div className="w-full h-full relative" ref={mainContainerRef}>
-                <div className="w-full h-full grid gap-2 overflow-auto" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}>
+                <div className="w-full h-full grid gap-2 p-2" style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gridTemplateRows: `repeat(${gridRows}, 1fr)` }}>
                     {remoteParticipants.map((p) => (
-                        <div key={p.id} className="w-full h-full rounded-lg relative aspect-[9/16] md:aspect-video">
+                        <div key={p.id} className="w-full h-full relative overflow-hidden rounded-xl">
                             <VideoTile 
                                 stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
                                 isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} 
@@ -767,7 +769,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} isCameraOn={camOn} />
 
       <main className="flex-1 overflow-hidden relative" ref={mainContainerRef}>
-          <div className={"w-full h-full p-2 transition-all duration-300"}>
+          <div className={"w-full h-full transition-all duration-300"}>
             {loadingMedia ? (
                 <div className="w-full h-full flex items-center justify-center">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
