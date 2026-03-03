@@ -195,7 +195,7 @@ export class MeshRTC {
 
     try {
       entry.makingOffer = true;
-      // 🎯 FORCE TRANSCEIVERS: Ensures video section is always in SDP
+      // 🎯 FORCE TRANSCEIVERS: Ensures media sections are always in SDP
       const offer = await entry.pc.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: true,
@@ -220,7 +220,7 @@ export class MeshRTC {
     };
 
     pc.ontrack = (event) => {
-      // 🎯 VERIFICATION LOG: Confirm video track arrival in console
+      // 🎯 VERIFICATION LOG: Confirm video/audio track arrival
       console.log("TRACK KIND RECEIVED:", event.track.kind);
       if (event.streams[0]) {
         this.onRemoteStream(remoteId, event.streams[0]);
