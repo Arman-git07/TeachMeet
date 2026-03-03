@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
@@ -567,8 +568,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         const remoteStream = remoteStreams.get(id) || null;
         const override = realtimeOverrides.get(id);
         
-        // 🎯 CRITICAL UI GATING FIX: Default to Camera ON if field is missing or overridden
-        // This ensures the VideoTile displays the stream immediately.
         const cameraOn = override?.isCameraOn ?? (data.isCameraOn !== false);
         const micOn = override?.isMicOn ?? (data.isMicOn !== false);
 
