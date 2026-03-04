@@ -655,7 +655,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
     if (spotlightParticipant) {
       return (
-        <div className="w-full h-full p-2">
+        <div className="w-full h-full p-0">
           <VideoTile
             stream={spotlightParticipant.stream}
             isCameraOn={!spotlightParticipant.isCamOff}
@@ -666,7 +666,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
             onDoubleClick={() => toggleSpotlight(spotlightParticipant.id)}
             onSpotlightClick={() => toggleSpotlight(spotlightParticipant.id)}
             onUnpin={() => togglePin(spotlightParticipant.id)}
-            className="w-full h-full"
+            className="w-full h-full rounded-none"
             isSpotlight={true}
           />
         </div>
@@ -765,7 +765,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
 
     return (
-        <div className="w-full h-full fixed inset-0 z-0">
+        <div className="w-full h-full relative overflow-hidden">
             <VideoTile 
                 stream={localParticipant?.stream || null} 
                 isCameraOn={!localParticipant?.isCamOff} 
@@ -793,7 +793,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
       <ScreenShareModal open={isScreenShareModalOpen} onClose={() => setIsScreenShareModalOpen(false)} onConfirm={onModalConfirm} isCameraOn={camOn} />
 
-      <main className="flex-1 overflow-hidden relative" ref={mainContainerRef}>
+      <main className="flex-1 overflow-hidden relative bg-black" ref={mainContainerRef}>
           <div className={"w-full h-full transition-all duration-300"}>
             {loadingMedia ? (
                 <div className="w-full h-full flex items-center justify-center">
@@ -816,7 +816,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           )}
       </main>
 
-      <footer className="p-2 sm:p-4 bg-background shrink-0 relative z-10">
+      <footer className="p-2 sm:p-4 bg-background shrink-0 relative z-10 border-t">
         <div className="flex items-center justify-center gap-2 sm:gap-4">
             <Button onClick={() => toggleMic()} className={cn("rounded-full flex items-center justify-center h-12 w-12 sm:h-14 sm:w-14", micOn ? "bg-primary/80" : "bg-destructive")} aria-label={micOn ? "Mute" : "Unmute"}>{micOn ? <Mic /> : <MicOff />}</Button>
             <Button onClick={() => toggleCamera()} className={cn("rounded-full flex items-center justify-center h-12 w-12 sm:h-14 sm:w-14", camOn ? "bg-primary/80" : "bg-destructive")} aria-label={camOn ? "Stop Camera" : "Start Camera"}>{camOn ? <Video /> : <VideoOff />}</Button>

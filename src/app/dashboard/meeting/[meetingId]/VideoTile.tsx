@@ -24,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from "@/components/ui/dialog";
 
 type Props = {
   stream: MediaStream | null;
@@ -106,7 +106,6 @@ const VideoTile: React.FC<Props> = ({
     syncStream();
 
     if (stream) {
-      // Listen for browser-added tracks
       stream.addEventListener('addtrack', syncStream);
       stream.addEventListener('removetrack', syncStream);
     }
@@ -134,30 +133,8 @@ const VideoTile: React.FC<Props> = ({
         draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
       )}
     >
-      <div className="absolute top-2 left-2 z-30 flex items-center gap-1">
-        {isPinned && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                 <button className="cursor-pointer p-1 hover:bg-black/50 rounded-full" title="Click to unpin">
-                    <Pin className="h-4 w-4 sm:h-5 sm:w-5 text-white/90" style={{ filter: "drop-shadow(1px 1px 2px rgba(0,0,0,0.5))" }} />
-                 </button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Unpin Participant?</AlertDialogTitle>
-                  <AlertDialogDescription>Are you sure you want to unpin {name}?</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={onUnpin}>Unpin</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-        )}
-        <HandRaiseIcon isRaised={isHandRaised} isFirst={isFirstHand} />
-      </div>
-      
-      <div className="relative w-full h-full z-0">
+      {/* Background Video Layer */}
+      <div className="absolute inset-0 z-0">
         <video
           ref={videoRef}
           autoPlay
@@ -165,7 +142,6 @@ const VideoTile: React.FC<Props> = ({
           muted={isLocal || !isMicOn}
           className={cn(
             "w-full h-full object-cover transition-opacity duration-200",
-            !hasNoRounding && "rounded-lg",
             isEffectivelyShowingVideo ? "opacity-100" : "opacity-0",
             isMirrored && "transform -scale-x-100"
           )}
@@ -174,24 +150,40 @@ const VideoTile: React.FC<Props> = ({
         {!isEffectivelyShowingVideo && (
           <div className="absolute inset-0 flex items-center justify-center z-10 bg-muted/10">
             <Avatar className="w-1/3 aspect-square h-auto max-w-24 max-h-24 md:w-28 md:h-28 border-4 border-background shadow-lg transition-all duration-300">
-              <AvatarImage src={profileUrl || undefined} alt={name} />
+              <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
               <AvatarFallback className="text-3xl md:text-5xl">{name?.trim().charAt(0).toUpperCase() ?? "U"}</AvatarFallback>
             </Avatar>
           </div>
         )}
       </div>
 
-      <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-30">
-        {isCameraOn ? <Video className="h-4 w-4 sm:h-5 sm:w-5 text-white" /> : <VideoOff className="h-4 w-4 sm:h-5 sm:w-5 text-red-400" />}
+      {/* Top Overlays */}
+      <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-black/40 to-transparent z-30 pointer-events-none" />
+      <div className="absolute top-2 left-2 z-40 flex items-center gap-1">
+        {isPinned && (
+            <button className="cursor-pointer p-1 hover:bg-black/50 rounded-full" title="Pinned" onClick={onUnpin}>
+                <Pin className="h-4 w-4 sm:h-5 sm:w-5 text-white/90 drop-shadow-md" />
+            </button>
+        )}
+        <HandRaiseIcon isRaised={isHandRaised} isFirst={isFirstHand} />
+      </div>
+      
+      <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-40">
+        <div className="bg-black/20 backdrop-blur-sm p-1.5 rounded-lg border border-white/10 shadow-sm">
+            {isCameraOn ? <Video className="h-4 w-4 sm:h-5 sm:w-5 text-white" /> : <VideoOff className="h-4 w-4 sm:h-5 sm:w-5 text-red-400" />}
+        </div>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 z-30 p-2 sm:p-3 flex items-center justify-between pointer-events-none">
-        <div className="flex items-center gap-2 text-white pointer-events-auto" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
+      {/* Bottom Overlays */}
+      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/60 via-black/30 to-transparent z-30 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 right-0 z-40 p-2 sm:p-3 flex items-center justify-between pointer-events-none">
+        <div className="flex items-center gap-2 text-white pointer-events-auto bg-black/20 backdrop-blur-sm px-2 py-1.5 rounded-xl border border-white/5" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
           <Avatar className="w-6 h-6 sm:w-7 sm:h-7 shrink-0">
-            <AvatarImage src={profileUrl || undefined} alt={name} />
+            <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
             <AvatarFallback className="text-xs sm:text-sm">{name?.trim().charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
-          <div className="text-xs sm:text-sm font-medium truncate">{name}</div>
+          <div className="text-xs sm:text-sm font-bold truncate max-w-[100px] sm:max-w-[150px]">{name}</div>
+          <div className="w-px h-3 bg-white/20 mx-0.5" />
           {isMicOn ? <Mic className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" /> : <MicOff className="h-3 w-3 sm:h-4 sm:w-4 text-red-400" />}
         </div>
         
@@ -200,7 +192,8 @@ const VideoTile: React.FC<Props> = ({
             variant="ghost"
             size="icon"
             onClick={onSpotlightClick}
-            className="h-7 w-7 sm:h-8 sm:w-8 rounded-full text-white/80 hover:bg-black/50 hover:text-white"
+            className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-black/20 backdrop-blur-sm text-white/90 hover:bg-black/50 hover:text-white border border-white/10"
+            title={isSpotlight ? "Standard View" : "Immersive View"}
           >
             {isSpotlight ? <Minimize2 className="h-4 w-4 sm:h-5 sm:w-5" /> : <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5" />}
           </Button>
