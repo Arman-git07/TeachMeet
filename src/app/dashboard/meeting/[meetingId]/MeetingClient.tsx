@@ -782,8 +782,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                                 profileUrl={fifthRemote.avatar} name={fifthRemote.name} isScreenSharing={fifthRemote.isScreenSharing} 
                                 isPinned={fifthRemote.id === pinnedId} className="w-full h-full rounded-none opacity-40 grayscale-[50%] blur-[1px]"
                             />
-                            <div className="absolute inset-0 flex items-center justify-center z-50">
-                                <div className="bg-primary/20 backdrop-blur-md px-6 py-3 rounded-2xl border border-primary/30 shadow-2xl group-hover:scale-110 transition-transform duration-300">
+                            <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none">
+                                <div className="bg-primary/20 backdrop-blur-md px-6 py-3 rounded-2xl border border-primary/30 shadow-2xl group-hover:scale-110 transition-transform duration-300 pointer-events-auto">
                                     <span className="text-4xl font-black text-white drop-shadow-lg">+{extraCount}</span>
                                 </div>
                             </div>
