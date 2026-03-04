@@ -686,8 +686,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                         <div key={p.id} className="w-full h-full relative overflow-hidden rounded-xl">
                             <VideoTile 
                                 stream={p.stream} 
-                                isCameraOn={!p.isCamOff} 
-                                isMicOn={!p.isMicOff} 
+                                isCameraOn={!p.isCameraOn} 
+                                isMicOn={!p.isMicOn} 
                                 name={p.name}
                                 profileUrl={p.avatar}
                                 isScreenSharing={true}
@@ -722,11 +722,15 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     if (remoteParticipants.length > 0 && localParticipant) {
         const isTwoPeopleTotal = remoteParticipants.length === 1;
         const isThreePeopleTotal = remoteParticipants.length === 2;
-        const isImmersive = isTwoPeopleTotal || isThreePeopleTotal;
+        const isFourPeopleTotal = remoteParticipants.length === 3;
+        const isImmersive = isTwoPeopleTotal || isThreePeopleTotal || isFourPeopleTotal;
 
         let gridCols, gridRows;
         if (isThreePeopleTotal) {
             gridCols = 1;
+            gridRows = 2;
+        } else if (isFourPeopleTotal) {
+            gridCols = 2;
             gridRows = 2;
         } else {
             gridCols = Math.ceil(Math.sqrt(remoteParticipants.length));
@@ -742,8 +746,12 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                         gridTemplateRows: `repeat(${gridRows}, 1fr)` 
                     }}
                 >
-                    {remoteParticipants.map((p) => (
-                        <div key={p.id} className={cn("w-full h-full relative overflow-hidden", !isImmersive && "rounded-xl")}>
+                    {remoteParticipants.map((p, index) => (
+                        <div 
+                            key={p.id} 
+                            className={cn("w-full h-full relative overflow-hidden", !isImmersive && "rounded-xl")}
+                            style={{ gridColumn: (isFourPeopleTotal && index === 2) ? "span 2" : "auto" }}
+                        >
                             <VideoTile 
                                 stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
                                 isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} 
