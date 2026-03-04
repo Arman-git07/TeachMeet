@@ -719,17 +719,16 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
 
     if (remoteParticipants.length > 0 && localParticipant) {
-        const isTwoPeopleTotal = remoteParticipants.length === 1;
-        const isThreePeopleTotal = remoteParticipants.length === 2;
-        const isFourPeopleTotal = remoteParticipants.length === 3;
-        const isFivePeopleTotal = remoteParticipants.length === 4;
+        const isTwoPeopleTotal = allParticipants.length === 2;
+        const isThreePeopleTotal = allParticipants.length === 3;
+        const isFourPeopleTotal = allParticipants.length === 4;
         
         if (isTwoPeopleTotal) {
             const p = remoteParticipants[0];
             return (
                 <div className="w-full h-full relative" ref={mainContainerRef}>
                     <VideoTile 
-                        stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOn} 
+                        stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
                         isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} 
                         raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={false} 
                         profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} 
@@ -845,24 +844,30 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
             );
         }
 
-        if (isFivePeopleTotal) {
+        if (remoteParticipants.length >= 4) {
             return (
                 <div className="w-full h-full relative" ref={mainContainerRef}>
                     <div 
                         className="w-full h-full grid gap-0" 
                         style={{ gridTemplateColumns: `repeat(2, 1fr)`, gridTemplateRows: `repeat(2, 1fr)` }}
                     >
-                        {remoteParticipants.map((p) => (
-                            <VideoTile 
-                                key={p.id}
-                                stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
-                                isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} 
-                                raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={false} 
-                                profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} 
-                                isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} 
-                                onUnpin={() => togglePin(p.id)} onSpotlightClick={() => toggleSpotlight(p.id)}
-                                className="w-full h-full rounded-none"
-                            />
+                        {remoteParticipants.slice(0, 4).map((p, index) => (
+                            <div key={p.id} className="relative w-full h-full">
+                                <VideoTile 
+                                    stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
+                                    isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} 
+                                    raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={false} 
+                                    profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} 
+                                    isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} 
+                                    onUnpin={() => togglePin(p.id)} onSpotlightClick={() => toggleSpotlight(p.id)}
+                                    className="w-full h-full rounded-none"
+                                />
+                                {index === 3 && allParticipants.length > 5 && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-50 pointer-events-none">
+                                        <span className="text-white text-5xl font-black">+{allParticipants.length - 5}</span>
+                                    </div>
+                                )}
+                            </div>
                         ))}
                     </div>
                     <motion.div
