@@ -687,8 +687,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                         <div key={p.id} className="w-full h-full relative overflow-hidden rounded-xl">
                             <VideoTile 
                                 stream={p.stream} 
-                                isCameraOn={!p.isCamOff} 
-                                isMicOn={!p.isMicOff} 
+                                isCameraOn={!p.isCameraOn} 
+                                isMicOn={p.isMicOn} 
                                 name={p.name}
                                 profileUrl={p.avatar}
                                 isScreenSharing={true}
@@ -706,7 +706,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                     {otherTiles.map(p => (
                         <div key={p.id} className="aspect-[9/16] md:h-32 md:aspect-auto shrink-0">
                         <VideoTile
-                            stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
+                            stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOn} 
                             isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} 
                             raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} 
                             isScreenSharing={p.isScreenSharing} isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} onUnpin={() => togglePin(p.id)}
@@ -726,7 +726,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
             return (
                 <div className="w-full h-full relative" ref={mainContainerRef}>
                     <VideoTile 
-                        stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
+                        stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOn} 
                         isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} 
                         raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={false} 
                         profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} 
@@ -741,7 +741,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                       className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-xl aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-50"
                     >
                       <VideoTile 
-                        stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} 
+                        stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOn} 
                         isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} 
                         raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} 
                         profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} 
@@ -761,7 +761,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                         {remoteParticipants.map((p) => (
                             <VideoTile 
                                 key={p.id}
-                                stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
+                                stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOn} 
                                 isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} 
                                 raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={false} 
                                 profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} 
@@ -778,7 +778,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                       className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-xl aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-50"
                     >
                       <VideoTile 
-                        stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} 
+                        stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOn} 
                         isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} 
                         raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} 
                         profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} 
@@ -801,7 +801,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                         {remoteParticipants.slice(0, 2).map((p) => (
                             <VideoTile 
                                 key={p.id}
-                                stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
+                                stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOn} 
                                 isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} 
                                 raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={false} 
                                 profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} 
@@ -812,7 +812,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                         ))}
                         <div style={{ gridColumn: "span 2" }}>
                             <VideoTile 
-                                stream={remoteParticipants[2].stream} isCameraOn={!remoteParticipants[2].isCamOff} isMicOn={!remoteParticipants[2].isMicOff} 
+                                stream={remoteParticipants[2].stream} isCameraOn={!remoteParticipants[2].isCamOff} isMicOn={!remoteParticipants[2].isMicOn} 
                                 isHandRaised={remoteParticipants[2].isHandRaised || false} isFirstHand={remoteParticipants[2].id === firstHandRaisedId} 
                                 raisedCount={raisedCount} volumeLevel={remoteParticipants[2].volumeLevel} isLocal={false} 
                                 profileUrl={remoteParticipants[2].avatar} name={remoteParticipants[2].name} isScreenSharing={remoteParticipants[2].isScreenSharing} 
@@ -829,7 +829,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                       className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-xl aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-50"
                     >
                       <VideoTile 
-                        stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} 
+                        stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOn} 
                         isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} 
                         raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} 
                         profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} 
@@ -856,16 +856,13 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                     {remotesToDisplay.map((p, index) => (
                         <div key={p.id} className="relative w-full h-full">
                             <VideoTile 
-                                stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
+                                stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOn} 
                                 isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} 
                                 raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={false} 
                                 profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} 
                                 isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} 
                                 onUnpin={() => togglePin(p.id)} onSpotlightClick={() => toggleSpotlight(p.id)}
-                                className={cn(
-                                    "w-full h-full rounded-none",
-                                    index === 3 && remoteParticipants.length > 4 && "opacity-40 grayscale-[50%] blur-[1px]"
-                                )}
+                                className="w-full h-full rounded-none"
                             />
                             {index === 3 && remoteParticipants.length > 4 && (
                                 <div 
@@ -873,9 +870,9 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                                         e.stopPropagation();
                                         router.push(`/dashboard/meeting/${meetingId}/participants`);
                                     }}
-                                    className="absolute inset-0 flex items-center justify-center bg-black/40 z-50 cursor-pointer hover:bg-black/60 transition-colors"
+                                    className="absolute inset-0 flex items-center justify-center bg-black/20 z-50 cursor-pointer hover:bg-black/40 transition-colors"
                                 >
-                                    <span className="text-white text-5xl font-black">+{allParticipants.length - 5}</span>
+                                    <span className="text-white text-5xl font-black drop-shadow-lg">+{allParticipants.length - 5}</span>
                                 </div>
                             )}
                         </div>
@@ -888,7 +885,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                   className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-xl aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-50"
                 >
                   <VideoTile 
-                    stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} 
+                    stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOn} 
                     isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} 
                     raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} 
                     profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} 
@@ -906,7 +903,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
             <VideoTile 
                 stream={localParticipant?.stream || null} 
                 isCameraOn={!localParticipant?.isCamOff} 
-                isMicOn={!localParticipant?.isMicOff} 
+                isMicOn={!localParticipant?.isMicOn} 
                 isHandRaised={localParticipant?.isHandRaised || false} 
                 isFirstHand={localParticipant?.id === firstHandRaisedId} 
                 raisedCount={raisedCount} 
