@@ -1,6 +1,5 @@
 "use client";
 
-import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { MeshRTC } from "@/lib/webrtc/mesh";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,6 +8,7 @@ import { collection, onSnapshot, doc, updateDoc, getDoc, serverTimestamp, setDoc
 import { db, storage } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes } from 'firebase/storage';
 import { getDownloadURL } from "firebase/storage";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -706,8 +706,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                         <div key={p.id} className="aspect-[9/16] md:h-32 md:aspect-auto shrink-0">
                         <VideoTile
                             stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
-                            isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} raisedCount={raisedCount} 
-                            volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} 
+                            isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} 
+                            raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={!!p.isLocal} profileUrl={p.avatar} name={p.name} 
                             isScreenSharing={p.isScreenSharing} isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} onUnpin={() => togglePin(p.id)}
                             onSpotlightClick={() => toggleSpotlight(p.id)}
                         />
@@ -720,18 +720,30 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
 
     if (remoteParticipants.length > 0 && localParticipant) {
-        const isTwoPeople = remoteParticipants.length === 1;
-        const gridCols = Math.ceil(Math.sqrt(remoteParticipants.length));
-        const gridRows = Math.ceil(remoteParticipants.length / gridCols);
+        const isTwoPeopleTotal = remoteParticipants.length === 1;
+        const isThreePeopleTotal = remoteParticipants.length === 2;
+        const isImmersive = isTwoPeopleTotal || isThreePeopleTotal;
+
+        let gridCols, gridRows;
+        if (isThreePeopleTotal) {
+            gridCols = 1;
+            gridRows = 2;
+        } else {
+            gridCols = Math.ceil(Math.sqrt(remoteParticipants.length));
+            gridRows = Math.ceil(remoteParticipants.length / gridCols);
+        }
         
         return (
             <div className="w-full h-full relative" ref={mainContainerRef}>
                 <div 
-                    className={cn("w-full h-full grid", !isTwoPeople && "gap-2 p-2")} 
-                    style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gridTemplateRows: `repeat(${gridRows}, 1fr)` }}
+                    className={cn("w-full h-full grid", !isImmersive && "gap-2 p-2")} 
+                    style={{ 
+                        gridTemplateColumns: `repeat(${gridCols}, 1fr)`, 
+                        gridTemplateRows: `repeat(${gridRows}, 1fr)` 
+                    }}
                 >
                     {remoteParticipants.map((p) => (
-                        <div key={p.id} className={cn("w-full h-full relative overflow-hidden", !isTwoPeople && "rounded-xl")}>
+                        <div key={p.id} className={cn("w-full h-full relative overflow-hidden", !isImmersive && "rounded-xl")}>
                             <VideoTile 
                                 stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
                                 isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} 
@@ -739,7 +751,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                                 profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} 
                                 isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} 
                                 onUnpin={() => togglePin(p.id)} onSpotlightClick={() => toggleSpotlight(p.id)}
-                                className={cn("w-full h-full", isTwoPeople && "rounded-none")}
+                                className={cn("w-full h-full", isImmersive && "rounded-none")}
                             />
                         </div>
                     ))}
