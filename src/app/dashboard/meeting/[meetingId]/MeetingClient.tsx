@@ -740,7 +740,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                       drag
                       dragConstraints={mainContainerRef}
                       dragMomentum={false}
-                      className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-20"
+                      className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-50"
                     >
                       <VideoTile 
                         stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} 
@@ -777,7 +777,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                       drag
                       dragConstraints={mainContainerRef}
                       dragMomentum={false}
-                      className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-20"
+                      className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-50"
                     >
                       <VideoTile 
                         stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} 
@@ -828,7 +828,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                       drag
                       dragConstraints={mainContainerRef}
                       dragMomentum={false}
-                      className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-20"
+                      className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-50"
                     >
                       <VideoTile 
                         stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} 
@@ -844,66 +844,15 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
             );
         }
 
-        if (remoteParticipants.length >= 4) {
-            return (
-                <div className="w-full h-full relative" ref={mainContainerRef}>
-                    <div 
-                        className="w-full h-full grid gap-0" 
-                        style={{ gridTemplateColumns: `repeat(2, 1fr)`, gridTemplateRows: `repeat(2, 1fr)` }}
-                    >
-                        {remoteParticipants.slice(0, 4).map((p, index) => (
-                            <div key={p.id} className="relative w-full h-full">
-                                <VideoTile 
-                                    stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
-                                    isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} 
-                                    raisedCount={raisedCount} volumeLevel={p.volumeLevel} isLocal={false} 
-                                    profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} 
-                                    isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} 
-                                    onUnpin={() => togglePin(p.id)} onSpotlightClick={() => toggleSpotlight(p.id)}
-                                    className="w-full h-full rounded-none"
-                                />
-                                {index === 3 && allParticipants.length > 5 && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-50 pointer-events-none">
-                                        <span className="text-white text-5xl font-black">+{allParticipants.length - 5}</span>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                    <motion.div
-                      drag
-                      dragConstraints={mainContainerRef}
-                      dragMomentum={false}
-                      className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-20"
-                    >
-                      <VideoTile 
-                        stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} 
-                        isHandRaised={localParticipant.isHandRaised || false} isFirstHand={localParticipant.id === firstHandRaisedId} 
-                        raisedCount={raisedCount} volumeLevel={localParticipant.volumeLevel} isLocal={true} 
-                        profileUrl={localParticipant.avatar} name={localParticipant.name} isScreenSharing={localParticipant.isScreenSharing} 
-                        isPinned={localParticipant.id === pinnedId} className="w-full h-full" 
-                        onDoubleClick={() => togglePin(localParticipant.id)} onUnpin={() => togglePin(localParticipant.id)} 
-                        onSpotlightClick={() => toggleSpotlight(localParticipant.id)} draggable={true} 
-                      />
-                    </motion.div>
-                </div>
-            );
-        }
-
-        const gridCols = Math.ceil(Math.sqrt(remoteParticipants.length));
-        const gridRows = Math.ceil(remoteParticipants.length / gridCols);
-        
+        // 5+ person layout: 4 remote tiles + overlay if > 5
         return (
             <div className="w-full h-full relative" ref={mainContainerRef}>
                 <div 
                     className="w-full h-full grid gap-0" 
-                    style={{ 
-                        gridTemplateColumns: `repeat(${gridCols}, 1fr)`, 
-                        gridTemplateRows: `repeat(${gridRows}, 1fr)` 
-                    }}
+                    style={{ gridTemplateColumns: `repeat(2, 1fr)`, gridTemplateRows: `repeat(2, 1fr)` }}
                 >
-                    {remoteParticipants.map((p) => (
-                        <div key={p.id} className="w-full h-full relative overflow-hidden">
+                    {remoteParticipants.slice(0, 4).map((p, index) => (
+                        <div key={p.id} className="relative w-full h-full">
                             <VideoTile 
                                 stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
                                 isHandRaised={p.isHandRaised || false} isFirstHand={p.id === firstHandRaisedId} 
@@ -913,6 +862,11 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                                 onUnpin={() => togglePin(p.id)} onSpotlightClick={() => toggleSpotlight(p.id)}
                                 className="w-full h-full rounded-none"
                             />
+                            {index === 3 && allParticipants.length > 5 && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-50 pointer-events-none">
+                                    <span className="text-white text-5xl font-black">+{allParticipants.length - 5}</span>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -920,7 +874,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                   drag
                   dragConstraints={mainContainerRef}
                   dragMomentum={false}
-                  className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-20"
+                  className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-50"
                 >
                   <VideoTile 
                     stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} 
