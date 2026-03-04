@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { motion } from "framer-motion";
 import { MeshRTC } from "@/lib/webrtc/mesh";
@@ -596,7 +596,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           id, name: data.name || `User ${id.substring(0, 4)}`, avatar: data.photoURL || undefined,
           isHandRaised: data.isHandRaised, handRaisedAt: data.handRaisedAt, isScreenSharing: data.isScreenSharing,
           isCamOff: videoBlocked || !cameraOn,
-          isMicOff: audioBlocked || !micOnState,
+          isMicOn: audioBlocked || !micOnState,
           stream: remoteStream, 
           volumeLevel: audioBlocked ? 0 : (volumeLevels.get(id) ?? 0),
         };
@@ -843,13 +843,17 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         }
 
         // 5+ person layout: 4 remote tiles + overlay if > 5
+        const remotesToDisplay = remoteParticipants.length > 4 
+            ? [...remoteParticipants.slice(0, 3), remoteParticipants[remoteParticipants.length - 1]]
+            : remoteParticipants.slice(0, 4);
+
         return (
             <div className="w-full h-full relative" ref={mainContainerRef}>
                 <div 
                     className="w-full h-full grid gap-0" 
                     style={{ gridTemplateColumns: `repeat(2, 1fr)`, gridTemplateRows: `repeat(2, 1fr)` }}
                 >
-                    {remoteParticipants.slice(0, 4).map((p, index) => (
+                    {remotesToDisplay.map((p, index) => (
                         <div key={p.id} className="relative w-full h-full">
                             <VideoTile 
                                 stream={p.stream} isCameraOn={!p.isCamOff} isMicOn={!p.isMicOff} 
@@ -860,10 +864,10 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                                 onUnpin={() => togglePin(p.id)} onSpotlightClick={() => toggleSpotlight(p.id)}
                                 className={cn(
                                     "w-full h-full rounded-none",
-                                    index === 3 && allParticipants.length > 5 && "opacity-40 grayscale-[50%] blur-[1px]"
+                                    index === 3 && remoteParticipants.length > 4 && "opacity-40 grayscale-[50%] blur-[1px]"
                                 )}
                             />
-                            {index === 3 && allParticipants.length > 5 && (
+                            {index === 3 && remoteParticipants.length > 4 && (
                                 <div 
                                     onClick={(e) => {
                                         e.stopPropagation();
