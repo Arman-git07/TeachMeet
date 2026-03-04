@@ -45,7 +45,6 @@ type Props = {
   volumeLevel?: number;
   isPinned?: boolean;
   isSpotlight?: boolean;
-  counter?: number;
 };
 
 const VideoTile: React.FC<Props> = ({
@@ -67,7 +66,6 @@ const VideoTile: React.FC<Props> = ({
   volumeLevel = 0,
   isPinned = false,
   isSpotlight = false,
-  counter,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isMirrored, setIsMirrored] = useState(false);
@@ -158,15 +156,6 @@ const VideoTile: React.FC<Props> = ({
           </div>
         )}
       </div>
-
-      {/* Counter Overlay (for large meetings) */}
-      {counter !== undefined && counter > 0 && (
-        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
-          <div className="bg-primary/20 backdrop-blur-md px-6 py-3 rounded-2xl border border-primary/30 shadow-2xl">
-            <span className="text-5xl font-black text-white drop-shadow-lg">+{counter}</span>
-          </div>
-        </div>
-      )}
 
       {/* Top Overlays */}
       <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-black/40 to-transparent z-30 pointer-events-none" />
