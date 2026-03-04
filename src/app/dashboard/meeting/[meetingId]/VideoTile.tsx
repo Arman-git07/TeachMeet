@@ -14,17 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import HandRaiseIcon from "./HandRaiseIcon";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/dialog";
+import { useRouter, useParams } from "next/navigation";
 
 type Props = {
   stream: MediaStream | null;
@@ -67,6 +57,9 @@ const VideoTile: React.FC<Props> = ({
   isPinned = false,
   isSpotlight = false,
 }) => {
+  const router = useRouter();
+  const params = useParams();
+  const meetingId = params.meetingId as string;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isMirrored, setIsMirrored] = useState(false);
   const [hasVideoTrack, setHasVideoTrack] = useState(false);
@@ -149,7 +142,13 @@ const VideoTile: React.FC<Props> = ({
 
         {!isEffectivelyShowingVideo && (
           <div className="absolute inset-0 flex items-center justify-center z-10 bg-muted/10">
-            <Avatar className="w-1/3 aspect-square h-auto max-w-24 max-h-24 md:w-28 md:h-28 border-4 border-background shadow-lg transition-all duration-300">
+            <Avatar 
+              onClick={(e) => {
+                e.stopPropagation();
+                router.push(`/dashboard/meeting/${meetingId}/participants`);
+              }}
+              className="w-1/3 aspect-square h-auto max-w-24 max-h-24 md:w-28 md:h-28 border-4 border-background shadow-lg transition-all duration-300 cursor-pointer hover:scale-105 active:scale-95"
+            >
               <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
               <AvatarFallback className="text-3xl md:text-5xl">{name?.trim().charAt(0).toUpperCase() ?? "U"}</AvatarFallback>
             </Avatar>

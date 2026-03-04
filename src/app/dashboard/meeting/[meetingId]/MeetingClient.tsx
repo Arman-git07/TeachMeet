@@ -12,6 +12,7 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from "react"
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import VideoTile from "./VideoTile";
 import { ScreenShareHelper, type ShareMode } from "@/lib/webrtc/screenShare";
@@ -57,6 +58,7 @@ type Props = {
 };
 
 export default function MeetingClient({ meetingId, userId, onLeave, topic, initialPinnedId }: Props) {
+  const router = useRouter();
   const { user } = useAuth();
   const { toast } = useToast();
   const { isBlockedByMe } = useBlock();
@@ -719,11 +721,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
 
     if (remoteParticipants.length > 0 && localParticipant) {
-        const isTwoPeopleTotal = allParticipants.length === 2;
-        const isThreePeopleTotal = allParticipants.length === 3;
-        const isFourPeopleTotal = allParticipants.length === 4;
-        
-        if (isTwoPeopleTotal) {
+        if (remoteParticipants.length === 1) {
             const p = remoteParticipants[0];
             return (
                 <div className="w-full h-full relative" ref={mainContainerRef}>
@@ -740,7 +738,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                       drag
                       dragConstraints={mainContainerRef}
                       dragMomentum={false}
-                      className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-50"
+                      className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-xl aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-50"
                     >
                       <VideoTile 
                         stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} 
@@ -756,7 +754,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
             );
         }
 
-        if (isThreePeopleTotal) {
+        if (remoteParticipants.length === 2) {
             return (
                 <div className="w-full h-full relative" ref={mainContainerRef}>
                     <div className="w-full h-full grid grid-cols-1 grid-rows-2 gap-0">
@@ -777,7 +775,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                       drag
                       dragConstraints={mainContainerRef}
                       dragMomentum={false}
-                      className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-50"
+                      className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-xl aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-50"
                     >
                       <VideoTile 
                         stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} 
@@ -793,7 +791,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
             );
         }
 
-        if (isFourPeopleTotal) {
+        if (remoteParticipants.length === 3) {
             return (
                 <div className="w-full h-full relative" ref={mainContainerRef}>
                     <div 
@@ -828,7 +826,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                       drag
                       dragConstraints={mainContainerRef}
                       dragMomentum={false}
-                      className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-50"
+                      className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-xl aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-50"
                     >
                       <VideoTile 
                         stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} 
@@ -860,10 +858,19 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                                 profileUrl={p.avatar} name={p.name} isScreenSharing={p.isScreenSharing} 
                                 isPinned={p.id === pinnedId} onDoubleClick={() => togglePin(p.id)} 
                                 onUnpin={() => togglePin(p.id)} onSpotlightClick={() => toggleSpotlight(p.id)}
-                                className="w-full h-full rounded-none"
+                                className={cn(
+                                    "w-full h-full rounded-none",
+                                    index === 3 && allParticipants.length > 5 && "opacity-40 grayscale-[50%] blur-[1px]"
+                                )}
                             />
                             {index === 3 && allParticipants.length > 5 && (
-                                <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-50 pointer-events-none">
+                                <div 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        router.push(`/dashboard/meeting/${meetingId}/participants`);
+                                    }}
+                                    className="absolute inset-0 flex items-center justify-center bg-black/40 z-50 cursor-pointer hover:bg-black/60 transition-colors"
+                                >
                                     <span className="text-white text-5xl font-black">+{allParticipants.length - 5}</span>
                                 </div>
                             )}
@@ -874,7 +881,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
                   drag
                   dragConstraints={mainContainerRef}
                   dragMomentum={false}
-                  className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-lg aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-50"
+                  className="absolute bottom-4 right-4 sm:right-6 w-1/3 sm:w-1/4 md:w-1/5 max-xs shadow-lg rounded-xl aspect-[9/16] md:aspect-video isolate cursor-grab active:cursor-grabbing z-50"
                 >
                   <VideoTile 
                     stream={localParticipant.stream} isCameraOn={!localParticipant.isCamOff} isMicOn={!localParticipant.isMicOff} 
