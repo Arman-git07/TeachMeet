@@ -1,4 +1,3 @@
-
 "use client";
 
 import { io, Socket } from "socket.io-client";
@@ -170,7 +169,13 @@ export class MeshRTC {
   }
 
   private async _initiateNewPeer(remoteId: string) {
-    if (!remoteId || remoteId === this.userId || this.peers.has(remoteId)) return;
+    if (!remoteId || remoteId === this.userId) return;
+    
+    // 🛡️ REJOIN HANDLER: Purge stale peer entry if it exists
+    if (this.peers.has(remoteId)) {
+      console.log(`[Mesh] Purging stale peer entry for ${remoteId} before re-initiating.`);
+      this.cleanupPeer(remoteId);
+    }
     
     // 🔒 BLOCK UNTIL MEDIA READY: Initiator side
     if (!this.localStream) {
@@ -220,8 +225,6 @@ export class MeshRTC {
     };
 
     pc.ontrack = (event) => {
-      // 🎯 VERIFICATION LOG: Confirm video/audio track arrival
-      console.log("TRACK KIND RECEIVED:", event.track.kind);
       if (event.streams[0]) {
         this.onRemoteStream(remoteId, event.streams[0]);
       }
@@ -230,8 +233,6 @@ export class MeshRTC {
     pc.onicecandidate = (ev) => {
       if (ev.candidate) this.socket.emit("ice-candidate", remoteId, ev.candidate);
     };
-
-    // 🎯 DETERMINISTIC SIGNALING: Removed onnegotiationneeded to prevent race conditions
     
     return entry;
   }
@@ -246,7 +247,7 @@ export class MeshRTC {
   private cleanupPeer(remoteId: string) {
     const entry = this.peers.get(remoteId);
     if (entry) {
-      entry.pc.close();
+      try { entry.pc.close(); } catch {}
       this.peers.delete(remoteId);
     }
   }

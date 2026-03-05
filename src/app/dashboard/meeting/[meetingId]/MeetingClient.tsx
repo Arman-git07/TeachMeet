@@ -450,6 +450,17 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     return () => unsubscribe();
   }, [meetingId, userId, camOn, toast, toggleCamera]);
 
+  // 🧹 GHOST PRUNER: Sync remote streams with Firestore presence
+  useEffect(() => {
+    const liveIds = new Set(liveParticipants.keys());
+    remoteStreams.forEach((_, id) => {
+      if (!liveIds.has(id)) {
+        console.log(`[MeetingClient] Pruning ghost stream for ${id}`);
+        handleRemoteLeft(id);
+      }
+    });
+  }, [liveParticipants, remoteStreams, handleRemoteLeft]);
+
   useEffect(() => { 
     if (localStream && rtc && user) { 
       rtc.init(localStream, user.displayName || 'User', user.photoURL || undefined); 
