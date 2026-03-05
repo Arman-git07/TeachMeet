@@ -1,4 +1,3 @@
-
 'use client';
 import { SlideUpPanel } from '@/components/common/SlideUpPanel';
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -20,13 +19,21 @@ import {
   ClipboardCheck, 
   Bell,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Star
 } from 'lucide-react';
 import { AppHeader } from '@/components/common/AppHeader';
 import { useAuth } from '@/hooks/useAuth';
 import { collection, query, where, onSnapshot, limit, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Logo } from '@/components/common/Logo';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export type ActivityItemType = 
   | 'meeting' 
@@ -135,6 +142,8 @@ export default function HomePage() {
 
   const [allClassroomIds, setAllClassroomIds] = useState<Record<string, { title: string, role: 'teacher' | 'student' }>>({});
 
+  const [showReviewDialog, setShowReviewDialog] = useState(false);
+
   // Local Storage Change Listener
   useEffect(() => {
     const handleRefresh = () => setRefreshTrigger(prev => prev + 1);
@@ -146,6 +155,25 @@ export default function HomePage() {
       window.removeEventListener('teachmeet_meeting_joined', handleRefresh);
       window.removeEventListener('teachmeet_meeting_ended', handleRefresh);
     };
+  }, []);
+
+  // Post-meeting review detection
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    // Detect if the user just left a meeting
+    const justLeft = sessionStorage.getItem('teachmeet-just-left-meeting') === 'true';
+    // Detect if the user has already reviewed (persisted in local storage)
+    const hasReviewed = localStorage.getItem('teachmeet-has-reviewed') === 'true';
+
+    if (justLeft && !hasReviewed) {
+      // Small delay to ensure landing experience is smooth
+      const timer = setTimeout(() => {
+        setShowReviewDialog(true);
+        sessionStorage.removeItem('teachmeet-just-left-meeting');
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
   }, []);
 
   // Logo Animation & Visibility Logic
@@ -505,6 +533,12 @@ export default function HomePage() {
     });
   };
 
+  const handleReviewConfirm = () => {
+    window.open('https://play.google.com/store/apps/details?id=com.teachmeet.3d', '_blank');
+    localStorage.setItem('teachmeet-has-reviewed', 'true');
+    setShowReviewDialog(false);
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <AppHeader showLogo={false} />
@@ -658,6 +692,35 @@ export default function HomePage() {
         </div>
       </main>
       <SlideUpPanel />
+
+      {/* Review Dialog */}
+      <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
+          <DialogContent className="sm:max-w-md rounded-2xl p-6 overflow-hidden border-none shadow-2xl">
+              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary via-accent to-primary" />
+              <DialogHeader className="space-y-3 pt-4">
+                  <div className="mx-auto bg-primary/10 w-20 h-20 rounded-full flex items-center justify-center mb-2 shadow-inner">
+                      <Star className="h-10 w-10 text-primary fill-primary animate-pulse" />
+                  </div>
+                  <DialogTitle className="text-2xl font-bold text-center">Enjoying TeachMeet?</DialogTitle>
+                  <DialogDescription className="text-center text-base leading-relaxed">
+                      We hope you had a productive meeting! 🚀
+                      <br /><br />
+                      Would you mind taking a moment to support us with a review on the Play Store?
+                  </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col sm:flex-row gap-3 mt-8">
+                  <Button variant="outline" onClick={() => setShowReviewDialog(false)} className="flex-1 rounded-xl h-12 text-muted-foreground font-semibold border-muted-foreground/20 hover:bg-muted/50">
+                      Maybe Later
+                  </Button>
+                  <Button 
+                      onClick={handleReviewConfirm} 
+                      className="flex-1 btn-gel rounded-xl h-12 text-lg font-bold shadow-lg hover:shadow-primary/30"
+                  >
+                      Yes, I'll Review!
+                  </Button>
+              </div>
+          </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -66,6 +66,12 @@ export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (rtc && !pathname.includes(`/dashboard/meeting/${rtc.roomId}`)) {
       console.log("🚦 Navigating away from meeting. Tearing down RTC.");
+      
+      // If we are navigating directly to the home page, flag it for the review prompt
+      if (pathname === '/' && typeof window !== 'undefined') {
+        sessionStorage.setItem('teachmeet-just-left-meeting', 'true');
+      }
+
       rtc.leave();
       setRtc(null);
     }

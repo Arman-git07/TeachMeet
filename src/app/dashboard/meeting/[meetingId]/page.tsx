@@ -167,6 +167,11 @@ function MeetingPageContent() {
       }
     }
   
+    // Flag that we just left a meeting to show the review prompt on the home page
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('teachmeet-just-left-meeting', 'true');
+    }
+    
     router.push("/");
   }, [meetingId, user, isHost, router, toast, rtc, setRtc]);
 
