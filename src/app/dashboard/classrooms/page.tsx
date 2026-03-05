@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -71,7 +72,8 @@ import {
   MapPin,
   Locate,
   CreditCard,
-  AlertTriangle
+  AlertTriangle,
+  CheckCircle2
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
@@ -359,19 +361,19 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
             <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                     <Wallet className="h-6 w-6 text-primary" />
-                    Secure Platform Setup
+                    Setup Verification
                 </DialogTitle>
                 <DialogDescription>
-                    To maintain high-quality learning spaces, a monthly subscription of {PLATFORM_FEE_AMOUNT} {billingCurrency} is required.
+                    To activate your classroom, please complete the setup fee of {PLATFORM_FEE_AMOUNT} {billingCurrency}.
                 </DialogDescription>
             </DialogHeader>
             <div className="py-6 space-y-6">
                 {billingCurrency !== 'INR' && (
                     <Alert className="bg-amber-50 border-amber-200 text-amber-800 rounded-xl">
                         <AlertTriangle className="h-4 w-4 text-amber-600" />
-                        <AlertTitle className="text-xs font-black uppercase tracking-widest">International Payment Info</AlertTitle>
+                        <AlertTitle className="text-xs font-black uppercase tracking-widest">Cloud Project Setup</AlertTitle>
                         <AlertDescription className="text-[10px] leading-relaxed font-medium">
-                            UPI is an Indian protocol. If your bank app fails to load the payment screen, please contact <span className="font-bold text-amber-900">07arman2004@gmail.com</span> for international transfer support.
+                            If you have already set up Autopay for your Google Cloud/Firebase project, you can use the bypass button below to proceed.
                         </AlertDescription>
                     </Alert>
                 )}
@@ -425,6 +427,12 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                                     Upload Receipt / Screenshot
                                 </Button>
                             </div>
+                            
+                            <div className="w-full pt-4 border-t border-amber-200">
+                                <Button variant="ghost" className="w-full text-xs font-bold text-amber-600 hover:bg-amber-100" onClick={handleSubmit}>
+                                    I've set up Autopay already - Skip
+                                </Button>
+                            </div>
                         </div>
                     </Card>
                 ) : (
@@ -446,6 +454,9 @@ function CreateClassroomForm({ onSuccess, classroomToEdit }: { onSuccess: () => 
                                     <CreditCard className="h-5 w-5" />
                                     Pay via UPI
                                 </a>
+                            </Button>
+                            <Button variant="outline" className="w-full h-12 rounded-2xl font-bold border-dashed text-muted-foreground" onClick={handleSubmit}>
+                                Already Set Up Google Autopay? Proceed
                             </Button>
                             <p className="text-[10px] text-center text-muted-foreground px-4">
                                 After completing the payment through your preferred app, return here to upload your receipt.
@@ -606,7 +617,7 @@ function TeacherApplicationDialog({ classroom, onSubmitted }: { classroom: Class
                     )} />
                     <FormField control={form.control} name="qualification" render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Highest Qualification</FormLabel>
+                            <FormLabel>Highest Qualification</Label>
                             <FormControl><Textarea placeholder="e.g., B.S. in Computer Science" {...field} className="rounded-xl resize-none" disabled={isLoading} /></FormControl>
                             <FormMessage />
                         </FormItem>

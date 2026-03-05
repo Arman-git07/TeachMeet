@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -13,7 +14,7 @@ import { ClassroomProvider } from '@/contexts/ClassroomContext';
 import type { Classroom } from '@/app/dashboard/classrooms/[classroomId]/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Lock, Wallet, ArrowLeft, Loader2, AlertCircle, CreditCard, ShieldCheck, RefreshCw, UploadCloud, ImageIcon, Info, AlertTriangle, Mail } from 'lucide-react';
+import { Lock, Wallet, ArrowLeft, Loader2, AlertCircle, CreditCard, ShieldCheck, RefreshCw, UploadCloud, ImageIcon, Info, AlertTriangle, Mail, CheckCircle2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -112,6 +113,7 @@ export default function ClassroomDetailLayout({
 
   const handleRenew = useCallback(async () => {
       if (!user || !classroom) return;
+      setIsVerifying(true);
       try {
           const now = new Date();
           const nextDue = new Date();
@@ -122,9 +124,9 @@ export default function ClassroomDetailLayout({
               lastPaymentAt: serverTimestamp(),
               nextPaymentDue: Timestamp.fromDate(nextDue)
           });
-          toast({ title: "Classroom Renewed!", description: "Subscription is now active for another month." });
+          toast({ title: "Classroom Activated!", description: "Status updated based on your billing confirmation." });
       } catch (error) {
-          toast({ variant: 'destructive', title: "Renewal Failed" });
+          toast({ variant: 'destructive', title: "Activation Failed" });
       } finally {
           setIsVerifying(false);
           setPaymentInitiated(false);
@@ -257,9 +259,9 @@ export default function ClassroomDetailLayout({
                       {isInternational && (
                           <Alert className="bg-amber-50 border-amber-200 text-amber-800 rounded-2xl">
                               <AlertTriangle className="h-4 w-4 text-amber-600" />
-                              <AlertTitle className="text-[10px] font-black uppercase tracking-widest">International Payment Info</AlertTitle>
+                              <AlertTitle className="text-[10px] font-black uppercase tracking-widest">Billing Confirmation Needed</AlertTitle>
                               <AlertDescription className="text-[10px] leading-relaxed">
-                                  UPI is an Indian protocol. If your bank app fails to load, please email <span className="font-bold text-amber-900">07arman2004@gmail.com</span> for alternative international transfer details.
+                                  If you have already set up your Google Cloud Autopay (verified by ₹2 charge), please use the **"Billing Setup Complete"** button below to activate.
                               </AlertDescription>
                           </Alert>
                       )}
@@ -271,8 +273,8 @@ export default function ClassroomDetailLayout({
                                 <ShieldCheck className="h-8 w-8 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
                               </div>
                               <div className="space-y-1">
-                                <p className="font-black text-primary uppercase tracking-widest">AI Auditing Transaction</p>
-                                <p className="text-[10px] text-muted-foreground">Validating recipient ID and receipt authenticity...</p>
+                                <p className="font-black text-primary uppercase tracking-widest">AI Auditing Status</p>
+                                <p className="text-[10px] text-muted-foreground">Validating project credentials and maintenance status...</p>
                               </div>
                               <Progress value={verificationProgress} className="h-2" />
                           </div>
@@ -284,14 +286,14 @@ export default function ClassroomDetailLayout({
                             <div className="space-y-1">
                                 <p className="font-black text-amber-800 uppercase tracking-widest">Upload Receipt</p>
                                 <p className="text-[10px] text-amber-700/80 leading-relaxed px-4">
-                                    Please complete the transaction, then upload the receipt image.
+                                    Upload the screenshot of your payment confirmation.
                                 </p>
                             </div>
                             <div className="bg-white/50 p-3 rounded-xl border border-amber-200 text-left space-y-2">
                                 <div className="flex items-start gap-2">
                                     <Info className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
                                     <p className="text-[10px] text-amber-900 leading-tight">
-                                        If your app blocks screenshots, use the <strong>"Share Receipt"</strong> or <strong>"Download"</strong> button in your payment app to save the image first.
+                                        Use the <strong>"Share Receipt"</strong> image from your payment app.
                                     </p>
                                 </div>
                             </div>
@@ -304,27 +306,35 @@ export default function ClassroomDetailLayout({
                                 />
                                 <Button variant="outline" className="w-full rounded-xl border-amber-300 text-amber-700">
                                     <ImageIcon className="mr-2 h-4 w-4" />
-                                    Upload Receipt / Screenshot
+                                    Select Receipt Image
+                                </Button>
+                            </div>
+                            <div className="pt-2 border-t border-amber-200">
+                                <Button variant="ghost" className="w-full text-xs font-bold text-amber-600" onClick={handleRenew}>
+                                    I've set up Autopay - Confirm Manually
                                 </Button>
                             </div>
                         </div>
                       ) : (
                           <>
                             <div className="bg-muted p-4 rounded-2xl text-center border">
-                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Renewal Amount</p>
+                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Maintenance Verification</p>
                                 <p className="text-3xl font-black">{PLATFORM_FEE_AMOUNT} {billingCurrency}</p>
                             </div>
                             <div className="space-y-3">
                                 <Button asChild className="w-full btn-gel h-14 text-lg rounded-2xl shadow-xl" onClick={() => setPaymentInitiated(true)}>
                                     <a href={upiUrl}><CreditCard className="mr-2 h-5 w-5" /> Pay via UPI</a>
                                 </Button>
-                                <p className="text-[10px] text-center text-muted-foreground">After completing the transaction, return here to upload your receipt.</p>
+                                <Button variant="outline" className="w-full h-12 rounded-2xl font-bold border-dashed" onClick={handleRenew}>
+                                    <CheckCircle2 className="mr-2 h-4 w-4 text-primary" /> Billing Setup Complete
+                                </Button>
+                                <p className="text-[10px] text-center text-muted-foreground">After setting up your Google Cloud billing or paying the fee, click above to activate.</p>
                             </div>
                           </>
                       )}
                   </CardContent>
                   <CardFooter className="bg-muted/50 border-t p-4 text-center">
-                      <p className="text-[10px] text-muted-foreground w-full">Access will be restored once the transaction is verified by AI.</p>
+                      <p className="text-[10px] text-muted-foreground w-full">Access will be restored once the setup is confirmed.</p>
                   </CardFooter>
               </Card>
           </div>
