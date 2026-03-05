@@ -22,6 +22,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Send, ArrowLeft, ShieldAlert, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import HostJoinRequestNotification from "@/components/meeting/HostJoinRequestNotification";
 
 interface ChatMessage {
   id: string;
@@ -189,6 +190,7 @@ export default function MeetingChatPage() {
 
   return (
     <div className="flex flex-col h-screen bg-muted/30 overflow-hidden">
+      {user?.uid === meetingHostId && <HostJoinRequestNotification meetingId={meetingId} />}
       {/* Header */}
       <header className="flex-none p-4 border-b bg-background/80 backdrop-blur-md flex items-center gap-4 sticky top-0 z-10">
         <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full h-10 w-10">

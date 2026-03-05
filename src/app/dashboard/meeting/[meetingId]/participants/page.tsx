@@ -38,6 +38,7 @@ import { auth, db } from '@/lib/firebase';
 import { collection, query, onSnapshot, doc, getDoc, DocumentData, writeBatch, updateDoc } from 'firebase/firestore';
 import { useBlock } from "@/contexts/BlockContext";
 import { BlockUserDialog } from "@/components/meeting/BlockUserDialog";
+import HostJoinRequestNotification from "@/components/meeting/HostJoinRequestNotification";
 
 interface Participant {
   id: string; // This will be the userId
@@ -169,7 +170,7 @@ const ParticipantItem = React.memo(({
                       <CameraOff className="mr-2 h-4 w-4" />
                       <span>Turn Off Camera</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onRemoveClick(participant); }} className="text-destructive focus:text-destructive cursor-pointer">
+                    <DropdownMenuItem onSelect={(event) => { event.preventDefault(); onRemoveClick(participant); }} className="text-destructive focus:text-destructive cursor-pointer">
                       <UserX className="mr-2 h-4 w-4" />
                       <span>Remove Participant</span>
                     </DropdownMenuItem>
@@ -414,6 +415,7 @@ export default function MeetingParticipantsPage({ params }: { params: { meetingI
             participant={participantToBlock}
         />
     )}
+    {isCurrentUserTheHost && <HostJoinRequestNotification meetingId={meetingId} />}
     </>
   );
 }

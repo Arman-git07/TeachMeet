@@ -46,7 +46,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import jsPDF from 'jspdf';
 import { auth, storage, db } from '@/lib/firebase';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import HostJoinRequestNotification from "@/components/meeting/HostJoinRequestNotification";
 
 
 // --- Type Definitions ---
@@ -195,6 +196,7 @@ export default function WhiteboardPage() {
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
   const [isProcessing, setIsProcessing] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [isHost, setIsHost] = useState(false);
 
 
   const [refinePrompt, setRefinePrompt] = useState("");
@@ -205,6 +207,19 @@ export default function WhiteboardPage() {
   useEffect(() => {
     currentPageIndexRef.current = currentPageIndex;
   }, [currentPageIndex]);
+
+  useEffect(() => {
+    if (!meetingId) return;
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        const meetingSnap = await getDoc(doc(db, 'meetings', meetingId));
+        if (meetingSnap.exists() && meetingSnap.data().hostId === user.uid) {
+          setIsHost(true);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, [meetingId]);
 
   useEffect(() => {
     setBgColor(localStorage.getItem('teachmeet-whiteboard-bg-color') || '#FFFFFF');
@@ -1290,6 +1305,7 @@ export default function WhiteboardPage() {
 
   return (
     <>
+      {isHost && <HostJoinRequestNotification meetingId={meetingId} />}
       <div className="flex flex-col h-full bg-muted/30">
         <div className="flex-none p-2 border-b bg-background shadow-md z-20">
           <div className="container mx-auto flex flex-wrap items-center justify-center gap-2 relative">
