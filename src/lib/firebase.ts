@@ -29,19 +29,18 @@ if (
 // Initialize Firebase App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// 🔥 FINAL FIX — AUTH INITIALIZED ONLY ONCE WITH FULL PERSISTENCE
-// This single instance is exported and used throughout the app.
+// 🔥 AUTH INITIALIZED WITH BROWSER PERSISTENCE FOR OFFLINE ACCOUNT ACCESS
 export const auth = initializeAuth(app, {
   persistence: browserLocalPersistence,
 });
 
 const db = getFirestore(app);
 
-// Enable offline persistence for Firestore.
+// 🔥 ROBUST OFFLINE PERSISTENCE FOR CLASSROOM DATA
 if (typeof window !== 'undefined') {
   try {
     enableIndexedDbPersistence(db)
-      .then(() => console.log("Firestore persistence enabled."))
+      .then(() => console.log("Firestore persistence enabled. Most app features will now work offline."))
       .catch((err) => {
         if (err.code == 'failed-precondition') {
           console.warn("Firestore persistence failed. Multiple tabs open?");
