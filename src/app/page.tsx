@@ -125,7 +125,7 @@ export default function HomePage() {
   
   const [activityChunks, setActivityChunks] = useState<Record<string, ActivityItem[]>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [validMeetings] = useState<Record<string, boolean>>({});
+  const [validMeetings, setValidMeetings] = useState<Record<string, boolean>>({});
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   const [fallenLetters, setFallenLetters] = useState<FallenLetter[]>([]);
@@ -157,22 +157,45 @@ export default function HomePage() {
     };
   }, []);
 
+  // Real-time Meeting Status Validator: Automatically remove notifications for ended meetings
+  useEffect(() => {
+    if (!user) return;
+    const STARTED_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
+    const JOINED_KEY = `${JOINED_MEETINGS_KEY_PREFIX}${user.uid}`;
+    
+    const started = JSON.parse(localStorage.getItem(STARTED_KEY) || '[]');
+    const joined = JSON.parse(localStorage.getItem(JOINED_KEY) || '[]');
+    const allMeetingIds = [...new Set([...started, ...joined].filter(m => m && m.id).map((m: any) => m.id))];
+
+    const unsubs = allMeetingIds.map(id => {
+      return onSnapshot(doc(db, 'meetings', id), (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          const isActive = data.status !== 'ended';
+          setValidMeetings(prev => ({ ...prev, [id]: isActive }));
+        } else {
+          // If meeting doc is deleted, it's definitely not joinable
+          setValidMeetings(prev => ({ ...prev, [id]: false }));
+        }
+      });
+    });
+
+    return () => unsubs.forEach(u => u());
+  }, [user, refreshTrigger]);
+
   // Post-meeting review detection
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    // Detect if the user just left a meeting
-    const justLeft = sessionStorage.getItem('teachmeet-just-left-meeting') === 'true';
-    // Detect if the user has already reviewed (persisted in local storage)
-    const hasReviewed = localStorage.getItem('teachmeet-has-reviewed') === 'true';
+    if (typeof window !== 'undefined') {
+      const justLeft = sessionStorage.getItem('teachmeet-just-left-meeting') === 'true';
+      const hasReviewed = localStorage.getItem('teachmeet-has-reviewed') === 'true';
 
-    if (justLeft && !hasReviewed) {
-      // Small delay to ensure landing experience is smooth
-      const timer = setTimeout(() => {
-        setShowReviewDialog(true);
-        sessionStorage.removeItem('teachmeet-just-left-meeting');
-      }, 1500);
-      return () => clearTimeout(timer);
+      if (justLeft && !hasReviewed) {
+        const timer = setTimeout(() => {
+          setShowReviewDialog(true);
+          sessionStorage.removeItem('teachmeet-just-left-meeting');
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
     }
   }, []);
 
@@ -483,7 +506,7 @@ export default function HomePage() {
         ...started.map((m: any) => ({ ...m, role: 'host' as const })),
         ...joined.map((m: any) => ({ ...m, role: 'participant' as const }))
     ]
-    .filter((m: any) => m && Date.now() - m.startedAt < TWO_HOURS_IN_MS && validMeetings[m.id] !== false)
+    .filter((m: any) => m && Date.now() - m.startedAt < TWO_HOURS_IN_MS && validMeetings[m.id] === true)
     .map((m: any) => ({ 
         type: 'meeting' as ActivityItemType, 
         id: m.id, 
