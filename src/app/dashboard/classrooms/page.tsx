@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -617,7 +616,7 @@ function TeacherApplicationDialog({ classroom, onSubmitted }: { classroom: Class
                     )} />
                     <FormField control={form.control} name="qualification" render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Highest Qualification</Label>
+                            <FormLabel>Highest Qualification</FormLabel>
                             <FormControl><Textarea placeholder="e.g., B.S. in Computer Science" {...field} className="rounded-xl resize-none" disabled={isLoading} /></FormControl>
                             <FormMessage />
                         </FormItem>
