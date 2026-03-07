@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -973,7 +974,7 @@ export default function ClassroomsPage() {
                     <CardFooter className="flex justify-between gap-2 border-t pt-4 bg-muted/5">
                         <Button asChild className="flex-1 btn-gel rounded-xl"><Link href={`/dashboard/classrooms/${c.id}`}>Enter</Link></Button>
                         <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 hover:bg-primary/10 hover:text-primary" onClick={() => handleEdit(c)}><Edit className="h-4 w-4"/></Button>
-                        <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 hover:bg-destructive/10 hover:text-destructive" onClick={() => setClassroomToDelete(c)}><Trash2 className="h-4 w-4"/></Button>
+                        <Button variant="ghost" size="icon" className="rounded-xl h-11 w-11 hover:bg-destructive/10 hover:text-destructive" onClick={() => setClassroomToDelete(c)}><Trash2 className="h-4 w-4"/></Button>
                     </CardFooter>
                 </Card>
             ))}
