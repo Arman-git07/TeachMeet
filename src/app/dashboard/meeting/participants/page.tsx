@@ -1,28 +1,19 @@
-
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { Loader2 } from "lucide-react";
+import React from 'react';
 
 /**
- * This page was causing a build conflict. 
- * The actual participants list is now located at /dashboard/meeting/[meetingId]/participants.
- * This file redirects users back to the dashboard to satisfy Next.js build requirements.
+ * This page provides a view for the participants list.
+ * Note: The primary participants view is handled dynamically within the meeting room,
+ * but this route exists to satisfy structure requirements and provide a standalone view if needed.
  */
-export default function LegacyParticipantsPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace('/');
-  }, [router]);
-
+export default function ParticipantsPage() {
   return (
-    <div className="flex items-center justify-center h-full min-h-screen bg-background">
-      <div className="flex flex-col items-center gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground font-medium uppercase tracking-widest">Redirecting...</p>
-      </div>
+    <div className="container mx-auto p-8 text-center space-y-4">
+      <h1 className="text-3xl font-bold">Meeting Participants</h1>
+      <p className="text-muted-foreground">
+        Access the participants list directly from within an active meeting session for real-time controls.
+      </p>
     </div>
   );
 }
