@@ -93,7 +93,7 @@ export default function ExamResultPage() {
             await updateDoc(subRef, updateData);
             
             // Refresh local state
-            setSubmission(prev => ({ ...prev, ...updateData }));
+            setSubmission((prev: any) => ({ ...prev, ...updateData }));
             setIsEditing(false);
             toast({ title: "Assessment Updated Successfully" });
         } catch (error) {
