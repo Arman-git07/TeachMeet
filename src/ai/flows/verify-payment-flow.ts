@@ -66,7 +66,7 @@ const verifyPaymentFlow = ai.defineFlow(
     inputSchema: VerifyPaymentInputSchema,
     outputSchema: VerifyPaymentOutputSchema,
   },
-  async input => {
+  async (input: any) => {
     const response = await verifyPaymentPrompt(input);
     return response.output!;
   }
