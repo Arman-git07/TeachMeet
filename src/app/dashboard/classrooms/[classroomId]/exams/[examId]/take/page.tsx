@@ -175,7 +175,7 @@ export default function TakeExamPage() {
                         operation: 'create',
                         requestResourceData: subData
                     });
-                    errorEmitter.emit('permission-error', pError);
+                    errorEmitter.emit('permission-error', pError as any);
                 });
 
             toast({ title: "Answers Uploaded Successfully!" });
