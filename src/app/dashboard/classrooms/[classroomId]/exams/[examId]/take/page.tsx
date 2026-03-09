@@ -135,6 +135,7 @@ export default function TakeExamPage() {
                     operation: 'create',
                     requestResourceData: subData
                 });
+                // @ts-ignore
                 errorEmitter.emit('permission-error', pError);
             });
 
