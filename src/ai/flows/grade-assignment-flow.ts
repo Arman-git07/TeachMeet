@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview An AI agent for grading student assignments against a teacher's answer key.
@@ -33,8 +32,8 @@ export type GradeAssignmentOutput = z.infer<typeof GradeAssignmentOutputSchema>;
 
 const gradeAssignmentPrompt = ai.definePrompt({
   name: 'gradeAssignmentPrompt',
-  inputSchema: GradeAssignmentInputSchema,
-  outputSchema: GradeAssignmentOutputSchema,
+  input: { schema: GradeAssignmentInputSchema },
+  output: { schema: GradeAssignmentOutputSchema },
   prompt: `You are an expert teaching assistant responsible for grading student assignments.
 
 Your task is to analyze the student's submission by comparing it against the teacher's provided assignment or answer key.
@@ -56,7 +55,7 @@ const gradeAssignmentFlow = ai.defineFlow(
     inputSchema: GradeAssignmentInputSchema,
     outputSchema: GradeAssignmentOutputSchema,
   },
-  async input => {
+  async (input: any) => {
     const response = await gradeAssignmentPrompt(input);
     return response.output!;
   }
