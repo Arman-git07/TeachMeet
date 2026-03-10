@@ -152,7 +152,7 @@ export default function TakeExamPage() {
     if (!file) return;
 
     setIsSubmitting(true);
- 
+
     try {
         const path = `classrooms/${classroomId}/exams/submissions/${examId}/${user.uid}-${file.name}`;
         const fileRef = storageRef(storage, path);
@@ -181,18 +181,6 @@ export default function TakeExamPage() {
         toast({ variant: 'destructive', title: "Upload Failed" });
         setIsSubmitting(false);
     }
-};
-        errorEmitter.emit('permission-error', (error: FirestorePermissionError) => {
-  console.error(error);
-});
-        
-            toast({ title: "Answers Uploaded Successfully!" });
-            router.replace(`/dashboard/classrooms/${classroomId}`);
-        } catch (error) {
-    console.error(error);
-    toast({ variant: 'destructive', title: "Upload Failed" });
-    setIsSubmitting(false);
-}
 };
 
 const handleSkipQuestion = (index: number) => {
