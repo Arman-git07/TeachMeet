@@ -32,6 +32,10 @@ export interface Classroom {
     feeCurrency?: string;
     paymentDetails?: { upiId: string; qrCodeUrl: string; };
     createdBy: string;
+
+    subscriptionStatus?: 'active' | 'grace_period' | 'blocked';
+    nextPaymentDue?: any;
+    billingCurrency?: string;
 }
 
 export interface UserProfile { id: string; name: string; photoURL?: string; role: 'student' | 'teacher' | 'creator'; uid: string; }
