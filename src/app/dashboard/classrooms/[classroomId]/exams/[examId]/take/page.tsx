@@ -168,13 +168,16 @@ export default function TakeExamPage() {
                 feedback: null
             };
 
-            setDoc(subRef, subData)
-    .catch(async (error) => {
-        const pError = new FirestorePermissionError({
-            path: subRef.path,
-            operation: 'create',
-            requestResourceData: subData
-        });
+            await setDoc(subRef, subData);
+
+toast({ title: "Answers Uploaded Successfully!" });
+router.replace(`/dashboard/classrooms/${classroomId}`);
+
+} catch (error) {
+    console.error(error);
+    toast({ variant: 'destructive', title: "Upload Failed" });
+    setIsSubmitting(false);
+}
 
         errorEmitter.emit('permission-error', (error: FirestorePermissionError) => {
   console.error(error);
