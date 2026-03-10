@@ -44,10 +44,12 @@ export default function MaterialViewerPage() {
         if (!material?.url) return;
         
         setIsDownloading(true);
-        const toastId = `download-${Date.now()}`;
-        toast({ id: toastId, title: "Preparing Download...", description: "Fetching file from server..." });
 
-        try {
+toast({
+  title: "Preparing Download..."
+});
+
+try {
             // Fetching as a blob is the most reliable way to force a browser download
             // for cross-origin assets like Firebase Storage URLs.
             const response = await fetch(material.url);
