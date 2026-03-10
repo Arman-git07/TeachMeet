@@ -169,15 +169,17 @@ export default function TakeExamPage() {
             };
 
             setDoc(subRef, subData)
-                .catch(async (error) => {
-                    const pError = new FirestorePermissionError({
-                        path: subRef.path,
-                        operation: 'create',
-                        requestResourceData: subData
-                    });
-                    errorEmitter.emit('permission-error');
-console.error(pError);
-                });
+    .catch(async (error) => {
+        const pError = new FirestorePermissionError({
+            path: subRef.path,
+            operation: 'create',
+            requestResourceData: subData
+        });
+
+        errorEmitter.emit('permission-error', pError);
+
+        console.error(pError);
+    });
 
             toast({ title: "Answers Uploaded Successfully!" });
             router.replace(`/dashboard/classrooms/${classroomId}`);
