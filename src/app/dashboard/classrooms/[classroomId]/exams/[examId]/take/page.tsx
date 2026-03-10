@@ -144,42 +144,44 @@ export default function TakeExamPage() {
     };
 
     const handleFileUploadSubmission = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        if (!user || !classroomId || !exam) return;
-        const fileInput = e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement;
-        const file = fileInput?.files?.[0];
-        if (!file) return;
+    e.preventDefault();
+    if (!user || !classroomId || !exam) return;
 
-        setIsSubmitting(true);
+    const fileInput = e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = fileInput?.files?.[0];
+    if (!file) return;
 
-try {
-    const path = `classrooms/${classroomId}/exams/submissions/${examId}/${user.uid}-${file.name}`;
-    const fileRef = storageRef(storage, path);
-    const snapshot = await uploadBytes(fileRef, file);
-    const url = await getDownloadURL(snapshot.ref);
+    setIsSubmitting(true);
 
-    const subRef = doc(db, 'classrooms', classroomId, 'exams', examId, 'submissions', user.uid);
+    try {
+        const path = `classrooms/${classroomId}/exams/submissions/${examId}/${user.uid}-${file.name}`;
+        const fileRef = storageRef(storage, path);
+        const snapshot = await uploadBytes(fileRef, file);
+        const url = await getDownloadURL(snapshot.ref);
 
-    const subData = {
-        studentId: user.uid,
-        studentName: user.displayName || 'Anonymous',
-        submittedAt: serverTimestamp(),
-        submissionUrl: url,
-        storagePath: path,
-        grade: null,
-        feedback: null
-    };
+        const subRef = doc(db, 'classrooms', classroomId, 'exams', examId, 'submissions', user.uid);
 
-    await setDoc(subRef, subData);
+        const subData = {
+            studentId: user.uid,
+            studentName: user.displayName || 'Anonymous',
+            submittedAt: serverTimestamp(),
+            submissionUrl: url,
+            storagePath: path,
+            grade: null,
+            feedback: null
+        };
 
-    toast({ title: "Answers Uploaded Successfully!" });
-    router.replace(`/dashboard/classrooms/${classroomId}`);
+        await setDoc(subRef, subData);
 
-} catch (error) {
-    console.error(error);
-    toast({ variant: 'destructive', title: "Upload Failed" });
-    setIsSubmitting(false);
-}
+        toast({ title: "Answers Uploaded Successfully!" });
+        router.replace(`/dashboard/classrooms/${classroomId}`);
+
+    } catch (error) {
+        console.error(error);
+        toast({ variant: 'destructive', title: "Upload Failed" });
+        setIsSubmitting(false);
+    }
+};
 
         errorEmitter.emit('permission-error', (error: FirestorePermissionError) => {
   console.error(error);
