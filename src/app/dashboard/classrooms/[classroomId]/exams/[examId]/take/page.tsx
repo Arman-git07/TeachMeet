@@ -151,27 +151,29 @@ export default function TakeExamPage() {
         if (!file) return;
 
         setIsSubmitting(true);
-        try {
-            const path = `classrooms/${classroomId}/exams/submissions/${examId}/${user.uid}-${file.name}`;
-            const fileRef = storageRef(storage, path);
-            const snapshot = await uploadBytes(fileRef, file);
-            const url = await getDownloadURL(snapshot.ref);
 
-            const subRef = doc(db, 'classrooms', classroomId, 'exams', examId, 'submissions', user.uid);
-            const subData = {
-                studentId: user.uid,
-                studentName: user.displayName || 'Anonymous',
-                submittedAt: serverTimestamp(),
-                submissionUrl: url,
-                storagePath: path,
-                grade: null,
-                feedback: null
-            };
+try {
+    const path = `classrooms/${classroomId}/exams/submissions/${examId}/${user.uid}-${file.name}`;
+    const fileRef = storageRef(storage, path);
+    const snapshot = await uploadBytes(fileRef, file);
+    const url = await getDownloadURL(snapshot.ref);
 
-            await setDoc(subRef, subData);
+    const subRef = doc(db, 'classrooms', classroomId, 'exams', examId, 'submissions', user.uid);
 
-toast({ title: "Answers Uploaded Successfully!" });
-router.replace(`/dashboard/classrooms/${classroomId}`);
+    const subData = {
+        studentId: user.uid,
+        studentName: user.displayName || 'Anonymous',
+        submittedAt: serverTimestamp(),
+        submissionUrl: url,
+        storagePath: path,
+        grade: null,
+        feedback: null
+    };
+
+    await setDoc(subRef, subData);
+
+    toast({ title: "Answers Uploaded Successfully!" });
+    router.replace(`/dashboard/classrooms/${classroomId}`);
 
 } catch (error) {
     console.error(error);
