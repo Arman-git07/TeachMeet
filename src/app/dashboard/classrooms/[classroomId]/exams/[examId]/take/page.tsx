@@ -176,11 +176,10 @@ export default function TakeExamPage() {
             requestResourceData: subData
         });
 
-        errorEmitter.emit('permission-error', pError);
-
-        console.error(pError);
-    });
-
+        errorEmitter.emit('permission-error', (error: FirestorePermissionError) => {
+  console.error(error);
+});
+        
             toast({ title: "Answers Uploaded Successfully!" });
             router.replace(`/dashboard/classrooms/${classroomId}`);
         } catch (error) {
