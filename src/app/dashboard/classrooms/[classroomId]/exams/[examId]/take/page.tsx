@@ -196,12 +196,12 @@ export default function TakeExamPage() {
 };
 
 const handleSkipQuestion = (index: number) => {
-        setExamAnswers(prev => {
-            const next = { ...prev };
-            delete next[index];
-            return next;
-        });
-    };
+    setExamAnswers(prev => {
+        const next = { ...prev };
+        delete next[index];
+        return next;
+    });
+};
 
     if (isLoading || !currentTime) {
         return (
