@@ -182,7 +182,6 @@ export default function TakeExamPage() {
         setIsSubmitting(false);
     }
 };
-
         errorEmitter.emit('permission-error', (error: FirestorePermissionError) => {
   console.error(error);
 });
