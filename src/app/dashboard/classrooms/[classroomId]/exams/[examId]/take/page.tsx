@@ -189,12 +189,13 @@ export default function TakeExamPage() {
             toast({ title: "Answers Uploaded Successfully!" });
             router.replace(`/dashboard/classrooms/${classroomId}`);
         } catch (error) {
-            toast({ variant: 'destructive', title: "Upload Failed" });
-            setIsSubmitting(false);
-        }
-    };
+    console.error(error);
+    toast({ variant: 'destructive', title: "Upload Failed" });
+    setIsSubmitting(false);
+}
+};
 
-    const handleSkipQuestion = (index: number) => {
+const handleSkipQuestion = (index: number) => {
         setExamAnswers(prev => {
             const next = { ...prev };
             delete next[index];
