@@ -33,27 +33,24 @@ export function MeetingChatPanel() {
     }
   }, [chatHistory]);
 
-  const handleSendMessage = useCallback(() => {
-    if (!inputValue.trim() || !user || !rtc) return;
+ const handleSendMessage = useCallback(() => {
+  if (!inputValue.trim() || !user || !rtc) return;
 
-    const newMessage: ChatMessage = {
-      id: `${Date.now()}-${user.uid}`,
-      senderId: user.uid,
-      senderName: user.displayName || 'You',
-      senderAvatar: user.photoURL || undefined,
-      text: inputValue,
-      timestamp: Date.now(),
-      isPrivate: false, // For now, all messages are public in the meeting
-    };
-    
-    // Optimistic update
-    addChatMessage(newMessage);
-    // Send to others
-    rtc.socket.emit('chat-message', newMessage);
+  const newMessage: ChatMessage = {
+    id: `${Date.now()}-${user.uid}`,
+    senderId: user.uid,
+    senderName: user.displayName || 'You',
+    senderAvatar: user.photoURL || undefined,
+    text: inputValue,
+    timestamp: Date.now(),
+    isPrivate: false,
+  };
 
-    setInputValue("");
-    inputRef.current?.focus();
-  }, [inputValue, user, rtc, addChatMessage]);
+  addChatMessage(newMessage);
+  setInputValue("");
+  inputRef.current?.focus();
+
+}, [inputValue, user, rtc, addChatMessage]);
 
   const filteredMessages = chatHistory.filter(msg => !msg.isPrivate && !isBlockedByMe(msg.senderId, 'publicChat'));
 
@@ -70,8 +67,14 @@ export function MeetingChatPanel() {
                         <div key={msg.id} className={cn("flex items-end gap-2", msg.senderId === user?.uid ? "justify-end" : "justify-start")}>
                         {msg.senderId !== user?.uid && (
                             <Avatar className="h-8 w-8 self-start">
-                            <AvatarImage src={msg.senderAvatar || `https://placehold.co/40x40.png?text=${msg.senderName.charAt(0)}`} alt={msg.senderName} data-ai-hint="avatar user"/>
-                            <AvatarFallback>{msg.senderName.charAt(0)}</AvatarFallback>
+                            <AvatarImage
+  src={msg.senderAvatar || `https://placehold.co/40x40.png?text=${(msg.senderName ?? "U").charAt(0)}`}
+  alt={msg.senderName ?? "User"}
+/>
+
+<AvatarFallback>
+  {(msg.senderName ?? "U").charAt(0)}
+</AvatarFallback>
                             </Avatar>
                         )}
                         <div
@@ -84,7 +87,9 @@ export function MeetingChatPanel() {
                         >
                             {msg.senderId !== user?.uid && <p className="text-xs font-medium mb-0.5">{msg.senderName}</p>}
                             <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                            <p className="text-xs opacity-70 mt-1 text-right">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                            <p className="text-xs opacity-70 mt-1 text-right">
+  {new Date(msg.timestamp ?? Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+</p>
                         </div>
                         {msg.senderId === user?.uid && (
                             <Avatar className="h-8 w-8 self-start">
