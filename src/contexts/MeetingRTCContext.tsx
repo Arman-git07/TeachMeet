@@ -1,5 +1,4 @@
 'use client';
-'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
@@ -25,14 +24,24 @@ interface RecordingControls {
 interface MeetingRTCContextType {
   rtc: MeshRTC | null;
   setRtc: (rtc: MeshRTC | null) => void;
+
   isRecording: boolean;
   setIsRecording: (isRecording: boolean) => void;
+
   isUploading: boolean;
   setIsUploading: (isUploading: boolean) => void;
+
   recordingControls: RecordingControls;
   setRecordingControls: (controls: RecordingControls) => void;
+
   isSaveRecordingDialogOpen: boolean;
   setIsSaveRecordingDialogOpen: (isOpen: boolean) => void;
+
+  // ✅ Chat system
+  chatHistory: ChatMessage[];
+  addChatMessage: (message: ChatMessage) => void;
+  isChatOpen: boolean;
+  setIsChatOpen: (open: boolean) => void;
 }
 
 const MeetingRTCContext = createContext<MeetingRTCContextType | undefined>(undefined);
@@ -42,6 +51,12 @@ export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaveRecordingDialogOpen, setIsSaveRecordingDialogOpen] = useState(false);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+const [isChatOpen, setIsChatOpen] = useState(false);
+
+const addChatMessage = (message: ChatMessage) => {
+  setChatHistory((prev) => [...prev, message]);
+};
   const [recordingControls, setRecordingControls] = useState<RecordingControls>({
     start: async () => console.warn('startRecording not implemented'),
     stop: async (destination) => console.warn('stopRecording not implemented'),
@@ -87,13 +102,22 @@ export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
   }, [pathname, rtc]);
 
   return (
-    <MeetingRTCContext.Provider value={{ 
-      rtc, setRtc, 
-      isRecording, setIsRecording,
-      isUploading, setIsUploading,
-      recordingControls, setRecordingControls,
-      isSaveRecordingDialogOpen, setIsSaveRecordingDialogOpen
-    }}>
+    <MeetingRTCContext.Provider value={{
+  rtc, setRtc,
+
+  isRecording, setIsRecording,
+  isUploading, setIsUploading,
+
+  recordingControls, setRecordingControls,
+
+  isSaveRecordingDialogOpen,
+  setIsSaveRecordingDialogOpen,
+
+  chatHistory,
+  addChatMessage,
+  isChatOpen,
+  setIsChatOpen
+}}>
       {children}
     </MeetingRTCContext.Provider>
   );
