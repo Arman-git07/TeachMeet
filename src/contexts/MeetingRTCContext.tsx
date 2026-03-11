@@ -1,4 +1,5 @@
 'use client';
+'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
@@ -6,6 +7,14 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import type { MeshRTC } from '@/lib/webrtc/mesh';
+
+export type ChatMessage = {
+  id: string;
+  senderId: string;
+  senderName?: string;
+  text: string;
+  createdAt: number;
+};
 
 interface RecordingControls {
   start: () => Promise<void>;
