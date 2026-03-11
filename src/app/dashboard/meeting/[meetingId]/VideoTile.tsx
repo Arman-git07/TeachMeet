@@ -58,8 +58,11 @@ const VideoTile: React.FC<Props> = ({
   isSpotlight = false,
 }) => {
   const router = useRouter();
-  const params = useParams();
-  const meetingId = params.meetingId as string;
+const params = useParams();
+
+const meetingId = Array.isArray(params?.meetingId)
+  ? params?.meetingId[0]
+  : params?.meetingId || "";
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isMirrored, setIsMirrored] = useState(false);
   const [hasVideoTrack, setHasVideoTrack] = useState(false);
