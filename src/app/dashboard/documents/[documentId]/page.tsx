@@ -131,7 +131,7 @@ export default function DocumentViewerPage() {
             }
         } catch (error) {
             console.error("Save to drive error:", error);
-            toast.update(toastId, { variant: "destructive", title: "Action Failed", description: "Could not open save options." });
+            toast( { variant: "destructive", title: "Action Failed", description: "Could not open save options." });
         } finally {
             setIsDownloading(false);
         }
