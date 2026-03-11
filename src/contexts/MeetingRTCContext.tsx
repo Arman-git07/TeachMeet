@@ -47,15 +47,41 @@ interface MeetingRTCContextType {
 const MeetingRTCContext = createContext<MeetingRTCContextType | undefined>(undefined);
 
 export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
+  
   const [rtc, setRtc] = useState<MeshRTC | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaveRecordingDialogOpen, setIsSaveRecordingDialogOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
 const [isChatOpen, setIsChatOpen] = useState(false);
+useEffect(() => {
+  if (!rtc) return;
 
+  const handleData = (data: any) => {
+    if (data?.type === "chat-message") {
+      setChatHistory((prev) => {
+        if (prev.some((m) => m.id === data.payload.id)) return prev;
+        return [...prev, data.payload];
+      });
+    }
+  };
+
+  rtc.onData(handleData);
+
+  return () => {
+    rtc.offData(handleData);
+  };
+}, [rtc]);
 const addChatMessage = (message: ChatMessage) => {
   setChatHistory((prev) => [...prev, message]);
+
+  // Broadcast message to peers
+  if (rtc) {
+    rtc.broadcast({
+      type: "chat-message",
+      payload: message
+    });
+  }
 };
   const [recordingControls, setRecordingControls] = useState<RecordingControls>({
     start: async () => console.warn('startRecording not implemented'),
