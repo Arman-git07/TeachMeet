@@ -151,9 +151,9 @@ export function RecordingsClientUI() {
             createdAt: serverTimestamp(),
             thumbnailUrl: `https://placehold.co/300x180.png?text=New`,
           });
-          toast.update(toastId, { title: "Recording Uploaded!", description: `${file.name} is now available.` });
+          toast( { title: "Recording Uploaded!", description: `${file.name} is now available.` });
         } catch (dbError) {
-          toast.update(toastId, { variant: "destructive", title: "Save Failed", description: "Could not save recording details." });
+          toast( { variant: "destructive", title: "Save Failed", description: "Could not save recording details." });
         } finally {
             if (event.target) event.target.value = "";
             setIsUploading(false);
