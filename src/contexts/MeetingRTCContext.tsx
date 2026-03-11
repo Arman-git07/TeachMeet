@@ -11,8 +11,11 @@ export type ChatMessage = {
   id: string;
   senderId: string;
   senderName?: string;
+  senderAvatar?: string;   // ⭐ add this
   text: string;
-  createdAt: number;
+  createdAt?: number;
+  timestamp?: number;      // ⭐ add this
+  isPrivate?: boolean;     // ⭐ add this
 };
 
 interface RecordingControls {
