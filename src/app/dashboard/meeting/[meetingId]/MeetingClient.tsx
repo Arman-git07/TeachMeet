@@ -249,7 +249,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
           }
 
           setIsUploading(true);
-          const toastId = toast({ title: 'Processing Recording...', duration: Infinity });
+           toast({ title: 'Processing Recording...', duration: Infinity });
 
           try {
             const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
@@ -276,9 +276,9 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
               createdAt: serverTimestamp(),
             });
             
-            toast.update(toastId, { title: 'Recording Saved!', description: `Your recording is in your ${destination} folder.` });
+            toast({ title: 'Recording Saved!', description: `Your recording is in your ${destination} folder.` });
           } catch (e: any) {
-            toast.update(toastId, { variant: 'destructive', title: 'Upload Failed', description: e.message });
+            toast({ variant: 'destructive', title: 'Upload Failed', description: e.message });
           } finally {
             setIsUploading(false);
           }
