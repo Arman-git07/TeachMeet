@@ -95,12 +95,10 @@ export default function DocumentViewerPage() {
         if (!document?.downloadURL) return;
         setIsDownloading(true);
         
-        const toastId = `drive-save-${Date.now()}`;
-        toast({ 
-            id: toastId,
-            title: "Preparing for Drive...", 
-            description: "Fetching document data. This works best on mobile devices with the Drive app installed." 
-        });
+        toast({
+    title: "Preparing for Drive...",
+    description: "Fetching document data. This works best on mobile devices with the Drive app installed."
+});
 
         try {
             const response = await fetch(document.downloadURL);
@@ -115,9 +113,9 @@ export default function DocumentViewerPage() {
                         title: document.name,
                         text: 'Save this document to your Google Drive.',
                     });
-                    toast.update(toastId, { title: "Save Options Opened", description: "Please select 'Save to Drive' from the list." });
+                    toast({ title: "Save Options Opened", description: "Please select 'Save to Drive' from the list." });
                 } else {
-                    toast.update(toastId, { 
+                    toast( { 
                         title: "Opening Drive", 
                         description: "Native sharing not fully supported. Opening your Google Drive for manual upload." 
                     });
@@ -125,7 +123,7 @@ export default function DocumentViewerPage() {
                 }
             } else {
                 // For desktop, we provide a direct link to the Drive upload area
-                toast.update(toastId, { 
+                toast( { 
                     title: "Opening Drive", 
                     description: "Please download the file first, then upload it to your Google Drive." 
                 });
