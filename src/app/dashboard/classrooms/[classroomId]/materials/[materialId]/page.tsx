@@ -41,47 +41,52 @@ export default function MaterialViewerPage() {
     }, [classroomId, materialId, toast, router]);
 
     const handleDownload = useCallback(async () => {
-        if (!material?.url) return;
-        
-        setIsDownloading(true);
 
-toast({
-  title: "Preparing Download..."
-});
+    setIsDownloading(true);
 
-try {
-            // Fetching as a blob is the most reliable way to force a browser download
-            // for cross-origin assets like Firebase Storage URLs.
-            const response = await fetch(material.url);
-            if (!response.ok) throw new Error("Network response was not ok");
-            
-            const blob = await response.blob();
-            const blobUrl = window.URL.createObjectURL(blob);
-            
-            const link = document.createElement('a');
-            link.href = blobUrl;
-            link.setAttribute('download', material.name || 'classroom-material');
-            document.body.appendChild(link);
-            link.click();
-            
-            // Cleanup
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(blobUrl);
-            
-            toast.update(toastId, { title: "Download Started", description: "Your file is being saved to your device." });
-        } catch (error) {
-            console.error('Download error:', error);
-            // Fallback: Try a direct link in a new window if fetch is blocked by CORS/security
-            window.open(material.url, '_blank');
-            toast.update(toastId, { 
-                variant: 'destructive', 
-                title: "Opening in new tab", 
-                description: "Direct download was blocked. You can save the file from the new tab." 
-            });
-        } finally {
-            setIsDownloading(false);
-        }
-    }, [material, toast]);
+    toast({
+        title: "Preparing Download..."
+    });
+
+    try {
+        const response = await fetch(material.url);
+        if (!response.ok) throw new Error("Network response was not ok");
+
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.setAttribute("download", material.name || "classroom-material");
+
+        document.body.appendChild(link);
+        link.click();
+
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+
+        toast({
+            title: "Download complete",
+            description: "Your file is being saved."
+        });
+
+    } catch (error) {
+
+        console.error("Download error:", error);
+
+        window.open(material.url, "_blank");
+
+        toast({
+            variant: "destructive",
+            title: "Opening in new tab",
+            description: "Direct download blocked. Save the file manually."
+        });
+
+    } finally {
+        setIsDownloading(false);
+    }
+
+}, [material, toast]);
 
     if (isLoading) {
         return (
