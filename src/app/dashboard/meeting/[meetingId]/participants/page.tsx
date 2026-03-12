@@ -110,10 +110,17 @@ const ParticipantItem = React.memo(({
           </Avatar>
           <div>
             <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
-              {participant.name} {isMe && "(You)"}
-              {isThisParticipantTheHost && <ShieldCheck className="inline-block h-4 w-4 text-primary" title="Host" />}
-              {participant.isHandRaised && <Hand className="inline-block h-4 w-4 text-primary" title="Hand Raised" />}
-              {isBlockedByMe && <UserX className="inline-block h-4 w-4 text-destructive" title="Blocked by you" />}
+              {isThisParticipantTheHost && (
+  <ShieldCheck className="inline-block h-4 w-4 text-primary" aria-label="Host" />
+)}
+
+{participant.isHandRaised && (
+  <Hand className="inline-block h-4 w-4 text-primary" aria-label="Hand Raised" />
+)}
+
+{isBlockedByMe && (
+  <UserX className="inline-block h-4 w-4 text-destructive" aria-label="Blocked by you" />
+)}
             </p>
             <p className="text-xs text-muted-foreground">
               {participant.isMicOn ? "Unmuted" : "Muted"} | {participant.isCameraOn ? "Camera On" : "Camera Off"}
