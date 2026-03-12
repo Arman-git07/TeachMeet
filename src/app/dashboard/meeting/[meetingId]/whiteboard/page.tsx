@@ -748,7 +748,8 @@ newPages[currentPageIndex] = updatedPage;
              setPages(currentPages => {
                  const newPages = [...currentPages];
                  const currentPage = newPages[currentPageIndex];
-                 const updatedPage = {
+                const newElements = [...currentPage.elements];
+               const updatedPage = {
   ...currentPage,
   elements: newElements,
   selectedElementIds: new Set<string>()
