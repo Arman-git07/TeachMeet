@@ -107,8 +107,8 @@ function MeetingPageContent() {
   const { user, loading: authLoading } = useAuth();
   const { rtc, setRtc, isRecording, isUploading, recordingControls, isSaveRecordingDialogOpen, setIsSaveRecordingDialogOpen } = useMeetingRTC();
   
-  const meetingId = params.meetingId as string;
-  const topic = searchParams.get('topic') || "TeachMeet Meeting";
+  const meetingId = params?.meetingId ?? "";
+const topic = searchParams?.get('topic') ?? "TeachMeet Meeting";
   const [isHost, setIsHost] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showHeaderAsId, setShowHeaderAsId] = useState(false);
