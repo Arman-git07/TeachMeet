@@ -49,6 +49,13 @@ import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage
 import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import HostJoinRequestNotification from "@/components/meeting/HostJoinRequestNotification";
 
+function hasPosition(element: any): element is { x: number; y: number } {
+  return 'x' in element && 'y' in element;
+}
+
+function isPathElement(element: any): element is { type: 'path'; points: { x: number; y: number }[] } {
+  return element.type === 'path' && 'points' in element;
+}
 
 // --- Type Definitions ---
 interface Point { x: number; y: number; }
@@ -769,9 +776,9 @@ newPages[currentPageIndex] = updatedPage;
                 if(!elementBox || (lassoBox && !boxesIntersect(lassoBox, elementBox))) return;
                 
                 if (
-  element.type === 'path'
+  isPathElement(element)
     ? element.points.some(p => isPointInPolygon(p, lassoPolygon))
-    : ('x' in element && 'y' in element && isPointInPolygon({ x: element.x, y: element.y }, lassoPolygon))
+    : hasPosition(element) && isPointInPolygon({ x: element.x, y: element.y }, lassoPolygon)
 ) {
   newSelectedIds.add(element.id);
 }
