@@ -768,10 +768,13 @@ newPages[currentPageIndex] = updatedPage;
                 const elementBox = getElementBoundingBox(element);
                 if(!elementBox || (lassoBox && !boxesIntersect(lassoBox, elementBox))) return;
                 
-                if (element.type === 'path' ? element.points.some(p => isPointInPolygon(p, lassoPolygon)) : isPointInPolygon({x: element.x, y: element.y}, lassoPolygon)) {
-                    newSelectedIds.add(element.id);
-                }
-            });
+                if (
+  element.type === 'path'
+    ? element.points.some(p => isPointInPolygon(p, lassoPolygon))
+    : ('x' in element && 'y' in element && isPointInPolygon({ x: element.x, y: element.y }, lassoPolygon))
+) {
+  newSelectedIds.add(element.id);
+}
 
             if (newSelectedIds.size > 0) {
                  setPages(currentPages => {
