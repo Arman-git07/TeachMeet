@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
-import { initializeAuth, browserLocalPersistence } from 'firebase/auth';
+import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
 import { getMessaging, type Messaging } from 'firebase/messaging';
@@ -29,41 +29,45 @@ if (
 // Initialize Firebase App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// 🔥 AUTH INITIALIZED WITH BROWSER PERSISTENCE FOR OFFLINE ACCOUNT ACCESS
-export const auth = initializeAuth(app, {
-  persistence: browserLocalPersistence,
-});
+// Auth
+export const auth = getAuth(app);
 
+if (typeof window !== "undefined") {
+  setPersistence(auth, browserLocalPersistence);
+}
+
+// Firestore
 const db = getFirestore(app);
 
-// 🔥 ROBUST OFFLINE PERSISTENCE FOR CLASSROOM DATA
+// Enable offline persistence
 if (typeof window !== 'undefined') {
   try {
     enableIndexedDbPersistence(db)
-      .then(() => console.log("Firestore persistence enabled. Most app features will now work offline."))
+      .then(() => console.log("Firestore persistence enabled."))
       .catch((err) => {
-        if (err.code == 'failed-precondition') {
+        if (err.code === 'failed-precondition') {
           console.warn("Firestore persistence failed. Multiple tabs open?");
-        } else if (err.code == 'unimplemented') {
-          console.warn("Firestore persistence not available in this browser.");
+        } else if (err.code === 'unimplemented') {
+          console.warn("Firestore persistence not supported in this browser.");
         }
       });
   } catch (err) {
-      console.error("Error enabling firestore persistence", err)
+    console.error("Error enabling firestore persistence", err);
   }
 }
 
 const storage = getStorage(app);
 const rtdb = getDatabase(app);
+
 let messaging: Messaging | null = null;
 
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-    try {
-        messaging = getMessaging(app);
-    } catch (error) {
-        console.warn("Could not initialize Firebase Messaging. This may be due to an unsupported environment (e.g., non-HTTPS).");
-        messaging = null;
-    }
+  try {
+    messaging = getMessaging(app);
+  } catch {
+    console.warn("Firebase Messaging not supported.");
+    messaging = null;
+  }
 }
 
 export { app, storage, db, messaging, rtdb };
