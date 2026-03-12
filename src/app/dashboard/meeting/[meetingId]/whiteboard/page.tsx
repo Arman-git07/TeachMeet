@@ -766,29 +766,55 @@ newPages[currentPageIndex] = updatedPage;
              });
         }
     } else if (opState.type === 'lassoing') {
-        if (opState.lassoPath.length > 2) {
-            const newSelectedIds = new Set<string>();
-            const lassoPolygon = opState.lassoPath;
-            const lassoBox = getElementBoundingBox({type:'path', id:'', points:lassoPolygon, color:'', lineWidth:1});
-            
-            pages[currentPageIndex].elements.forEach(element => {
-                const elementBox = getElementBoundingBox(element);
-                if(!elementBox || (lassoBox && !boxesIntersect(lassoBox, elementBox))) return;
-                
-                if (
-  isPathElement(element)
-    ? element.points.some(p => isPointInPolygon(p, lassoPolygon))
-    : hasPosition(element) && isPointInPolygon({ x: element.x, y: element.y }, lassoPolygon)
-) {
-  newSelectedIds.add(element.id);
-}
 
-            if (newSelectedIds.size > 0) {
-                 setPages(currentPages => {
-                    const newPages = [...currentPages];
-                    newPages[currentPageIndex] = { ...newPages[currentPageIndex], selectedElementIds: newSelectedIds };
-                    return newPages;
-                });
+    if (opState.lassoPath.length > 2) {
+
+        const newSelectedIds = new Set<string>();
+        const lassoPolygon = opState.lassoPath;
+
+        const lassoBox = getElementBoundingBox({
+            type: 'path',
+            id: '',
+            points: lassoPolygon,
+            color: '',
+            lineWidth: 1
+        });
+
+        pages[currentPageIndex].elements.forEach(element => {
+
+            const elementBox = getElementBoundingBox(element);
+
+            if (!elementBox || (lassoBox && !boxesIntersect(lassoBox, elementBox))) return;
+
+            if (
+                isPathElement(element)
+                    ? element.points.some(p => isPointInPolygon(p, lassoPolygon))
+                    : hasPosition(element) && isPointInPolygon({ x: element.x, y: element.y }, lassoPolygon)
+            ) {
+                newSelectedIds.add(element.id);
+            }
+
+        });   // ✅ CLOSE forEach
+
+        if (newSelectedIds.size > 0) {
+
+            setPages(currentPages => {
+                const newPages = [...currentPages];
+                newPages[currentPageIndex] = {
+                    ...newPages[currentPageIndex],
+                    selectedElementIds: newSelectedIds
+                };
+                return newPages;
+            });
+
+            setActiveTool('select');
+
+        }
+
+    }   // ✅ CLOSE lassoPath check
+}       // ✅ CLOSE lassoing block
+
+else if (opState.type === 'dragging') {
                 setActiveTool('select');
             
     } else if (opState.type === 'dragging') {
