@@ -790,7 +790,7 @@ newPages[currentPageIndex] = updatedPage;
                     return newPages;
                 });
                 setActiveTool('select');
-            }
+            
     } else if (opState.type === 'dragging') {
         const { startPos, originalElements } = opState;
         const pos = getPointerPosition(event);
