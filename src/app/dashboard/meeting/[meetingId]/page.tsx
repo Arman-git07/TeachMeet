@@ -107,7 +107,8 @@ function MeetingPageContent() {
   const { user, loading: authLoading } = useAuth();
   const { rtc, setRtc, isRecording, isUploading, recordingControls, isSaveRecordingDialogOpen, setIsSaveRecordingDialogOpen } = useMeetingRTC();
   
-  const meetingId = params?.meetingId ?? "";
+  const meetingIdParam = params?.meetingId ?? "";
+const meetingId = Array.isArray(meetingIdParam) ? meetingIdParam[0] : meetingIdParam;
 const topic = searchParams?.get('topic') ?? "TeachMeet Meeting";
   const [isHost, setIsHost] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -150,22 +151,28 @@ const topic = searchParams?.get('topic') ?? "TeachMeet Meeting";
         }
     }
   
-    if (isHost && endForAll) {
-      try {
-        const meetingRef = doc(db, "meetings", meetingId);
-        await updateDoc(meetingRef, { status: 'ended' });
-      } catch (error) {
-        console.error("Error ending meeting for all:", error);
-        toast({ variant: "destructive", title: "Error", description: "Could not end meeting for all participants." });
-      }
-    } else {
-      const participantRef = doc(db, "meetings", meetingId, "participants", user.uid);
-      try {
-        await deleteDoc(participantRef);
-      } catch (error) {
-        console.error("Error removing participant on leave:", error);
-      }
-    }
+    const meetingIdStr = Array.isArray(meetingId) ? meetingId[0] : meetingId;
+
+if (isHost && endForAll) {
+  try {
+    const meetingRef = doc(db, "meetings", meetingIdStr);
+    await updateDoc(meetingRef, { status: "ended" });
+  } catch (error) {
+    console.error("Error ending meeting for all:", error);
+    toast({
+      variant: "destructive",
+      title: "Error",
+      description: "Could not end meeting for all participants.",
+    });
+  }
+} else {
+  const participantRef = doc(db, "meetings", meetingIdStr, "participants", user.uid);
+  try {
+    await deleteDoc(participantRef);
+  } catch (error) {
+    console.error("Error removing participant on leave:", error);
+  }
+}
   
     // Flag that we just left a meeting to show the review prompt on the home page
     if (typeof window !== 'undefined') {
