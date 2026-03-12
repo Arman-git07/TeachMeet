@@ -748,9 +748,11 @@ newPages[currentPageIndex] = updatedPage;
              setPages(currentPages => {
                  const newPages = [...currentPages];
                  const currentPage = newPages[currentPageIndex];
-                 const newElements = [...currentPage.elements, newShape];
-                 const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set() };
-                 newPages[currentPageIndex] = updatedPage;
+                 const updatedPage = {
+  ...currentPage,
+  elements: newElements,
+  selectedElementIds: new Set<string>()
+};
                  pushToHistory(currentPageIndex, updatedPage);
                  return newPages;
              });
