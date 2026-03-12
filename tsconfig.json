@@ -7,6 +7,10 @@
     "strict": false,
     "strictNullChecks": false,
     "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
