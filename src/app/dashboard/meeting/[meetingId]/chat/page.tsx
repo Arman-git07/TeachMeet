@@ -38,9 +38,9 @@ export default function MeetingChatPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const topic = searchParams.get('topic') || "Meeting Chat";
+const searchParams = useSearchParams();
 
+const topic = searchParams?.get('topic') ?? "Meeting Chat";
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isSending, setIsSending] = useState(false);
