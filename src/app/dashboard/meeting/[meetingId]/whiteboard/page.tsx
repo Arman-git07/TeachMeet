@@ -814,10 +814,7 @@ newPages[currentPageIndex] = updatedPage;
     }   // ✅ CLOSE lassoPath check
 }       // ✅ CLOSE lassoing block
 
-else if (opState.type === 'dragging') {
-                setActiveTool('select');
-            
-    } else if (opState.type === 'dragging') {
+ else if (opState.type === 'dragging') {
         const { startPos, originalElements } = opState;
         const pos = getPointerPosition(event);
         const dx = pos.x - startPos.x;
