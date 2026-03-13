@@ -1000,23 +1000,23 @@ newPages[currentPageIndex] = updatedPage;
       return;
     }
   
-    const recognitionToastId = toast({
+    const recognitionToast = toast({
   title: "Refining Shape...",
   description: "The AI is analyzing your drawing. This might take a moment.",
   duration: Infinity,
 });
-  
-    const PADDING = 20;
-    const width = selectionBox.maxX - selectionBox.minX + PADDING * 2;
-    const height = selectionBox.maxY - selectionBox.minY + PADDING * 2;
-  
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = width;
-    tempCanvas.height = height;
-    const tempCtx = tempCanvas.getContext('2d');
+
+const PADDING = 20;
+const width = selectionBox.maxX - selectionBox.minX + PADDING * 2;
+const height = selectionBox.maxY - selectionBox.minY + PADDING * 2;
+
+const tempCanvas = document.createElement('canvas');
+tempCanvas.width = width;
+tempCanvas.height = height;
+const tempCtx = tempCanvas.getContext('2d');
 
 if (!tempCtx) {
-  toast.dismiss(recognitionToastId);
+  recognitionToast.dismiss();
 
   toast({
     variant: "destructive",
