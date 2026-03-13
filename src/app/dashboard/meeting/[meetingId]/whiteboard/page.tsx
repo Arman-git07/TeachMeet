@@ -1002,11 +1002,11 @@ newPages[currentPageIndex] = updatedPage;
   
     const recognitionToastId = `recognize-${Date.now()}`;
     toast({
-      id: recognitionToastId,
-      title: "Refining Shape...",
-      description: "The AI is analyzing your drawing. This might take a moment.",
-      duration: Infinity,
-    });
+      const recognitionToastId = toast({
+  title: "Refining Shape...",
+  description: "The AI is analyzing your drawing. This might take a moment.",
+  duration: Infinity,
+})
   
     const PADDING = 20;
     const width = selectionBox.maxX - selectionBox.minX + PADDING * 2;
