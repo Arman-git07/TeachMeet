@@ -1014,11 +1014,19 @@ newPages[currentPageIndex] = updatedPage;
     tempCanvas.width = width;
     tempCanvas.height = height;
     const tempCtx = tempCanvas.getContext('2d');
-    if (!tempCtx) {
-      toast.update(recognitionToastId, { variant: "destructive", title: "Canvas Error", description: "Could not create temporary canvas for recognition." });
-      setRefinePrompt(''); 
-      return;
-    }
+
+if (!tempCtx) {
+  toast.dismiss(recognitionToastId);
+
+  toast({
+    variant: "destructive",
+    title: "Canvas Error",
+    description: "Could not create temporary canvas for recognition."
+  });
+
+  setRefinePrompt('');
+  return;
+}
   
     tempCtx.fillStyle = 'white';
     tempCtx.fillRect(0, 0, width, height);
