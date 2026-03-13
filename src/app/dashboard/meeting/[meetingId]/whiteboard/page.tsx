@@ -878,8 +878,13 @@ newPages[currentPageIndex] = updatedPage;
                 const newPages = [...currentPages];
                 const currentPage = newPages[currentPageIndex];
                 const newElements = currentPage.elements.filter(el => el.id !== idToDelete);
-                const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set() };
-                newPages[currentPageIndex] = updatedPage;
+                const updatedPage: ElementState = {
+    ...currentPage,
+    elements: newElements,
+    selectedElementIds: new Set<string>(currentPage.selectedElementIds)
+};
+
+newPages[currentPageIndex] = updatedPage;
                 pushToHistory(currentPageIndex, updatedPage);
                 return newPages;
             });
