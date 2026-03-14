@@ -1182,7 +1182,7 @@ toast({
           createdAt: serverTimestamp(),
       });
       
-      toast({ id: toastId, title: "Screenshot Captured!", description: "Saved to your Private Documents." });
+      toast({ title: "Screenshot Captured!", description: "Saved to your Private Documents." });
 
     } catch (error) {
       console.error("Screenshot failed:", error);
