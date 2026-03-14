@@ -117,32 +117,55 @@ export function Assignments() {
     }, [canUserManage, user, classroomId, toast, assignmentForm]);
 
     const handleStudentSubmission = useCallback(async (file: File, assignmentId: string) => {
-        if (!user || !classroomId) return;
-        
-        setIsProcessing(`submitting-${assignmentId}`);
-        const isUpdate = submissions.some(s => s.assignmentId === assignmentId && s.studentId === user.uid);
-        const toastId = `sub-${Date.now()}`;
-        toast({ id: toastId, title: isUpdate ? "Updating Submission..." : "Submitting Work..." });
+    if (!user || !classroomId) return;
+    
+    setIsProcessing(`submitting-${assignmentId}`);
+    const isUpdate = submissions.some(
+        s => s.assignmentId === assignmentId && s.studentId === user.uid
+    );
 
-        try {
-            const fileRef = storageRef(storage, `classrooms/${classroomId}/assignments/${assignmentId}/submissions/${user.uid}-${file.name}`);
-            const url = await getDownloadURL(await uploadBytes(fileRef, file).then(s => s.ref));
-            await setDoc(doc(db, "classrooms", classroomId, "assignments", assignmentId, "submissions", user.uid), {
-                studentId: user.uid, 
-                studentName: user.displayName || 'Student', 
-                submittedAt: serverTimestamp(), 
-                submissionUrl: url, 
-                grade: null, 
+    toast({
+        title: isUpdate ? "Updating Submission..." : "Submitting Work..."
+    });
+
+    try {
+        const fileRef = storageRef(
+            storage,
+            `classrooms/${classroomId}/assignments/${assignmentId}/submissions/${user.uid}-${file.name}`
+        );
+
+        const snapshot = await uploadBytes(fileRef, file);
+        const url = await getDownloadURL(snapshot.ref);
+
+        await setDoc(
+            doc(db, "classrooms", classroomId, "assignments", assignmentId, "submissions", user.uid),
+            {
+                studentId: user.uid,
+                studentName: user.displayName || "Student",
+                submittedAt: serverTimestamp(),
+                submissionUrl: url,
+                grade: null,
                 feedback: null,
                 assignmentId: assignmentId
-            });
-            toast.update(toastId, { title: isUpdate ? "Submission Updated!" : "Submitted Successfully!" });
-        } catch (error) {
-            toast.update(toastId, { variant: 'destructive', title: "Action Failed" });
-        } finally {
-            setIsProcessing(null);
-        }
-    }, [classroomId, user, submissions, toast]);
+            }
+        );
+
+        toast({
+            title: isUpdate ? "Submission Updated!" : "Submitted Successfully!"
+        });
+
+    } catch (error) {
+
+        toast({
+            variant: "destructive",
+            title: "Action Failed",
+            description: "Unable to submit assignment."
+        });
+
+    } finally {
+        setIsProcessing(null);
+    }
+}, [classroomId, user, submissions, toast]);
 
     const handleDelete = useCallback(async (item: Assignment) => {
         if (!classroomId) return;
