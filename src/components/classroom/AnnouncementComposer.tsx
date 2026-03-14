@@ -137,8 +137,11 @@ export default function AnnouncementComposer({
           (snapshot) => {
             const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
              if (toastHandle.update) {
-                toastHandle.update({ description: `Uploading audio... ${Math.round(progress)}%` });
-            }
+                toastHandle.update({
+  id: toastHandle.id,
+  description: `Uploading audio... ${Math.round(progress)}%`
+});
+             }
           },
           (error) => {
             // This is the error handler for the upload task itself
