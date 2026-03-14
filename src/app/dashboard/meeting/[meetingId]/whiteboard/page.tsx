@@ -1086,19 +1086,32 @@ if (!tempCtx) {
           return newPages;
         });
   
-        toast.update(recognitionToastId, { title: "Shape Refined!", description: "Your drawing has been transformed." });
+        recognitionToast.dismiss();
+
+toast({
+  title: "Shape Refined!",
+  description: "Your drawing has been transformed."
+}); 
       };
       newImg.onerror = () => {
-        toast.update(recognitionToastId, { variant: "destructive", title: "Image Load Error", description: "The AI generated an image that could not be loaded." });
+        recognitionToast.dismiss();
+
+toast({
+  variant: "destructive",
+  title: "Image Load Error",
+  description: "The AI generated an image that could not be loaded."
+});
       };
       newImg.src = result.refinedImageUri;
     } catch (error) {
       console.error("Shape recognition failed:", error);
-      toast.update(recognitionToastId, {
-        variant: "destructive",
-        title: "Refinement Failed",
-        description: error instanceof Error ? error.message : "An unknown error occurred.",
-      });
+      recognitionToast.dismiss();
+
+toast({
+  variant: "destructive",
+  title: "Refinement Failed",
+  description: error instanceof Error ? error.message : "An unknown error occurred.",
+});
     } finally {
         setRefinePrompt(''); 
     }
