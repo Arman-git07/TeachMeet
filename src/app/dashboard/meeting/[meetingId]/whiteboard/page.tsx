@@ -1122,7 +1122,7 @@ toast({
     setIsProcessing(true);
     
     const toastId = `screenshot-cap-${Date.now()}`;
-    toast({ id: toastId, title: "Capturing Screenshot...", description: "Compositing drawing and text layers..." });
+    toast({  title: "Capturing Screenshot...", description: "Compositing drawing and text layers..." });
 
     try {
       const mainCanvas = mainCanvasRef.current;
