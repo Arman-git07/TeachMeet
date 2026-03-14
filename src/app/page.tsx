@@ -516,9 +516,9 @@ export default function HomePage() {
     }));
     
     const combined = [...ongoingMeetings, ...firestoreActivity]
-        .filter(item => item && !dismissed.includes(item.id))
-        .sort((a,b) => (b.updatedAt || b.timestamp) - (a.updatedAt || a.timestamp)); 
-
+    .filter(item => item && !dismissed.includes(item.id))
+    .sort((a,b) => (b.updatedAt || b.timestamp) - (a.updatedAt || a.timestamp));
+    
     const unique = combined.reduce((acc: ActivityItem[], current) => {
         const currentCompareId = current.type === 'meeting' 
             ? (current.id.startsWith('meeting-') ? current.id : `meeting-${current.id}`)
