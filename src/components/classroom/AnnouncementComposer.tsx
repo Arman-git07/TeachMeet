@@ -122,7 +122,7 @@ export default function AnnouncementComposer({
     }
 
     setLoading(true);
-    const toastHandle = toast({ id: `announcement-post-${Date.now()}`, title: "Posting Announcement...", duration: Infinity });
+    const toastHandle = toast({ title: "Posting Announcement...", duration: Infinity });
     
     try {
       let audioUrl: string | null = null;
