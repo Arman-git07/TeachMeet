@@ -516,8 +516,12 @@ export default function HomePage() {
     }));
     
     const combined = [...ongoingMeetings, ...firestoreActivity]
-    .filter(item => item && !dismissed.includes(item.id))
-    .sort((a,b) => (b.updatedAt || b.timestamp) - (a.updatedAt || a.timestamp));
+  .filter(item => item && !dismissed.includes(item.id))
+  .sort((a, b) => {
+    const timeA = 'updatedAt' in a ? Number(a.updatedAt) : Number((a as any).timestamp || 0);
+    const timeB = 'updatedAt' in b ? Number(b.updatedAt) : Number((b as any).timestamp || 0);
+    return timeB - timeA;
+  });
     
     const unique = combined.reduce((acc: ActivityItem[], current) => {
         const currentCompareId = current.type === 'meeting' 
