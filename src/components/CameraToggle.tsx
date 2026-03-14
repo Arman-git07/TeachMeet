@@ -15,14 +15,13 @@ const CameraToggle = React.forwardRef<HTMLButtonElement, CameraToggleProps>(
   ({ isCameraOn, onToggle, className }, ref) => {
     return (
       <ControlButton
-        label={isCameraOn ? "Stop Camera" : "Start Camera"}
-        onClick={onToggle}
-        className={cn(
-          !isCameraOn && "bg-destructive hover:bg-destructive/90",
-          className
-        )}
-        ref={ref}
-      >
+  onClick={onToggle}
+  className={cn(
+    !isCameraOn && "bg-destructive hover:bg-destructive/90",
+    className
+  )}
+  ref={ref}
+>
         {isCameraOn ? (
           <Video className="h-6 w-6" />
         ) : (
