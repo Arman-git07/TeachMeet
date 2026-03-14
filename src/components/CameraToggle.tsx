@@ -20,7 +20,6 @@ const CameraToggle = React.forwardRef<HTMLButtonElement, CameraToggleProps>(
     !isCameraOn && "bg-destructive hover:bg-destructive/90",
     className
   )}
-  ref={ref}
 >
         {isCameraOn ? (
           <Video className="h-6 w-6" />
