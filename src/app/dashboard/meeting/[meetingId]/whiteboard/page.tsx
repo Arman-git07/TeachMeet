@@ -1198,9 +1198,9 @@ toast({
     setIsProcessing(true);
     setIsPagesPopoverOpen(false);
 
-    const exportToastId = `export-${Date.now()}`;
+    
     toast({
-        id: exportToastId,
+        
         title: "Exporting to PDF...",
         description: "Please wait while your whiteboard is being converted.",
         duration: Infinity
@@ -1209,7 +1209,7 @@ toast({
     const offscreenCanvas = document.createElement('canvas');
     const mainCanvas = mainCanvasRef.current;
     if (!mainCanvas) {
-        toast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: "Canvas element not found." });
+        toast({ variant: "destructive", title: "Export Failed", description: "Canvas element not found." });
         setIsProcessing(false);
         return;
     }
@@ -1218,7 +1218,7 @@ toast({
     offscreenCanvas.height = mainCanvas.height;
     const offscreenCtx = offscreenCanvas.getContext('2d');
     if (!offscreenCtx) {
-        toast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: "Could not create offscreen canvas context." });
+        toast({ variant: "destructive", title: "Export Failed", description: "Could not create offscreen canvas context." });
         setIsProcessing(false);
         return;
     }
@@ -1231,7 +1231,7 @@ toast({
 
     try {
         for (let i = 0; i < pages.length; i++) {
-            toast({ id: exportToastId, title: "Exporting to PDF...", description: `Processing page ${i + 1} of ${pages.length}...` });
+            toast({  title: "Exporting to PDF...", description: `Processing page ${i + 1} of ${pages.length}...` });
             
             offscreenCtx.fillStyle = bgColor;
             offscreenCtx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
@@ -1269,11 +1269,11 @@ toast({
             createdAt: serverTimestamp(),
         });
 
-        toast({ id: exportToastId, title: "Export Successful!", description: `Your whiteboard has been saved to your ${destination} documents.` });
+        toast({  title: "Export Successful!", description: `Your whiteboard has been saved to your ${destination} documents.` });
         
     } catch (error) {
         console.error("PDF Export or Upload Failed:", error);
-        toast({ id: exportToastId, variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred during export." });
+        toast({ variant: "destructive", title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred during export." });
     } finally {
         setIsProcessing(false);
     }
