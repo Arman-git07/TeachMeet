@@ -1186,7 +1186,7 @@ toast({
 
     } catch (error) {
       console.error("Screenshot failed:", error);
-      toast({ id: toastId, variant: "destructive", title: "Capture Failed", description: error instanceof Error ? error.message : "An unexpected error occurred." });
+      toast({  variant: "destructive", title: "Capture Failed", description: error instanceof Error ? error.message : "An unexpected error occurred." });
     } finally {
       setIsProcessing(false);
     }
