@@ -205,7 +205,7 @@ export function Exams() {
                 operation: 'update',
                 requestResourceData: updateData
             });
-            errorEmitter.emit('permission-error', pError);
+            errorEmitter.emit('permission-error', pError[0]);
         } finally {
             setIsSubmitting(false);
         }
