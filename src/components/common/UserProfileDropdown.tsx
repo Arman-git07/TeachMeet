@@ -97,7 +97,7 @@ export function UserProfileDropdown() {
       setIsUploading(true);
       const toastId = `upload-avatar-${Date.now()}`;
       toast({ 
-        id: toastId,
+        
         title: "Uploading Avatar...",
         description: (
           <div className="flex items-center">
@@ -116,7 +116,7 @@ export function UserProfileDropdown() {
         (snapshot: UploadTaskSnapshot) => {
           const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           toast({
-            id: toastId,
+          
             title: "Uploading Avatar...",
             description: (
               <div className="flex items-center">
@@ -130,7 +130,7 @@ export function UserProfileDropdown() {
         (error) => {
           console.error("Avatar Upload Error:", error);
           toast({
-            id: toastId,
+            
             variant: "destructive",
             title: "Upload Failed",
             description: "Could not upload your avatar. Please try again.",
@@ -143,7 +143,7 @@ export function UserProfileDropdown() {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             await updateProfile(auth.currentUser!, { photoURL: downloadURL });
             toast({
-              id: toastId,
+            
               title: "Avatar Uploaded!",
               description: "Your new avatar has been set.",
               duration: 5000,
@@ -152,7 +152,7 @@ export function UserProfileDropdown() {
           } catch (error) {
             console.error("Error setting avatar URL:", error);
             toast({
-              id: toastId,
+              
               variant: "destructive",
               title: "Update Failed",
               description: "Could not update your profile with the new avatar.",
