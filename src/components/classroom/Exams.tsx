@@ -210,7 +210,7 @@ export function Exams() {
             setIsSubmitting(false);
         }
     };
-
+ 
     const handleOpenResults = async (sub: any, examId: string) => {
         setActiveResult({ sub, examId });
         if (user && sub.studentId === user.uid && !sub.seenAt && (sub.grade != null || sub.percentage != null)) {
