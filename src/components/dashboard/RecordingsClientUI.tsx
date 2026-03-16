@@ -131,7 +131,7 @@ export function RecordingsClientUI() {
     
     setIsUploading(true);
     const toastId = `upload-rec-${Date.now()}`;
-    toast({ id: toastId, title: "Uploading Recording...", description: `Uploading ${file.name}...`, duration: Infinity });
+    toast({ title: "Uploading Recording...", description: `Uploading ${file.name}...`, duration: Infinity });
 
     const storagePath = `recordings/${currentUser.uid}/${destination}/${Date.now()}-${file.name}`;
     const fileRef = storageRef(storage, storagePath);
