@@ -114,7 +114,7 @@ export function DocumentsClientUI() {
     
     setIsUploading(true);
     const toastId = `upload-${Date.now()}`;
-    toast({ id: toastId, title: "Uploading Document...", description: `Uploading ${file.name}...`, duration: Infinity });
+    toast({  title: "Uploading Document...", description: `Uploading ${file.name}...`, duration: Infinity });
 
     const storagePath = `documents/${currentUser.uid}/${destination}/${Date.now()}-${file.name}`;
     const fileRef = storageRef(storage, storagePath);
@@ -132,9 +132,9 @@ export function DocumentsClientUI() {
             storagePath,
             createdAt: serverTimestamp(),
           });
-          toast.update(toastId, { title: "Document Uploaded!", description: `${file.name} is now available.` });
+          toast( { title: "Document Uploaded!", description: `${file.name} is now available.` });
         } catch (dbError) {
-          toast.update(toastId, { variant: "destructive", title: "Save Failed", description: "Could not save document details to the database." });
+          toast({ variant: "destructive", title: "Save Failed", description: "Could not save document details to the database." });
         } finally {
             if (event.target) event.target.value = "";
             setIsUploading(false);
@@ -147,7 +147,7 @@ export function DocumentsClientUI() {
            title = "API Key Configuration Error";
            description = "Could not connect to Firebase. Please check your API key configuration.";
         }
-        toast.update(toastId, { variant: 'destructive', title, description, duration: 9000 });
+        toast( { variant: 'destructive', title, description, duration: 9000 });
         setIsUploading(false);
     });
 
