@@ -105,7 +105,7 @@ export function Assignments() {
             setIsDialogOpen(false);
             assignmentForm.reset();
         } catch (error) {
-            toast.update(toastId, { variant: 'destructive', title: "Creation Failed" });
+            toast({ variant: 'destructive', title: "Creation Failed" });
         }
     }, [canUserManage, user, classroomId, toast, assignmentForm]);
 
