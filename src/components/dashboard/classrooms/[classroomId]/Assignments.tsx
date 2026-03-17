@@ -98,7 +98,7 @@ export function Assignments() {
                 creatorId: user.uid,
                 uploaderId: user.uid,
                 createdAt: serverTimestamp(),
-                storagePath: path,
+                 storagePath: path,
             });
 
             toast( { title: "Assignment Created!" });
