@@ -124,9 +124,9 @@ export function Assignments() {
             await setDoc(doc(db, "classrooms", classroomId, "assignments", assignmentId, "submissions", user.uid), {
                 studentId: user.uid, studentName: user.displayName || 'Student', submittedAt: serverTimestamp(), submissionUrl, grade: null, feedback: null
             });
-            toast.update(submissionToastId, { title: "Submission Successful!" });
+            toast( { title: "Submission Successful!" });
         } catch (error) {
-            toast.update(submissionToastId, { variant: 'destructive', title: "Submission Failed" });
+            toast( { variant: 'destructive', title: "Submission Failed" });
         }
     }, [classroomId, user, toast]);
 
