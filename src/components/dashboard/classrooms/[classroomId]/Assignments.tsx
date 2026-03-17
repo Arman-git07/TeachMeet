@@ -84,7 +84,7 @@ export function Assignments() {
         if (!answerKeyFile) return;
 
         const toastId = `assignment-upload-${Date.now()}`;
-        toast({ id: toastId, title: "Creating Assignment...", description: "Please wait." });
+        toast({  title: "Creating Assignment...", description: "Please wait." });
         try {
             const path = `classrooms/${classroomId}/assignments/${Date.now()}-${answerKeyFile.name}`;
             const fileRef = storageRef(storage, path);
@@ -101,7 +101,7 @@ export function Assignments() {
                 storagePath: path,
             });
 
-            toast.update(toastId, { title: "Assignment Created!" });
+            toast( { title: "Assignment Created!" });
             setIsDialogOpen(false);
             assignmentForm.reset();
         } catch (error) {
@@ -117,7 +117,7 @@ export function Assignments() {
         if (!submissionFile) return;
 
         const submissionToastId = `submission-${Date.now()}`;
-        toast({ id: submissionToastId, title: "Submitting..." });
+        toast({ title: "Submitting..." });
         try {
             const fileRef = storageRef(storage, `classrooms/${classroomId}/assignments/${assignmentId}/submissions/${user.uid}-${submissionFile.name}`);
             const submissionUrl = await getDownloadURL(await uploadBytes(fileRef, submissionFile).then(s => s.ref));
