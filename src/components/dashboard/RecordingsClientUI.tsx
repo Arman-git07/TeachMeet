@@ -166,7 +166,7 @@ export function RecordingsClientUI() {
            title = "API Key Configuration Error";
            description = "Could not connect to Firebase. Please check your API key configuration.";
         }
-        toast.update(toastId, { variant: 'destructive', title, description, duration: 9000 });
+        toast( { variant: 'destructive', title, description, duration: 9000 });
         setIsUploading(false);
     });
   }, [currentUser, toast]);
