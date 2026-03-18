@@ -466,14 +466,21 @@ export default function WhiteboardPage() {
     const newTextElement: TextElement = { type: 'text', id: `text_${Date.now()}`, text: textInput.value, x: opState.position.x, y: opState.position.y, color: selectedColor, font, width: maxWidth, height: totalHeight };
     
     setPages(currentPages => {
-        const newPages = [...currentPages];
-        const currentPage = newPages[currentPageIndex];
-        const newElements = [...currentPage.elements, newTextElement];
-        const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set<string>();
-        newPages[currentPageIndex] = updatedPage;
-        pushToHistory(currentPageIndex, updatedPage);
-        return newPages;
-    });
+    const newPages = [...currentPages];
+    const currentPage = newPages[currentPageIndex];
+    const newElements = [...currentPage.elements, newTextElement];
+
+    const updatedPage = { 
+        ...currentPage, 
+        elements: newElements, 
+        selectedElementIds: new Set<string>() // ✅ fixed
+    };
+
+    newPages[currentPageIndex] = updatedPage;
+    pushToHistory(currentPageIndex, updatedPage);
+
+    return newPages;
+});
 
     textInput.value = '';
     textInput.style.display = 'none';
