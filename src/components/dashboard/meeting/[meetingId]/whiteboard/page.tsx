@@ -642,15 +642,24 @@ export default function WhiteboardPage() {
     
     if (opState.type === 'drawing' && opState.currentPath.length > 1) {
         const newPath: PathElement = { type: 'path', id: `path_${Date.now()}`, points: opState.currentPath, color: selectedColor, lineWidth };
-        setPages(currentPages => {
-            const newPages = [...currentPages];
-            const currentPage = newPages[currentPageIndex];
-            const newElements = [...currentPage.elements, newPath];
-            const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set<string>()
-            newPages[currentPageIndex] = updatedPage;
-            pushToHistory(currentPageIndex, updatedPage);
-            return newPages;
-        });
+        setPages((currentPages) => {
+    const newPages = [...currentPages];
+    const currentPage = newPages[currentPageIndex];
+
+    const newElements = [...currentPage.elements, newPath];
+
+    const updatedPage = { 
+        ...currentPage, 
+        elements: newElements, 
+        selectedElementIds: new Set<string>()
+    };
+
+    newPages[currentPageIndex] = updatedPage;
+
+    pushToHistory(currentPageIndex, updatedPage);
+
+    return newPages; // ✅ VERY IMPORTANT
+});
     } else if (opState.type === 'shaping') {
         const { startPoint, currentPoint } = opState;
         if (Math.hypot(currentPoint.x - startPoint.x, currentPoint.y - startPoint.y) > 2) {
