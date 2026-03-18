@@ -646,7 +646,7 @@ export default function WhiteboardPage() {
             const newPages = [...currentPages];
             const currentPage = newPages[currentPageIndex];
             const newElements = [...currentPage.elements, newPath];
-            const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set() };
+            const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set<string>()
             newPages[currentPageIndex] = updatedPage;
             pushToHistory(currentPageIndex, updatedPage);
             return newPages;
