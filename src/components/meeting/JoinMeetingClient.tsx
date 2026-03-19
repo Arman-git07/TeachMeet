@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { LinkIcon, Loader2 } from "lucide-react";
-import { doc, getDoc, collection, getDocs, limit } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, limit, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 
