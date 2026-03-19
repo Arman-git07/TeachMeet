@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
-import type { MeshRTC } from '@/lib/webrtc/mesh';
+import { MeshRTC } from '@/lib/webrtc/mesh';
 
 export type ChatMessage = {
   id: string;
