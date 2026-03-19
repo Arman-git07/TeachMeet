@@ -72,13 +72,15 @@ useEffect(() => {
   };
 
   const rtcInstance = new MeshRTC({
-    onData: handleData
-  } as MeshRTCOptions);
+  roomId: meetingId,
+  userId: currentUser.uid,
+  onRemoteStream: (userId, stream) => {
+    console.log("Remote stream:", userId);
+  },
+  onData: handleData
+} as any);
 
-  return () => {
-    // no cleanup needed
-  };
-}, []);
+return () => {};
 const addChatMessage = (message: ChatMessage) => {
   setChatHistory((prev) => [...prev, message]);
 
