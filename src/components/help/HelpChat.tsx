@@ -158,7 +158,7 @@ const HelpChatComponent = forwardRef<HelpChatRef, {}>((props, ref) => {
                 }`}>
                   <p className="whitespace-pre-wrap">{msg.text}</p>
                   {msg.sender !== 'system' && <p className="text-xs opacity-70 mt-1 text-right">{msg.timestamp.toLocaleTimeString()}</p>}
-                }
+                
 
                 {msg.sender !== 'system' && msg.sender !== 'user' && (
                   <p className="text-xs opacity-70 mt-1 text-right">{msg.timestamp.toLocaleTimeString()}</p>
