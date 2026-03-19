@@ -69,7 +69,7 @@ useEffect(() => {
     }
   };
 
-rtc.on("data", handleData);
+rtc.onData = handleData;
 
 return () => {
   rtc.off("data", handleData);
