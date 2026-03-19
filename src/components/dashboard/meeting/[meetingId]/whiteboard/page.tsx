@@ -1124,7 +1124,7 @@ export default function WhiteboardPage() {
 
     try {
         for (let i = 0; i < pages.length; i++) {
-            toast({ id: exportToastId, title: "Exporting to PDF...", description: `Processing page ${i + 1} of ${pages.length}...` });
+            toast({  title: "Exporting to PDF...", description: `Processing page ${i + 1} of ${pages.length}...` });
             
             offscreenCtx.fillStyle = bgColor;
             offscreenCtx.fillRect(0, 0, offscreenCanvas.width, offscreenCanvas.height);
