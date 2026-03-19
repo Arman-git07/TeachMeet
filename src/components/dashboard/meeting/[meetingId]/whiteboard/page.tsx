@@ -664,15 +664,23 @@ export default function WhiteboardPage() {
         const { startPoint, currentPoint } = opState;
         if (Math.hypot(currentPoint.x - startPoint.x, currentPoint.y - startPoint.y) > 2) {
              const newShape: ShapeElement = { type: 'shape', id: `shape_${Date.now()}`, shapeType: selectedShape, x1: startPoint.x, y1: startPoint.y, x2: currentPoint.x, y2: currentPoint.y, color: selectedColor, lineWidth };
-             setPages(currentPages => {
-                 const newPages = [...currentPages];
-                 const currentPage = newPages[currentPageIndex];
-                 const newElements = [...currentPage.elements, newShape];
-                 const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set<string>()
-                 newPages[currentPageIndex] = updatedPage;
-                 pushToHistory(currentPageIndex, updatedPage);
-                 return newPages;
-             });
+             setPages((currentPages) => {
+    const newPages = [...currentPages];
+    const currentPage = newPages[currentPageIndex];
+
+    const newElements = [...currentPage.elements, newShape];
+
+    const updatedPage = { 
+        ...currentPage, 
+        elements: newElements, 
+        selectedElementIds: new Set<string>() 
+    };
+
+    newPages[currentPageIndex] = updatedPage;
+    pushToHistory(currentPageIndex, updatedPage);
+
+    return newPages;
+});
         }
     } else if (opState.type === 'lassoing') {
         if (opState.lassoPath.length > 2) {
