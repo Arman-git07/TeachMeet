@@ -817,7 +817,7 @@ export default function WhiteboardPage() {
   }, [getPointerPosition, selectedColor, lineWidth, pages, currentPageIndex, activeTool, pushToHistory, selectedShape]);
 
   const handleClearPage = () => { 
-    const clearedPage: ElementState = { elements: [], selectedElementIds: new Set<string>()
+    const clearedPage: ElementState = { elements: [], selectedElementIds: new Set<string>()};
     setPages(currentPages => {
         const newPages = [...currentPages];
         newPages[currentPageIndex] = clearedPage;
