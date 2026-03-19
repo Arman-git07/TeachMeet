@@ -131,7 +131,7 @@ export function RecordingsClientUI() {
     
     setIsUploading(true);
     const toastId = `upload-rec-${Date.now()}`;
-    toast({ id: toastId, title: "Uploading Recording...", description: `Uploading ${file.name}...`, duration: Infinity });
+    toast({ title: "Uploading Recording...", description: `Uploading ${file.name}...`, duration: Infinity });
 
     const storagePath = `recordings/${currentUser.uid}/${destination}/${Date.now()}-${file.name}`;
     const fileRef = storageRef(storage, storagePath);
@@ -151,9 +151,9 @@ export function RecordingsClientUI() {
             createdAt: serverTimestamp(),
             thumbnailUrl: `https://placehold.co/300x180.png?text=New`,
           });
-          toast.update(toastId, { title: "Recording Uploaded!", description: `${file.name} is now available.` });
+          toast({ title: "Recording Uploaded!", description: `${file.name} is now available.` });
         } catch (dbError) {
-          toast.update(toastId, { variant: "destructive", title: "Save Failed", description: "Could not save recording details." });
+          toast({ variant: "destructive", title: "Save Failed", description: "Could not save recording details." });
         } finally {
             if (event.target) event.target.value = "";
             setIsUploading(false);
@@ -166,7 +166,7 @@ export function RecordingsClientUI() {
            title = "API Key Configuration Error";
            description = "Could not connect to Firebase. Please check your API key configuration.";
         }
-        toast.update(toastId, { variant: 'destructive', title, description, duration: 9000 });
+        toast({ variant: 'destructive', title, description, duration: 9000 });
         setIsUploading(false);
     });
   }, [currentUser, toast]);
