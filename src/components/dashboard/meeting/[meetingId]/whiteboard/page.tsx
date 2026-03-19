@@ -791,14 +791,22 @@ export default function WhiteboardPage() {
         if (elementToDeleteId) {
             const idToDelete = elementToDeleteId;
             setPages(currentPages => {
-                const newPages = [...currentPages];
-                const currentPage = newPages[currentPageIndex];
-                const newElements = currentPage.elements.filter(el => el.id !== idToDelete);
-                const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set<string>()
-                newPages[currentPageIndex] = updatedPage;
-                pushToHistory(currentPageIndex, updatedPage);
-                return newPages;
-            });
+    const newPages = [...currentPages];
+    const currentPage = newPages[currentPageIndex];
+    const newElements = currentPage.elements.filter(el => el.id !== idToDelete);
+
+    const updatedPage = {
+        ...currentPage,
+        elements: newElements,
+        selectedElementIds: new Set<string>()
+    };
+
+    newPages[currentPageIndex] = updatedPage;
+
+    pushToHistory(currentPageIndex, updatedPage);
+
+    return newPages; // ✅ THIS WAS MISSING
+});
         }
     }
 
