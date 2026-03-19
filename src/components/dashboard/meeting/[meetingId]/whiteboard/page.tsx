@@ -794,7 +794,7 @@ export default function WhiteboardPage() {
                 const newPages = [...currentPages];
                 const currentPage = newPages[currentPageIndex];
                 const newElements = currentPage.elements.filter(el => el.id !== idToDelete);
-                const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set() };
+                const updatedPage = { ...currentPage, elements: newElements, selectedElementIds: new Set<string>()
                 newPages[currentPageIndex] = updatedPage;
                 pushToHistory(currentPageIndex, updatedPage);
                 return newPages;
@@ -809,7 +809,7 @@ export default function WhiteboardPage() {
   }, [getPointerPosition, selectedColor, lineWidth, pages, currentPageIndex, activeTool, pushToHistory, selectedShape]);
 
   const handleClearPage = () => { 
-    const clearedPage: ElementState = { elements: [], selectedElementIds: new Set() };
+    const clearedPage: ElementState = { elements: [], selectedElementIds: new Set<string>()
     setPages(currentPages => {
         const newPages = [...currentPages];
         newPages[currentPageIndex] = clearedPage;
@@ -867,7 +867,7 @@ export default function WhiteboardPage() {
         finalizeLiveText();
         setPages(currentPages => {
             const newPages = [...currentPages];
-            newPages[currentPageIndex] = { ...newPages[currentPageIndex], selectedElementIds: new Set() };
+            newPages[currentPageIndex] = { ...newPages[currentPageIndex], selectedElementIds: new Set<string>();
             return newPages;
         });
         setCurrentPageIndex(index);
@@ -988,7 +988,7 @@ export default function WhiteboardPage() {
           const finalElements = [...elementsWithoutOld, newImageElement];
           const updatedPage: ElementState = {
             elements: finalElements,
-            selectedElementIds: new Set([newImageElement.id])
+            selectedElementIds:new Set<string>([newImageElement.id])
           };
           newPages[currentPageIndex] = updatedPage;
           pushToHistory(currentPageIndex, updatedPage);
@@ -1068,11 +1068,11 @@ export default function WhiteboardPage() {
           createdAt: serverTimestamp(),
       });
       
-      toast({ id: toastId, title: "Screenshot Saved!", description: `Saved to your ${destination} documents.` });
+      toast({  title: "Screenshot Saved!", description: `Saved to your ${destination} documents.` });
 
     } catch (error) {
       console.error("Failed to save screenshot:", error);
-      toast({ id: toastId, variant: "destructive", title: "Save Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
+      toast({ variant: "destructive", title: "Save Failed", description: error instanceof Error ? error.message : "An unknown error occurred." });
     } finally {
       setIsProcessing(false);
     }
@@ -1167,7 +1167,7 @@ export default function WhiteboardPage() {
 
 
   useEffect(() => {
-    const newInitialPage = { elements: [], selectedElementIds: new Set() };
+    const newInitialPage = { elements: [], selectedElementIds: new Set<string>()
     setPages([newInitialPage]);
     pagesHistoryRef.current = [[newInitialPage]];
     pagesHistoryStepRef.current = [0];
