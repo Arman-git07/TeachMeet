@@ -1174,7 +1174,7 @@ export default function WhiteboardPage() {
 
 
   useEffect(() => {
-    const newInitialPage = { elements: [], selectedElementIds: new Set<string>()
+    const newInitialPage = { elements: [], selectedElementIds: new Set<string>()};
     setPages([newInitialPage]);
     pagesHistoryRef.current = [[newInitialPage]];
     pagesHistoryStepRef.current = [0];
