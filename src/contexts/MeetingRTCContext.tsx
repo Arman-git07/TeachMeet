@@ -71,18 +71,22 @@ useEffect(() => {
     onData?: (data: any) => void;
   };
 
+  useEffect(() => {
   const rtcInstance = new MeshRTC({
-  roomId: meetingId,
-  userId: currentUser.uid,
-  onRemoteStream: (userId, stream) => {
-    console.log("Remote stream:", userId);
-  },
-  onData: handleData
-} as any);
+    roomId: meetingId,
+    userId: currentUser.uid,
+    onRemoteStream: (userId, stream) => {
+      console.log("Remote stream:", userId);
+    },
+    onData: handleData
+  } as any);
 
-return () => {};
+  return () => {};
+}, []);
+
 const addChatMessage = (message: ChatMessage) => {
   setChatHistory((prev) => [...prev, message]);
+};
 
   // Broadcast message to peers
   if (rtc) {
