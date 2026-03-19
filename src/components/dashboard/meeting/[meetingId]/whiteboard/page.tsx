@@ -875,7 +875,7 @@ export default function WhiteboardPage() {
         finalizeLiveText();
         setPages(currentPages => {
             const newPages = [...currentPages];
-            newPages[currentPageIndex] = { ...newPages[currentPageIndex], selectedElementIds: new Set<string>();
+            newPages[currentPageIndex] = { ...newPages[currentPageIndex], selectedElementIds: new Set<string>()};
             return newPages;
         });
         setCurrentPageIndex(index);
