@@ -58,8 +58,6 @@ export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
 const [isChatOpen, setIsChatOpen] = useState(false);
 useEffect(() => {
-  if (!rtc) return;
-
   const handleData = (data: any) => {
     if (data?.type === "chat-message") {
       setChatHistory((prev) => {
@@ -69,12 +67,18 @@ useEffect(() => {
     }
   };
 
-rtc.onmessage = handleData;
+  type MeshRTCOptions = {
+    onData?: (data: any) => void;
+  };
 
-return () => {
-  rtc.off("data", handleData);
-};
-}, [rtc]);
+  const rtcInstance = new MeshRTC({
+    onData: handleData
+  } as MeshRTCOptions);
+
+  return () => {
+    // no cleanup needed
+  };
+}, []);
 const addChatMessage = (message: ChatMessage) => {
   setChatHistory((prev) => [...prev, message]);
 
