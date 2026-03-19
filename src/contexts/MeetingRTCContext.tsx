@@ -69,11 +69,11 @@ useEffect(() => {
     }
   };
 
-rtc.off("data", handleData);
+rtc.on("data", handleData);
 
-  return () => {
-    rtc.offData(handleData);
-  };
+return () => {
+  rtc.off("data", handleData);
+};
 }, [rtc]);
 const addChatMessage = (message: ChatMessage) => {
   setChatHistory((prev) => [...prev, message]);
