@@ -684,28 +684,52 @@ export default function WhiteboardPage() {
         }
     } else if (opState.type === 'lassoing') {
         if (opState.lassoPath.length > 2) {
-            const newSelectedIds = new Set<string>();
-            const lassoPolygon = opState.lassoPath;
-            const lassoBox = getElementBoundingBox({type:'path', id:'', points:lassoPolygon, color:'', lineWidth:1});
-            
-            pages[currentPageIndex].elements.forEach(element => {
-                const elementBox = getElementBoundingBox(element);
-                if(!elementBox || (lassoBox && !boxesIntersect(lassoBox, elementBox))) return;
-                
-                if (element.type === 'path' ? element.points.some(p => isPointInPolygon(p, lassoPolygon)) : isPointInPolygon({x: element.x, y: element.y}, lassoPolygon)) {
-                    newSelectedIds.add(element.id);
-                }
-            });
+    const newSelectedIds = new Set<string>();
+    const lassoPolygon = opState.lassoPath;
+    const lassoBox = getElementBoundingBox({
+        type: 'path',
+        id: '',
+        points: lassoPolygon,
+        color: '',
+        lineWidth: 1
+    });
 
-            if (newSelectedIds.size > 0) {
-                 setPages(currentPages => {
-                    const newPages = [...currentPages];
-                    newPages[currentPageIndex] = { ...newPages[currentPageIndex], selectedElementIds: newSelectedIds };
-                    return newPages;
-                });
-                setActiveTool('select');
-            }
+    pages[currentPageIndex].elements.forEach(element => {
+        const elementBox = getElementBoundingBox(element);
+        if (!elementBox || (lassoBox && !boxesIntersect(lassoBox, elementBox))) return;
+
+        let isInside = false;
+
+        if (element.type === 'path') {
+            isInside = element.points.some(p => isPointInPolygon(p, lassoPolygon));
+        } else if (element.type === 'text' || element.type === 'image') {
+            isInside = isPointInPolygon({ x: element.x, y: element.y }, lassoPolygon);
+        } else if (element.type === 'shape') {
+            const center = {
+                x: (element.x1 + element.x2) / 2,
+                y: (element.y1 + element.y2) / 2
+            };
+            isInside = isPointInPolygon(center, lassoPolygon);
         }
+
+        if (isInside) {
+            newSelectedIds.add(element.id);
+        }
+    });
+
+    if (newSelectedIds.size > 0) {
+        setPages(currentPages => {
+            const newPages = [...currentPages];
+            newPages[currentPageIndex] = {
+                ...newPages[currentPageIndex],
+                selectedElementIds: newSelectedIds
+            };
+            return newPages;
+        });
+
+        setActiveTool('select');
+    }
+}
     } else if (opState.type === 'dragging') {
         const { startPos, originalElements } = opState;
         const pos = getPointerPosition(event);
