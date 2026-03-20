@@ -55,7 +55,7 @@ export class ScreenShareHelper {
       this.originalTrack = this.mesh.getLocalVideoTrack?.() ?? null;
       await this.mesh.replaceTrack(this.screenTrack, 'video');
     } else { // 'alongside'
-      await this.mesh.addTrack?.(this.screenTrack, stream);
+      addTrack?: (track: MediaStreamTrack, stream: MediaStream) => Promise<void>;
     }
     
     this.isSharingFlag = true;
