@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useParams } from 'next/navigation';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
@@ -50,7 +50,9 @@ interface MeetingRTCContextType {
 const MeetingRTCContext = createContext<MeetingRTCContextType | undefined>(undefined);
 
 export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
-  
+
+  const params = useParams();
+const meetingId = params?.meetingId as string;
   const [rtc, setRtc] = useState<MeshRTC | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -67,10 +69,10 @@ useEffect(() => {
     }
   };
 
-  if (!user) return;
+  if (!user || !meetingId) return;
 
   const rtcInstance = new MeshRTC({
-    roomId: "TEMP_ROOM_ID", // 🔥 replace with real meetingId
+    roomId: meetingId,
     userId: user.uid,
     onRemoteStream: (userId, stream) => {
       console.log("Remote stream:", userId);
@@ -83,7 +85,7 @@ useEffect(() => {
   return () => {
     rtcInstance.leave?.();
   };
-}, [user]);
+}, [user, meetingId]);   // ✅ FIXED
 
 const addChatMessage = (message: ChatMessage) => {
   setChatHistory((prev) => [...prev, message]);
