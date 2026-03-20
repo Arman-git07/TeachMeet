@@ -52,14 +52,17 @@ const MeetingRTCContext = createContext<MeetingRTCContextType | undefined>(undef
 export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
 
   const params = useParams();
-const meetingId = params?.meetingId as string;
+  const meetingId = params?.meetingId as string;
+
+  const pathname = usePathname();
+  const { user } = useAuth();   // ✅ MOVE HERE (before useEffect)
+
   const [rtc, setRtc] = useState<MeshRTC | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaveRecordingDialogOpen, setIsSaveRecordingDialogOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-const [isChatOpen, setIsChatOpen] = useState(false);
-useEffect(() => {
+  const [isChatOpen, setIsChatOpen] = useState(false);useEffect(() => {
   const handleData = (data: any) => {
     if (data?.type === "chat-message") {
       setChatHistory((prev) => {
