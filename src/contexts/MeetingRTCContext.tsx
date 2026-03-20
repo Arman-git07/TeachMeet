@@ -67,33 +67,33 @@ useEffect(() => {
     }
   };
 
-  type MeshRTCOptions = {
-    onData?: (data: any) => void;
-  };
+  if (!user) return;
 
-  useEffect(() => {
   const rtcInstance = new MeshRTC({
-    roomId: meetingId,
-    userId: currentUser.uid,
+    roomId: "TEMP_ROOM_ID", // 🔥 replace with real meetingId
+    userId: user.uid,
     onRemoteStream: (userId, stream) => {
       console.log("Remote stream:", userId);
     },
     onData: handleData
   } as any);
 
-  return () => {};
-}, []);
+  setRtc(rtcInstance);
+
+  return () => {
+    rtcInstance.leave?.();
+  };
+}, [user]);
 
 const addChatMessage = (message: ChatMessage) => {
   setChatHistory((prev) => [...prev, message]);
-};
 
-  // Broadcast message to peers
   if (rtc) {
     rtc.broadcast({
       type: "chat-message",
       payload: message
     });
+  }
 };
   const [recordingControls, setRecordingControls] = useState<RecordingControls>({
     start: async () => console.warn('startRecording not implemented'),
@@ -140,25 +140,25 @@ const addChatMessage = (message: ChatMessage) => {
   }, [pathname, rtc]);
 
   return (
-    <MeetingRTCContext.Provider value={{
-  rtc, setRtc,
+  <MeetingRTCContext.Provider value={{
+    rtc, setRtc,
 
-  isRecording, setIsRecording,
-  isUploading, setIsUploading,
+    isRecording, setIsRecording,
+    isUploading, setIsUploading,
 
-  recordingControls, setRecordingControls,
+    recordingControls, setRecordingControls,
 
-  isSaveRecordingDialogOpen,
-  setIsSaveRecordingDialogOpen,
+    isSaveRecordingDialogOpen,
+    setIsSaveRecordingDialogOpen,
 
-  chatHistory,
-  addChatMessage,
-  isChatOpen,
-  setIsChatOpen
-}}>
-      {children}
-    </MeetingRTCContext.Provider>
-  );
+    chatHistory,
+    addChatMessage,
+    isChatOpen,
+    setIsChatOpen
+  }}>
+    {children}
+  </MeetingRTCContext.Provider>
+);
 };
 
 export const useMeetingRTC = () => {
