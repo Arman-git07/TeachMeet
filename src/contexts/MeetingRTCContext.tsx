@@ -106,9 +106,6 @@ const addChatMessage = (message: ChatMessage) => {
     discard: async () => console.warn('discardRecording not implemented'),
   });
 
-  const pathname = usePathname();
-  const { user } = useAuth();
-
   // 📡 GLOBAL HEARTBEAT: Update lastSeen every 10 seconds while in a meeting
   useEffect(() => {
     if (!rtc || !user || !rtc.roomId) return;
