@@ -51,12 +51,8 @@ export class ScreenShareHelper {
     this.screenTrack = track;
     this.currentMode = mode;
 
-    if (mode === "replace") {
-      this.originalTrack = this.mesh.getLocalVideoTrack?.() ?? null;
-      await this.mesh.replaceTrack(this.screenTrack, 'video');
-    } else { // 'alongside'
-      addTrack?: (track: MediaStreamTrack, stream: MediaStream) => Promise<void>;
-    }
+    this.originalTrack = this.mesh.getLocalVideoTrack?.() ?? null;
+await this.mesh.replaceTrack(this.screenTrack, 'video');
     
     this.isSharingFlag = true;
 
@@ -96,12 +92,13 @@ export class ScreenShareHelper {
         } catch (e) { /* ignore */ }
       }
 
-      if (this.currentMode === 'replace') {
-        try {
-          await this.mesh.restoreCameraTrack?.();
-        } catch (err) {
-          console.error("Failed to restore camera track:", err);
-        }
+      if (this.originalTrack) {
+  try {
+    await this.mesh.restoreCameraTrack?.();
+  } catch (err) {
+    console.error("Failed to restore camera track:", err);
+  }
+}
       } else if (this.currentMode === 'alongside' && this.screenTrack) {
         try {
             await this.mesh.removeTrack?.(this.screenTrack);
