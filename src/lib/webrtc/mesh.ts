@@ -13,6 +13,7 @@ type PeerEntry = {
 };
 
 export class MeshRTC {
+  private onData?: (data: any) => void;
   public socket: Socket;
   public roomId: string;
   private userId: string;
@@ -47,6 +48,7 @@ export class MeshRTC {
   onRemoteStateUpdate?: (userId: string, state: { isCameraOn?: boolean; isMicOn?: boolean }) => void;
   onData?: (data: any) => void;   // ✅ ADD THIS
 }) {
+    this.onData = opts.onData;
     this.roomId = opts.roomId;
     this.userId = opts.userId;
     this.onRemoteStream = opts.onRemoteStream;
