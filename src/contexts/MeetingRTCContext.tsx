@@ -94,7 +94,6 @@ const addChatMessage = (message: ChatMessage) => {
       type: "chat-message",
       payload: message
     });
-  }
 };
   const [recordingControls, setRecordingControls] = useState<RecordingControls>({
     start: async () => console.warn('startRecording not implemented'),
