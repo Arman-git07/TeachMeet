@@ -62,7 +62,9 @@ export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [isSaveRecordingDialogOpen, setIsSaveRecordingDialogOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [isChatOpen, setIsChatOpen] = useState(false);useEffect(() => {
+ const [isChatOpen, setIsChatOpen] = useState(false);
+
+useEffect(() => {
   const handleData = (data: any) => {
     if (data?.type === "chat-message") {
       setChatHistory((prev) => {
