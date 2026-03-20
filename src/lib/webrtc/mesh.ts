@@ -23,7 +23,23 @@ export class MeshRTC {
   private onRemoteLeft?: (remoteId: string) => void;
   private onRemoteStateUpdate?: (userId: string, state: { isCameraOn?: boolean; isMicOn?: boolean }) => void;
   public socketId: string | null = null;
-
+ 
+  public broadcast(data: any) {
+    this.peers.forEach((entry, remoteId) => {
+      try {
+        // ❗ You are NOT using DataChannels yet → so this won't work
+        // For now just emit via socket (BEST FIX 👇)
+        this.socket.emit("data-message", {
+          roomId: this.roomId,
+          from: this.userId,
+          payload: data
+        });
+      } catch (err) {
+        console.warn("Broadcast failed:", err);
+      }
+    });
+  }
+  
   private _ready = false; 
   private _pendingSignals: Array<() => void> = []; 
 
