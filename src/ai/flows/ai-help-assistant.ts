@@ -1,5 +1,4 @@
 
-'use server';
 /**
  * @fileOverview An AI Help Assistant flow.
  *
