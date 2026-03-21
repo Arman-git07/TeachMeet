@@ -615,7 +615,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       
     let all = [self, ...remotes];
 
-    if (isSharingScreen && screenShareHelper?.currentMode === 'alongside' && screenShareStream) {
+    if (isSharingScreen && screenShareStream) {
         self.isScreenSharing = false; 
         const screenShareParticipant: Participant = {
             id: `${userId}-screen`,
