@@ -16,6 +16,7 @@ export type ChatMessage = {
   createdAt?: number;
   timestamp?: number;      // ⭐ add this
   isPrivate?: boolean;     // ⭐ add this
+recipientId?: string;
 };
 
 interface RecordingControls {
