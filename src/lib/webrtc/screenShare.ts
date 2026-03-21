@@ -97,8 +97,7 @@ await this.mesh.replaceTrack(this.screenTrack, 'video');
   } catch (err) {
     console.error("Failed to restore camera track:", err);
   }
-}
-      } else if (this.currentMode === 'alongside' && this.screenTrack) {
+} else if (this.currentMode === 'alongside' && this.screenTrack) {
         try {
             await this.mesh.removeTrack?.(this.screenTrack);
         } catch (err) {
