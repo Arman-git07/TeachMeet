@@ -1,8 +1,7 @@
 // src/lib/webrtc/screenShare.ts
 import type { MeshRTC } from "./mesh";
 
-export type ShareMode = "replace" | "alongside";
-
+export type ShareMode = "replace";
 export class ScreenShareHelper {
   private mesh: MeshRTC;
   private screenStream: MediaStream | null = null;
