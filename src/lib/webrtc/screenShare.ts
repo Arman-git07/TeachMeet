@@ -93,7 +93,7 @@ await this.mesh.replaceTrack(this.screenTrack, 'video');
 
       if (this.originalTrack) {
   try {
-    await this.mesh.restoreCameraTrack?.();
+    await this.mesh.replaceTrack(this.originalTrack, 'video');
   } catch (err) {
     console.error("Failed to restore camera track:", err);
   }
