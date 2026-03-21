@@ -1,4 +1,4 @@
-'use server';
+//'use server';
 
 // NOTE: This file has been temporarily modified to allow the application to build.
 // The Genkit dependencies were causing installation failures.
