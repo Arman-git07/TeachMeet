@@ -95,7 +95,7 @@ function SignInForm() {
         toast({
           variant: "destructive",
           title: "Sign In Failed",
-          description: errorMessage,
+          description: error.code + " - " + error.message,
           duration: 7000
         });
       })
