@@ -21,9 +21,7 @@ if (
   !firebaseConfig.authDomain ||
   !firebaseConfig.projectId
 ) {
-  console.warn(
-    'WARNING: Firebase config is missing or incomplete in your .env file. Firebase services will not work.'
-  );
+  console.error("❌ Firebase config is missing or incorrect. Check Vercel ENV variables.");
 }
 
 // Initialize Firebase App
@@ -33,7 +31,13 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 
 if (typeof window !== "undefined") {
-  setPersistence(auth, browserLocalPersistence);
+  setPersistence(auth, browserLocalPersistence)
+    .then(() => {
+      console.log("Auth persistence set to LOCAL");
+    })
+    .catch((error) => {
+      console.error("Error setting persistence:", error);
+    });
 }
 
 // Firestore
