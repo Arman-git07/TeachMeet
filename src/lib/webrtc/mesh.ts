@@ -120,13 +120,14 @@ export class MeshRTC {
           entry = this.createPeerEntry(fromId);
           this.peers.set(fromId, entry);
           
-          this.localStream!.getTracks().forEach(track => {
-            const sender = entry!.pc.addTrack(track, this.localStream!);
-            if (track.kind === 'video') entry!.videoSender = sender;
-            else if (track.kind === 'audio') entry!.audioSender = sender;
-          });
-        }
-        
+          if (entry.pc.getSenders().length === 0) {
+  this.localStream!.getTracks().forEach(track => {
+    const sender = entry!.pc.addTrack(track, this.localStream!);
+    if (track.kind === 'video') entry!.videoSender = sender;
+    else if (track.kind === 'audio') entry!.audioSender = sender;
+  });
+}
+        }        
         const pc = entry.pc;
         const polite = this.userId > fromId;
         const offerCollision = (offer.type === "offer") && (entry.makingOffer || pc.signalingState !== "stable");
@@ -246,14 +247,7 @@ export class MeshRTC {
     ignoreOffer: false, 
     isSettingRemoteAnswerPending: false 
   };
-
-  // ✅ ADD THIS BLOCK (MOST IMPORTANT FIX)
-  if (this.localStream) {
-    this.localStream.getTracks().forEach(track => {
-      pc.addTrack(track, this.localStream);
-    });
-  }
-
+    
   // ✅ Already correct
   pc.ontrack = (event) => {
     if (event.streams[0]) {
