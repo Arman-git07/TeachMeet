@@ -393,6 +393,12 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         stream.getAudioTracks().forEach(track => { track.enabled = desiredMicState; });
         
         setLocalStream(stream);
+
+// 🔥 ADD THIS
+if (meshRef.current) {
+  await meshRef.current.init(stream, "user");
+  meshRef.current.markReady();
+}
       } catch (err: any) { 
         console.error("Media init error:", err); 
         toast({ variant: "destructive", title: "Media Error", description: "Could not access hardware." });
