@@ -71,9 +71,20 @@ export class MeshRTC {
     this.registerSocketEvents();
   }
 
-  public async init(localStream: MediaStream, displayName: string, photoURL?: string) {
-    this.localStream = localStream;
-  }
+  public async init(localStream: MediaStream, userId: string) {
+  this.localStream = localStream;
+
+  // 🔥 Ensure existing peers also get tracks
+  this.peers.forEach((entry, remoteId) => {
+    if (entry.pc.getSenders().length === 0) {
+      localStream.getTracks().forEach(track => {
+        const sender = entry.pc.addTrack(track, localStream);
+        if (track.kind === 'video') entry.videoSender = sender;
+        else if (track.kind === 'audio') entry.audioSender = sender;
+      });
+    }
+  });
+}
 
   public markReady() {
     this._ready = true;
