@@ -230,27 +230,39 @@ export class MeshRTC {
   }
 
   private createPeerEntry(remoteId: string): PeerEntry {
-    const pc = new RTCPeerConnection({ iceServers: this.iceServers });
-    const entry: PeerEntry = { 
-      pc, 
-      stream: null, 
-      makingOffer: false, 
-      ignoreOffer: false, 
-      isSettingRemoteAnswerPending: false 
-    };
+  const pc = new RTCPeerConnection({ iceServers: this.iceServers });
 
-    pc.ontrack = (event) => {
-      if (event.streams[0]) {
-        this.onRemoteStream(remoteId, event.streams[0]);
-      }
-    };
+  const entry: PeerEntry = { 
+    pc, 
+    stream: null, 
+    makingOffer: false, 
+    ignoreOffer: false, 
+    isSettingRemoteAnswerPending: false 
+  };
 
-    pc.onicecandidate = (ev) => {
-      if (ev.candidate) this.socket.emit("ice-candidate", remoteId, ev.candidate);
-    };
-    
-    return entry;
+  // ✅ ADD THIS BLOCK (MOST IMPORTANT FIX)
+  if (this.localStream) {
+    this.localStream.getTracks().forEach(track => {
+      pc.addTrack(track, this.localStream);
+    });
   }
+
+  // ✅ Already correct
+  pc.ontrack = (event) => {
+    if (event.streams[0]) {
+      this.onRemoteStream(remoteId, event.streams[0]);
+    }
+  };
+
+  // ✅ Already correct
+  pc.onicecandidate = (ev) => {
+    if (ev.candidate) {
+      this.socket.emit("ice-candidate", remoteId, ev.candidate);
+    }
+  };
+
+  return entry;
+}
 
   public leave() {
     this.peers.forEach(({ pc }) => pc.close());
