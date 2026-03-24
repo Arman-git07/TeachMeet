@@ -252,7 +252,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
            toast({ title: 'Processing Recording...', duration: Infinity });
 
           try {
-            const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+            const blob = newp Blob(recordedChunksRef.current, { type: 'video/webm' });
             const durationMs = Date.now() - recordingStartRef.current;
             const durationStr = new Date(durationMs).toISOString().substr(11, 8);
 
@@ -375,47 +375,81 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   };
 
  useEffect(() => {
-    let mounted = true;
-    let stream: MediaStream | null = null;
-    const initMedia = async () => {
-      setLoadingMedia(true);
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
-        
-        const desiredCamState = localStorage.getItem('teachmeet-cam-state') !== 'false';
-        const desiredMicState = localStorage.getItem('teachmeet-mic-state') !== 'false';
-        
-        setCamOn(desiredCamState);
-        setMicOn(desiredMicState);
-        
-        stream.getVideoTracks().forEach(track => { track.enabled = desiredCamState; });
-        stream.getAudioTracks().forEach(track => { track.enabled = desiredMicState; });
-        
-        setLocalStream(stream);
+  let mounted = true;
+  let stream: MediaStream | null = null;
 
-// 🔥 ADD THIS
-if (meshRef.current) {
-  await meshRef.current.init(stream, "user");
-  meshRef.current.markReady();
-}
-      } catch (err: any) { 
-        console.error("Media init error:", err); 
-        toast({ variant: "destructive", title: "Media Error", description: "Could not access hardware." });
-      } 
-      finally { if (mounted) setLoadingMedia(false); }
-    };
-    initMedia();
-    return () => {
-      mounted = false;
-      stream?.getTracks().forEach(t => t.stop());
-      if (localAnimationRef.current) cancelAnimationFrame(localAnimationRef.current);
-      try { audioContextRef.current?.close(); } catch(e) {}
-      remoteAnalysersRef.current.forEach(entry => { if (entry.rafId) cancelAnimationFrame(entry.rafId); });
-      remoteAnalysersRef.current.clear();
-      screenShareHelper?.stopSharing();
-    };
-  }, [toast, screenShareHelper]);
+  const initMedia = async () => {
+    setLoadingMedia(true);
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+
+      if (!mounted) {
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
+
+      const desiredCamState = localStorage.getItem('teachmeet-cam-state') !== 'false';
+      const desiredMicState = localStorage.getItem('teachmeet-mic-state') !== 'false';
+
+      setCamOn(desiredCamState);
+      setMicOn(desiredMicState);
+
+      stream.getVideoTracks().forEach(track => {
+        track.enabled = desiredCamState;
+      });
+
+      stream.getAudioTracks().forEach(track => {
+        track.enabled = desiredMicState;
+      });
+
+      setLocalStream(stream);
+
+    } catch (err: any) {
+      console.error("Media init error:", err);
+      toast({
+        variant: "destructive",
+        title: "Media Error",
+        description: "Could not access hardware.",
+      });
+    } finally {
+      if (mounted) setLoadingMedia(false);
+    }
+  };
+
+  initMedia();
+
+  return () => {
+    mounted = false;
+    stream?.getTracks().forEach(t => t.stop());
+    if (localAnimationRef.current) cancelAnimationFrame(localAnimationRef.current);
+    try { audioContextRef.current?.close(); } catch(e) {}
+    remoteAnalysersRef.current.forEach(entry => {
+      if (entry.rafId) cancelAnimationFrame(entry.rafId);
+    });
+    remoteAnalysersRef.current.clear();
+    screenShareHelper?.stopSharing();
+  };
+}, [toast, screenShareHelper]);
+
+ useEffect(() => {
+  if (!rtc || !localStream) return;
+
+  const initRTC = async () => {
+    try {
+      await rtc.init(localStream, userId);
+      rtc.markReady();
+      console.log("✅ RTC initialized");
+    } catch (err) {
+      console.error("❌ RTC init failed:", err);
+    }
+  };
+
+  initRTC();
+
+}, [rtc, localStream, userId]);
 
   useEffect(() => {
     if (!meetingId) return;
