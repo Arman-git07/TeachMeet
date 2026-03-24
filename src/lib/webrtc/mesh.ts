@@ -19,7 +19,14 @@ export class MeshRTC {
   private userId: string;
   public localStream: MediaStream | null = null;
   private peers: Map<string, PeerEntry> = new Map();
-  private iceServers = [{ urls: "stun:stun.l.google.com:19302" }];
+  private iceServers = [
+  { urls: "stun:stun.l.google.com:19302" },
+  {
+    urls: "turn:relay.metered.ca:80",
+    username: "openrelayproject",
+    credential: "openrelayproject"
+  }
+];
   private onRemoteStream: (userId: string, stream: MediaStream) => void;
   private onRemoteLeft?: (remoteId: string) => void;
   private onRemoteStateUpdate?: (userId: string, state: { isCameraOn?: boolean; isMicOn?: boolean }) => void;
