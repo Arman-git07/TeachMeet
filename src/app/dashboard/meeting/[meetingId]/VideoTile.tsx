@@ -76,27 +76,36 @@ const meetingId = Array.isArray(params?.meetingId)
   }, [isLocal, isScreenSharing]);
 
   const syncStream = useCallback(() => {
-    const videoEl = videoRef.current;
-    if (!videoEl || !stream) {
-      setHasVideoTrack(false);
-      return;
-    }
+  const videoEl = videoRef.current;
 
-    if (videoEl.srcObject !== stream) {
-      videoEl.srcObject = stream;
-    }
-    
+  if (!videoEl) return;
+
+  if (stream) {
+    // ✅ ALWAYS set srcObject (no condition)
+    videoEl.srcObject = stream;
+
     const hasVideo = stream.getVideoTracks().length > 0;
     setHasVideoTrack(hasVideo);
 
-    if (hasVideo || stream.getAudioTracks().length > 0) {
-      videoEl.play().catch(e => {
-        if (e.name !== 'AbortError') {
-          console.warn(`[VideoTile] Playback issue for ${name}:`, e);
-        }
-      });
-    }
-  }, [stream, name]);
+    // 🔥 Important for autoplay issues
+    videoEl.muted = isLocal;
+
+    videoEl.play().catch(e => {
+      console.warn(`[VideoTile] Playback issue for ${name}:`, e);
+    });
+
+  } else {
+    videoEl.srcObject = null;
+    setHasVideoTrack(false);
+  }
+}, [stream, isLocal, name]);
+
+  useEffect(() => {
+  const videoEl = videoRef.current;
+  if (!videoEl) return;
+
+  videoEl.muted = isLocal;
+}, [isLocal]);
 
   useEffect(() => {
     syncStream();
@@ -136,7 +145,7 @@ const meetingId = Array.isArray(params?.meetingId)
   ref={videoRef}
   autoPlay
   playsInline
-  muted={isLocal}
+  muted
   className={cn(
     "w-full h-full object-cover transition-opacity duration-200 bg-black",
     isEffectivelyShowingVideo ? "opacity-100" : "opacity-0",
