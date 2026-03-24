@@ -252,7 +252,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
            toast({ title: 'Processing Recording...', duration: Infinity });
 
           try {
-            const blob = newp Blob(recordedChunksRef.current, { type: 'video/webm' });
+            const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
             const durationMs = Date.now() - recordingStartRef.current;
             const durationStr = new Date(durationMs).toISOString().substr(11, 8);
 
