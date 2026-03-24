@@ -251,6 +251,10 @@ export class MeshRTC {
   private createPeerEntry(remoteId: string): PeerEntry {
   const pc = new RTCPeerConnection({ iceServers: this.iceServers });
 
+    pc.onconnectionstatechange = () => {
+  console.log(`[Mesh] ${remoteId} connection state:`, pc.connectionState);
+};
+    
   const entry: PeerEntry = { 
     pc, 
     stream: null, 
