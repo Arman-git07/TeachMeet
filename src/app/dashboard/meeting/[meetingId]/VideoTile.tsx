@@ -133,16 +133,16 @@ const meetingId = Array.isArray(params?.meetingId)
       {/* Background Video Layer */}
       <div className="absolute inset-0 z-0">
         <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={isLocal || !isMicOn}
-          className={cn(
-            "w-full h-full object-cover transition-opacity duration-200 bg-black",
-            isEffectivelyShowingVideo ? "opacity-100" : "opacity-0",
-            isMirrored && "transform -scale-x-100"
-          )}
-        />
+  ref={videoRef}
+  autoPlay
+  playsInline
+  muted={isLocal}
+  className={cn(
+    "w-full h-full object-cover transition-opacity duration-200 bg-black",
+    isEffectivelyShowingVideo ? "opacity-100" : "opacity-0",
+    isMirrored && "transform -scale-x-100"
+  )}
+/>
 
         {!isEffectivelyShowingVideo && (
           <div className="absolute inset-0 flex items-center justify-center z-10">
