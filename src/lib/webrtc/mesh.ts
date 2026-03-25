@@ -150,27 +150,31 @@ export class MeshRTC {
   });
 }
         }        
-        const pc = entry.pc;
-        const polite = this.userId > fromId;
-        const offerCollision = (offer.type === "offer") && (entry.makingOffer || pc.signalingState !== "stable");
+        const handler = async () => {
+  const pc = entry.pc;
+  const polite = this.userId > fromId;
+  const offerCollision =
+    offer.type === "offer" &&
+    (entry.makingOffer || pc.signalingState !== "stable");
 
-        entry.ignoreOffer = !polite && offerCollision;
-        if (entry.ignoreOffer) return;
+  entry.ignoreOffer = !polite && offerCollision;
+  if (entry.ignoreOffer) return;
 
-        try {
-          await pc.setRemoteDescription(offer);
-          if (offer.type === "offer") {
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            this.socket.emit("answer", fromId, pc.localDescription);
-          }
-        } catch (err) {
-          console.error("[Mesh] Offer handling failed:", err);
-        }
-      };
+  try {
+    await pc.setRemoteDescription(offer);
+
+    if (offer.type === "offer") {
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      this.socket.emit("answer", fromId, pc.localDescription);
+    }
+  } catch (err) {
+    console.error("[Mesh] Offer handling failed:", err);
+  }
+};
 
       if (!this._ready) this._pendingSignals.push(handler);
-      else handler();
+      else handler().catch(console.error);
     });
 
     this.socket.on("answer", async (fromId: string, answer: RTCSessionDescriptionInit) => {
