@@ -113,18 +113,29 @@ export class MeshRTC {
     });
 
     this.socket.on("offer", async (fromId: string, offer: RTCSessionDescriptionInit) => {
-      const handler = async () => {
-        // 🔒 BLOCK UNTIL MEDIA READY: Receiver side
-        if (!this.localStream) {
-          await new Promise<void>((resolve) => {
-            const interval = setInterval(() => {
-              if (this.localStream) {
-                clearInterval(interval);
-                resolve();
-              }
-            }, 100);
-          });
-        }
+  let entry = this.peers.get(fromId);
+
+  if (!entry) {
+    entry = this.createPeerEntry(fromId);
+    this.peers.set(fromId, entry);
+
+    // ✅ add tracks here (receiver side)
+    if (this.localStream) {
+      this.localStream.getTracks().forEach(track => {
+        const sender = entry!.pc.addTrack(track, this.localStream!);
+        if (track.kind === 'video') entry!.videoSender = sender;
+        else if (track.kind === 'audio') entry!.audioSender = sender;
+      });
+    }
+  }
+
+  await entry.pc.setRemoteDescription(new RTCSessionDescription(offer));
+
+  const answer = await entry.pc.createAnswer();
+  await entry.pc.setLocalDescription(answer);
+
+  this.socket.emit("answer", fromId, answer);
+});
 
         let entry = this.peers.get(fromId);
         if (!entry) {
@@ -249,60 +260,47 @@ export class MeshRTC {
   }
 
   private createPeerEntry(remoteId: string): PeerEntry {
-
-const pc = new RTCPeerConnection({
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-
-    {
-      urls: "turn:openrelay.metered.ca:80",
-      username: "openrelayproject",
-      credential: "openrelayproject"
-    },
-    {
-      urls: "turn:openrelay.metered.ca:443",
-      username: "openrelayproject",
-      credential: "openrelayproject"
-    }
-  ]
-});
-    pc.onconnectionstatechange = () => {
-  alert("Connection State: " + pc.connectionState);
-};
-
-if (this.localStream) {
-  this.localStream.getTracks().forEach(track => {
-    const sender = pc.addTrack(track, this.localStream);
-
-    if (track.kind === 'video') entry.videoSender = sender;
-    else if (track.kind === 'audio') entry.audioSender = sender;
+  const pc = new RTCPeerConnection({
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      {
+        urls: "turn:openrelay.metered.ca:80",
+        username: "openrelayproject",
+        credential: "openrelayproject"
+      },
+      {
+        urls: "turn:openrelay.metered.ca:443",
+        username: "openrelayproject",
+        credential: "openrelayproject"
+      }
+    ]
   });
-}
 
-    pc.onconnectionstatechange = () => {
-  console.log(`[Mesh] ${remoteId} connection state:`, pc.connectionState);
-};
-    
-  const entry: PeerEntry = { 
-    pc, 
-    stream: null, 
-    makingOffer: false, 
-    ignoreOffer: false, 
-    isSettingRemoteAnswerPending: false 
+  const entry: PeerEntry = {
+    pc,
+    stream: null,
+    makingOffer: false,
+    ignoreOffer: false,
+    isSettingRemoteAnswerPending: false
   };
-    
-  // ✅ Already correct
+
+  // ✅ receive remote stream
   pc.ontrack = (event) => {
     if (event.streams[0]) {
       this.onRemoteStream(remoteId, event.streams[0]);
     }
   };
 
-  // ✅ Already correct
+  // ✅ send ICE
   pc.onicecandidate = (ev) => {
     if (ev.candidate) {
       this.socket.emit("ice-candidate", remoteId, ev.candidate);
     }
+  };
+
+  // ✅ debug
+  pc.onconnectionstatechange = () => {
+    console.log("Connection:", pc.connectionState);
   };
 
   return entry;
