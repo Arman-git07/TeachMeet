@@ -270,10 +270,20 @@ export class MeshRTC {
 
   // ✅ receive remote stream
   pc.ontrack = (event) => {
-    if (event.streams[0]) {
-      this.onRemoteStream(remoteId, event.streams[0]);
-    }
-  };
+  console.log("[Mesh] ontrack fired from:", remoteId);
+  console.log("[Mesh] streams:", event.streams);
+  console.log("[Mesh] track kind:", event.track.kind);
+
+  const stream = event.streams[0];
+
+  if (stream) {
+    this.onRemoteStream(remoteId, stream);
+  } else {
+    // fallback (important for some browsers)
+    const newStream = new MediaStream([event.track]);
+    this.onRemoteStream(remoteId, newStream);
+  }
+};
 
   // ✅ send ICE
   pc.onicecandidate = (ev) => {
