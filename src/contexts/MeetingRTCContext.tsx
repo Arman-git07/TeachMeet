@@ -78,15 +78,34 @@ useEffect(() => {
   if (!user || !meetingId) return;
 
   const rtcInstance = new MeshRTC({
-    roomId: meetingId,
-    userId: user.uid,
-    onRemoteStream: (userId, stream) => {
-      console.log("Remote stream:", userId);
-    },
-    onData: handleData
-  } as any);
+  roomId: meetingId,
+  userId: user.uid,
+  onRemoteStream: (userId, stream) => {
+    console.log("Remote stream:", userId, stream);
+  },
+  onData: handleData
+} as any);
 
-  setRtc(rtcInstance);
+// ✅ GET USER MEDIA
+const startRTC = async () => {
+  try {
+    const localStream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true
+    });
+
+    console.log("Local stream tracks:", localStream.getTracks()); // ✅ DEBUG
+
+    await rtcInstance.init(localStream, user.uid);
+    rtcInstance.markReady(); // ✅ VERY IMPORTANT
+
+    setRtc(rtcInstance);
+  } catch (err) {
+    console.error("Failed to get media:", err);
+  }
+};
+
+startRTC();
 
   return () => {
     rtcInstance.leave?.();
