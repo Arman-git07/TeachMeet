@@ -140,7 +140,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
         setRemoteStreams(prev => {
   const next = new Map(prev);
   next.set(remoteId, stream);
-  return new Map(next);   // 🔥 IMPORTANT
+  return next;   // 🔥 IMPORTANT
 });
       },
       onRemoteLeft: handleRemoteLeft,
