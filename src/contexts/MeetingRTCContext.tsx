@@ -77,15 +77,6 @@ useEffect(() => {
 
   if (!user || !meetingId) return;
 
-  const rtcInstance = new MeshRTC({
-  roomId: meetingId,
-  userId: user.uid,
-  onRemoteStream: (userId, stream) => {
-    console.log("Remote stream:", userId, stream);
-  },
-  onData: handleData
-} as any);
-
 // ✅ GET USER MEDIA
 const startRTC = async () => {
   try {
