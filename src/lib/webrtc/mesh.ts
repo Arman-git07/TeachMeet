@@ -255,6 +255,9 @@ const pc = new RTCPeerConnection({
     { urls: "stun:stun.l.google.com:19302" }
   ]
 });
+    pc.onconnectionstatechange = () => {
+  alert("Connection State: " + pc.connectionState);
+};
 
 if (this.localStream) {
   this.localStream.getTracks().forEach(track => {
