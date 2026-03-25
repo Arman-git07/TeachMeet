@@ -249,7 +249,21 @@ export class MeshRTC {
   }
 
   private createPeerEntry(remoteId: string): PeerEntry {
-  const pc = new RTCPeerConnection({ iceServers: this.iceServers });
+
+const pc = new RTCPeerConnection({
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" }
+  ]
+});
+
+if (this.localStream) {
+  this.localStream.getTracks().forEach(track => {
+    const sender = pc.addTrack(track, this.localStream);
+
+    if (track.kind === 'video') entry.videoSender = sender;
+    else if (track.kind === 'audio') entry.audioSender = sender;
+  });
+}
 
     pc.onconnectionstatechange = () => {
   console.log(`[Mesh] ${remoteId} connection state:`, pc.connectionState);
