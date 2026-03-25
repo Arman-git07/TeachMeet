@@ -118,8 +118,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const handleRemoteLeft = useCallback(async (remoteUserId: string) => {
     setRemoteStreams(prev => {
   const next = new Map(prev);
-  next.set(remoteId, stream);
-  return new Map(next);   // 🔥 IMPORTANT
+  next.delete(remoteUserId); // ✅ FIX
+  return next;
 });
     
     const entry = remoteAnalysersRef.current.get(remoteUserId);
@@ -500,13 +500,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       }
     });
   }, [liveParticipants, remoteStreams, handleRemoteLeft]);
-
-  useEffect(() => { 
-    if (localStream && rtc && user) { 
-      rtc.init(localStream, user.uid); 
-      rtc.markReady();
-    }  
-  }, [rtc, localStream, user]);
 
   useEffect(() => {
     if (!localStream || localStream.getAudioTracks().length === 0 || !micOn) {
