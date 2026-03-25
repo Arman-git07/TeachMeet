@@ -117,10 +117,10 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 
   const handleRemoteLeft = useCallback(async (remoteUserId: string) => {
     setRemoteStreams(prev => {
-      const next = new Map(prev);
-      next.delete(remoteUserId);
-      return next;
-    });
+  const next = new Map(prev);
+  next.set(remoteId, stream);
+  return new Map(next);   // 🔥 IMPORTANT
+});
     
     const entry = remoteAnalysersRef.current.get(remoteUserId);
     if (entry && entry.rafId) cancelAnimationFrame(entry.rafId);
@@ -138,10 +138,10 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       userId,
       onRemoteStream: (remoteId, stream) => {
         setRemoteStreams(prev => {
-          const next = new Map(prev);
-          next.set(remoteId, stream);
-          return next;
-        });
+  const next = new Map(prev);
+  next.set(remoteId, stream);
+  return new Map(next);   // 🔥 IMPORTANT
+});
       },
       onRemoteLeft: handleRemoteLeft,
       onRemoteStateUpdate: (remoteId, state) => {
@@ -627,31 +627,33 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     }
 
     const remotes: Participant[] = Array.from(liveParticipants.entries())
-      .filter(([id]) => id !== userId)
-      .map(([id, data]) => {
-        const videoBlocked = isBlockedByMe(id, 'video');
-        const audioBlocked = isBlockedByMe(id, 'audio');
-        const remoteStream = remoteStreams.get(id) || null;
-        const override = realtimeOverrides.get(id);
-        
-        const cameraOn = override?.isCameraOn ?? (data.isCameraOn !== false);
-        const micOnState = override?.isMicOn ?? (data.isMicOn !== false);
+  .filter(([id]) => id !== userId)
+  .map(([id, data]) => {
+    const videoBlocked = isBlockedByMe(id, 'video');
+    const audioBlocked = isBlockedByMe(id, 'audio');
+    const remoteStream = remoteStreams.get(id) || null;
+    const override = realtimeOverrides.get(id);
+    
+    const cameraOn = override?.isCameraOn ?? (data.isCameraOn !== false);
+    const micOnState = override?.isMicOn ?? (data.isMicOn !== false);
 
-        if (remoteStream && audioBlocked) {
-            remoteStream.getAudioTracks().forEach(t => t.enabled = false);
-        } else if (remoteStream && !audioBlocked) {
-            remoteStream.getAudioTracks().forEach(t => t.enabled = true);
-        }
+    if (remoteStream) {
+      console.log("🎥 Stream tracks for", id, remoteStream.getTracks().map(t => t.kind));
+    }
 
-        return {
-          id, name: data.name || `User ${id.substring(0, 4)}`, avatar: data.photoURL || undefined,
-          isHandRaised: data.isHandRaised, handRaisedAt: data.handRaisedAt, isScreenSharing: data.isScreenSharing,
-          isCameraOn: !videoBlocked && cameraOn,
-          isMicOn: !audioBlocked && micOnState,
-          stream: remoteStream, 
-          volumeLevel: audioBlocked ? 0 : (volumeLevels.get(id) ?? 0),
-        };
-      });
+    return {
+      id,
+      name: data.name || `User ${id.substring(0, 4)}`,
+      avatar: data.photoURL || undefined,
+      isHandRaised: data.isHandRaised,
+      handRaisedAt: data.handRaisedAt,
+      isScreenSharing: data.isScreenSharing,
+      isCameraOn: !videoBlocked && cameraOn,
+      isMicOn: !audioBlocked && micOnState,
+      stream: remoteStream,
+      volumeLevel: audioBlocked ? 0 : (volumeLevels.get(id) ?? 0),
+    };
+  });
       
     let all = [self, ...remotes];
 
