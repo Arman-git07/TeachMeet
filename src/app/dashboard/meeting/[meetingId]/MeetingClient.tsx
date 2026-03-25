@@ -505,7 +505,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     if (localStream && rtc && user) { 
       rtc.init(localStream, user.uid); 
       rtc.markReady();
-    } 
+    }  
   }, [rtc, localStream, user]);
 
   useEffect(() => {
