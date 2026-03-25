@@ -124,6 +124,11 @@ const meetingId = Array.isArray(params?.meetingId)
   }, [stream, syncStream]);
 
   const isSpeaking = (volumeLevel ?? 0) > 0.1 && isMicOn;
+ 
+  const debugText = stream
+  ? "Tracks: " + stream.getTracks().map(t => t.kind).join(", ")
+  : "No Stream";
+  
   const isEffectivelyShowingVideo = (isCameraOn || isScreenSharing) && hasVideoTrack;
   const hasNoRounding = className?.includes('rounded-none');
 
@@ -169,6 +174,18 @@ const meetingId = Array.isArray(params?.meetingId)
             </Avatar>
           </div>
         )}
+        <div style={{
+  position: "absolute",
+  bottom: 2,
+  right: 2,
+  fontSize: 10,
+  background: "black",
+  color: "white",
+  padding: "2px 4px",
+  zIndex: 999
+}}>
+  {debugText}
+</div>
       </div>
 
       {/* Top Overlays */}
