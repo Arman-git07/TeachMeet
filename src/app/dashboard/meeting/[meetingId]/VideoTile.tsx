@@ -150,7 +150,7 @@ const meetingId = Array.isArray(params?.meetingId)
   ref={videoRef}
   autoPlay
   playsInline
-          
+          muted={isLocal}
   className={cn(
     "w-full h-full object-cover transition-opacity duration-200 bg-black",
     isEffectivelyShowingVideo ? "opacity-100" : "opacity-0",
