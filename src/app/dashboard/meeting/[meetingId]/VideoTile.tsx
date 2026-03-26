@@ -77,25 +77,30 @@ const meetingId = Array.isArray(params?.meetingId)
 
   const syncStream = useCallback(() => {
   const videoEl = videoRef.current;
-
   if (!videoEl) return;
 
   if (stream) {
-    // ✅ ALWAYS set srcObject (no condition)
-    if (videoEl.srcObject !== stream) {
-  videoEl.srcObject = stream;
-}
+    // ✅ Always attach stream
+    videoEl.srcObject = stream;
 
     const hasVideo = stream.getVideoTracks().length > 0;
     setHasVideoTrack(hasVideo);
 
-    // 🔥 Important for autoplay issues
+    // ✅ Fix autoplay + Chrome policy
     videoEl.muted = isLocal;
+
+    // 🔥 CRITICAL: force play
+    videoEl.onloadedmetadata = () => {
+      videoEl
+        .play()
+        .catch((err) => console.error("Play failed:", err));
+    };
+
   } else {
     videoEl.srcObject = null;
     setHasVideoTrack(false);
   }
-}, [stream, isLocal, name]);
+}, [stream, isLocal]);
 
   useEffect(() => {
   const videoEl = videoRef.current;
@@ -123,7 +128,7 @@ const meetingId = Array.isArray(params?.meetingId)
   const isSpeaking = (volumeLevel ?? 0) > 0.1 && isMicOn;
  
   const debugText = stream
-  ? `Tracks: ${stream.getTracks().map(t => `${t.kind}:${t.readyState}`).join(", ")}`
+  ? `Tracks: ${stream.getTracks().map(t => `${t.kind}:${t.readyState}:${t.enabled}`).join(", ")}`
   : "No Stream";
   
   const isEffectivelyShowingVideo = (isCameraOn || isScreenSharing) && hasVideoTrack;
@@ -147,7 +152,7 @@ const meetingId = Array.isArray(params?.meetingId)
   ref={videoRef}
   autoPlay
   playsInline
-          muted={isLocal}
+          muted
   className={cn(
     "w-full h-full object-cover transition-opacity duration-200 bg-black",
     isEffectivelyShowingVideo ? "opacity-100" : "opacity-0",
