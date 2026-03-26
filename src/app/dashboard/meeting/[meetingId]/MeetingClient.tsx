@@ -407,13 +407,18 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   };
 }, [toast, screenShareHelper]);
 
- useEffect(() => {
-  if (!rtc || !localStream || rtc.isInitialized) return;
 
   useEffect(() => {
+  console.log("RTC INIT CHECK:", {
+    hasRtc: !!rtc,
+    hasStream: !!localStream,
+    initialized: rtc?.isInitialized
+  });
+
   if (!rtc || !localStream || rtc.isInitialized) return;
 
   const initRTC = async () => {
+    console.log("🚀 Initializing RTC...");
     await rtc.init(localStream, userId);
     rtc.markReady();
   };
