@@ -90,7 +90,21 @@ useEffect(() => {
 
       console.log("Local stream tracks:", localStream.getTracks());
 
-      const rtcInstance = new MeshRTC(socket);
+      const rtcInstance = new MeshRTC({
+  socket,
+  roomId: meetingId,
+  userId: user.uid,
+
+  onRemoteStream: (userId, stream) => {
+    console.log("Remote stream:", userId, stream);
+  },
+
+  onRemoteLeft: (remoteId) => {
+    console.log("User left:", remoteId);
+  },
+
+  onData: handleData
+});
 
       await rtcInstance.init(localStream, user.uid);
       rtcInstance.markReady();
