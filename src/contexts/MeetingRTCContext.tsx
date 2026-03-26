@@ -6,7 +6,6 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { MeshRTC } from '@/lib/webrtc/mesh';
-import { io } from "socket.io-client";
 
 export type ChatMessage = {
   id: string;
@@ -69,52 +68,37 @@ export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
 const rtcRef = useRef<MeshRTC | null>(null);
 
 useEffect(() => {
+useEffect(() => {
   if (!user || !meetingId) return;
-  if (rtcRef.current) return;
+  if (rtc) return;
 
-  let rtcInstance: MeshRTC | null = null;
+  const rtcInstance = new MeshRTC({
+    roomId: meetingId,
+    userId: user.uid,
 
-  const startRTC = async () => {
-    try {
-      const localStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      });
+    onRemoteStream: (userId, stream) => {
+      console.log("Remote stream:", userId, stream);
+    },
 
-      console.log("Local stream tracks:", localStream.getTracks());
+    onRemoteLeft: (remoteId) => {
+      console.log("User left:", remoteId);
+    },
 
-      rtcInstance = new MeshRTC({
-        roomId: meetingId,
-        userId: user.uid,
-
-        onRemoteStream: (userId, stream) => {
-          console.log("Remote stream:", userId, stream);
-        },
-
-        onRemoteLeft: (remoteId) => {
-          console.log("User left:", remoteId);
-        },
-
-        onData: handleData
-      });
-
-      rtcRef.current = rtcInstance;
-
-      await rtcInstance.init(localStream, user.uid);
-      rtcInstance.markReady();
-
-      setRtc(rtcInstance);
-    } catch (err) {
-      console.error("Failed to get media:", err);
+    onData: (data: any) => {
+      if (data?.type === "chat-message") {
+        setChatHistory((prev) => {
+          if (prev.some((m) => m.id === data.payload.id)) return prev;
+          return [...prev, data.payload];
+        });
+      }
     }
-  };
+  });
 
-  startRTC();
+  setRtc(rtcInstance);
 
   return () => {
     console.log("Cleaning up RTC");
-    rtcInstance?.leave?.();
-    rtcRef.current = null;
+    rtcInstance.leave();
   };
 }, [user?.uid, meetingId]);
 const addChatMessage = (message: ChatMessage) => {
