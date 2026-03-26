@@ -80,15 +80,20 @@ export class MeshRTC {
   this.localStream = localStream;
 
   // 🔥 Ensure existing peers also get tracks
-  this.peers.forEach((entry, remoteId) => {
-    if (entry.pc.getSenders().length === 0) {
-      localStream.getTracks().forEach(track => {
-        const sender = entry.pc.addTrack(track, localStream);
-        if (track.kind === 'video') entry.videoSender = sender;
-        else if (track.kind === 'audio') entry.audioSender = sender;
-      });
-    }
-  });
+  this.peers.forEach((entry) => {
+  const videoTrack = localStream.getVideoTracks()[0];
+  const audioTrack = localStream.getAudioTracks()[0];
+
+  // ✅ Ensure video sender exists
+  if (videoTrack && !entry.videoSender) {
+    entry.videoSender = entry.pc.addTrack(videoTrack, localStream);
+  }
+
+  // ✅ Ensure audio sender exists (CRITICAL)
+  if (audioTrack && !entry.audioSender) {
+    entry.audioSender = entry.pc.addTrack(audioTrack, localStream);
+  }
+});
 }
 
   public markReady() {
