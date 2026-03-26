@@ -100,8 +100,6 @@ const meetingId = Array.isArray(params?.meetingId)
   videoEl.onloadedmetadata = () => {
     videoEl.play().catch(err => console.error("Play failed:", err));
   };
-}
-
   } else {
     videoEl.srcObject = null;
     setHasVideoTrack(false);
