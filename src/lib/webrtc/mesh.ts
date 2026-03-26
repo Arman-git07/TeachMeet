@@ -80,22 +80,28 @@ export class MeshRTC {
   this.localStream = localStream;
 
   // 🔥 Ensure existing peers also get tracks
-  this.peers.forEach((entry) => {
+  this.peers.forEach(async (entry, remoteId) => {
   const videoTrack = localStream.getVideoTracks()[0];
   const audioTrack = localStream.getAudioTracks()[0];
 
-  // ✅ Ensure video sender exists
   if (videoTrack && !entry.videoSender) {
     entry.videoSender = entry.pc.addTrack(videoTrack, localStream);
   }
 
-  // ✅ Ensure audio sender exists (CRITICAL)
   if (audioTrack && !entry.audioSender) {
     entry.audioSender = entry.pc.addTrack(audioTrack, localStream);
   }
-});
-}
 
+  // 🔥 ADD THIS PART (missing)
+  try {
+    const offer = await entry.pc.createOffer();
+    await entry.pc.setLocalDescription(offer);
+    this.socket.emit("offer", remoteId, entry.pc.localDescription);
+  } catch (e) {
+    console.error("[Mesh] Re-offer failed:", e);
+  }
+});
+  }
   public markReady() {
     this._ready = true;
     while (this._pendingSignals.length) {
@@ -105,10 +111,23 @@ export class MeshRTC {
   }
 
   private registerSocketEvents() {
-    this.socket.on("connect", () => { 
-        this.socketId = this.socket.id; 
-        this.socket.emit("join-room", this.roomId, this.userId);
+    this.socket.on("connect", async () => { 
+  this.socketId = this.socket.id;
+
+  // 🔥 WAIT until media is ready
+  if (!this.localStream) {
+    await new Promise<void>((resolve) => {
+      const interval = setInterval(() => {
+        if (this.localStream) {
+          clearInterval(interval);
+          resolve();
+        }
+      }, 50);
     });
+  }
+
+  this.socket.emit("join-room", this.roomId, this.userId);
+});
 
     this.socket.on("user-joined", (remoteId: string) => {
       const handler = () => this._initiateNewPeer(remoteId);
@@ -258,6 +277,25 @@ export class MeshRTC {
     iceServers: this.iceServers   // ✅ correct, single source
   });
 
+    pc.onnegotiationneeded = async () => {
+  try {
+    const entry = this.peers.get(remoteId);
+    if (!entry) return;
+
+    entry.makingOffer = true;
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    this.socket.emit("offer", remoteId, pc.localDescription);
+  } catch (err) {
+    console.error("[Mesh] Negotiation failed:", err);
+  } finally {
+    const entry = this.peers.get(remoteId);
+    if (entry) entry.makingOffer = false;
+  }
+};
+    
   const entry: PeerEntry = {
     pc,
     stream: null,
