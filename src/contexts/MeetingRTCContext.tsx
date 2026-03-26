@@ -66,9 +66,6 @@ const rtcRef = useRef<MeshRTC | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
  const [isChatOpen, setIsChatOpen] = useState(false);
 
-const rtcRef = useRef<MeshRTC | null>(null);
-
-
 useEffect(() => {
   if (!user || !meetingId) return;
 
