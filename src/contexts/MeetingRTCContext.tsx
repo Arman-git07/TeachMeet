@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { usePathname, useParams } from 'next/navigation';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -59,6 +59,7 @@ export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();   // ✅ MOVE HERE (before useEffect)
 
   const [rtc, setRtc] = useState<MeshRTC | null>(null);
+const rtcRef = useRef<MeshRTC | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaveRecordingDialogOpen, setIsSaveRecordingDialogOpen] = useState(false);
@@ -70,18 +71,22 @@ const rtcRef = useRef<MeshRTC | null>(null);
 
 useEffect(() => {
   if (!user || !meetingId) return;
-  if (rtc) return;
+
+  // 🚫 prevent re-creation
+  if (rtcRef.current) return;
+
+  console.log("🧠 Creating RTC instance...");
 
   const rtcInstance = new MeshRTC({
     roomId: meetingId,
     userId: user.uid,
 
     onRemoteStream: (userId, stream) => {
-      console.log("Remote stream:", userId, stream);
+      console.log("🎥 Remote stream:", userId, stream);
     },
 
     onRemoteLeft: (remoteId) => {
-      console.log("User left:", remoteId);
+      console.log("👋 User left:", remoteId);
     },
 
     onData: (data: any) => {
@@ -94,19 +99,21 @@ useEffect(() => {
     }
   });
 
+  rtcRef.current = rtcInstance;
   setRtc(rtcInstance);
 
   return () => {
-    console.log("Cleaning up RTC");
-    rtcInstance.leave();
+    console.log("🧹 Cleaning up RTC");
+    rtcRef.current?.leave();
+    rtcRef.current = null;
   };
 }, [user?.uid, meetingId]);
   
 const addChatMessage = (message: ChatMessage) => {
   setChatHistory((prev) => [...prev, message]);
 
-  if (rtc) {
-    rtc.broadcast({
+  if (rtcRef.current) {
+  rtcRef.current.broadcast({
       type: "chat-message",
       payload: message
     });
@@ -148,8 +155,9 @@ const addChatMessage = (message: ChatMessage) => {
         sessionStorage.setItem('teachmeet-just-left-meeting', 'true');
       }
 
-      rtc.leave();
-      setRtc(null);
+      rtcRef.current?.leave();
+rtcRef.current = null;
+setRtc(null);
     }
   }, [pathname, rtc]);
 
