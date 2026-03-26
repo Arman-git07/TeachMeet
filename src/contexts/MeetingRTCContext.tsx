@@ -101,6 +101,7 @@ useEffect(() => {
     rtcInstance.leave();
   };
 }, [user?.uid, meetingId]);
+  
 const addChatMessage = (message: ChatMessage) => {
   setChatHistory((prev) => [...prev, message]);
 
