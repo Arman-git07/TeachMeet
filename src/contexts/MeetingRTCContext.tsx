@@ -66,18 +66,13 @@ export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
  const [isChatOpen, setIsChatOpen] = useState(false);
 
-useEffect(() => {
-  const handleData = (data: any) => {
-    if (data?.type === "chat-message") {
-      setChatHistory((prev) => {
-        if (prev.some((m) => m.id === data.payload.id)) return prev;
-        return [...prev, data.payload];
-      });
-    }
-  };
+const rtcRef = useRef<MeshRTC | null>(null);
 
+useEffect(() => {
   if (!user || !meetingId) return;
-  if (rtc) return; // ✅ prevent duplicate init
+  if (rtcRef.current) return;
+
+  let rtcInstance: MeshRTC | null = null;
 
   const startRTC = async () => {
     try {
@@ -88,20 +83,22 @@ useEffect(() => {
 
       console.log("Local stream tracks:", localStream.getTracks());
 
-      const rtcInstance = new MeshRTC({
-  roomId: meetingId,
-  userId: user.uid,
+      rtcInstance = new MeshRTC({
+        roomId: meetingId,
+        userId: user.uid,
 
-  onRemoteStream: (userId, stream) => {
-    console.log("Remote stream:", userId, stream);
-  },
+        onRemoteStream: (userId, stream) => {
+          console.log("Remote stream:", userId, stream);
+        },
 
-  onRemoteLeft: (remoteId) => {
-    console.log("User left:", remoteId);
-  },
+        onRemoteLeft: (remoteId) => {
+          console.log("User left:", remoteId);
+        },
 
-  onData: handleData
-});
+        onData: handleData
+      });
+
+      rtcRef.current = rtcInstance;
 
       await rtcInstance.init(localStream, user.uid);
       rtcInstance.markReady();
@@ -115,10 +112,11 @@ useEffect(() => {
   startRTC();
 
   return () => {
-    rtc?.leave?.(); // ✅ FIX 2
+    console.log("Cleaning up RTC");
+    rtcInstance?.leave?.();
+    rtcRef.current = null;
   };
-}, [user, meetingId]);
-
+}, [user?.uid, meetingId]);
 const addChatMessage = (message: ChatMessage) => {
   setChatHistory((prev) => [...prev, message]);
 
