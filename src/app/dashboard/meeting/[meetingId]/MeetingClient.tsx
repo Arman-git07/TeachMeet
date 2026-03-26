@@ -1,7 +1,7 @@
 'use client';
  
 import { motion } from "framer-motion";
-
+import { useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, X, Users, Pin, Minimize2, Maximize2 } from "lucide-react";
 import { collection, onSnapshot, doc, updateDoc, getDoc, serverTimestamp, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
@@ -104,7 +104,8 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
   const recordingStartRef = useRef<number>(0);
   const saveDestinationRef = useRef<'private' | 'public' | 'device'>('private');
   const shouldDiscardRef = useRef<boolean>(false);
-
+const videoRef = useRef<HTMLVideoElement>(null);
+ 
   const unlockAudio = useCallback(() => {
     if (audioUnlockedRef.current) return;
     const context = audioContextRef.current;
