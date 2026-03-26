@@ -379,9 +379,17 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
       });
 
       setLocalStream(stream);
+     if (videoRef.current) {
+  videoRef.current.srcObject = stream;
+}
+     await mesh.init(stream);
+ mesh.markReady();
 
     } catch (err: any) {
       console.error("Media init error:", err);
+     if (err.name === "NotAllowedError") {
+  alert("Please allow camera and microphone access.");
+}
       toast({
         variant: "destructive",
         title: "Media Error",
@@ -405,7 +413,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     remoteAnalysersRef.current.clear();
     screenShareHelper?.stopSharing();
   };
-}, [toast, screenShareHelper]);
+ }, []);
 
 
   useEffect(() => {
