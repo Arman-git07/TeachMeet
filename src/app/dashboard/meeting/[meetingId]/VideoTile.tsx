@@ -82,18 +82,15 @@ const meetingId = Array.isArray(params?.meetingId)
 
   if (stream) {
     // ✅ ALWAYS set srcObject (no condition)
-    videoEl.srcObject = stream;
+    if (videoEl.srcObject !== stream) {
+  videoEl.srcObject = stream;
+}
 
     const hasVideo = stream.getVideoTracks().length > 0;
     setHasVideoTrack(hasVideo);
 
     // 🔥 Important for autoplay issues
     videoEl.muted = isLocal;
-
-    videoEl.play().catch(e => {
-      console.warn(`[VideoTile] Playback issue for ${name}:`, e);
-    });
-
   } else {
     videoEl.srcObject = null;
     setHasVideoTrack(false);
@@ -126,7 +123,7 @@ const meetingId = Array.isArray(params?.meetingId)
   const isSpeaking = (volumeLevel ?? 0) > 0.1 && isMicOn;
  
   const debugText = stream
-  ? "Tracks: " + stream.getTracks().map(t => t.kind).join(", ")
+  ? `Tracks: ${stream.getTracks().map(t => `${t.kind}:${t.readyState}`).join(", ")}`
   : "No Stream";
   
   const isEffectivelyShowingVideo = (isCameraOn || isScreenSharing) && hasVideoTrack;
