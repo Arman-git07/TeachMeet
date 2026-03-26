@@ -6,6 +6,7 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { MeshRTC } from '@/lib/webrtc/mesh';
+import { io } from "socket.io-client";
 
 export type ChatMessage = {
   id: string;
@@ -76,34 +77,36 @@ useEffect(() => {
   };
 
   if (!user || !meetingId) return;
+  if (rtc) return; // ✅ prevent duplicate init
 
-// ✅ GET USER MEDIA
-const startRTC = async () => {
-  try {
-    const localStream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: true
-    });
+  const socket = io(); // ✅ FIX 1
 
-    console.log("Local stream tracks:", localStream.getTracks());
+  const startRTC = async () => {
+    try {
+      const localStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
 
-const rtcInstance = new MeshRTC(socket); // ✅ ADD THIS LINE
+      console.log("Local stream tracks:", localStream.getTracks());
 
-await rtcInstance.init(localStream, user.uid);
-rtcInstance.markReady();
+      const rtcInstance = new MeshRTC(socket);
 
-setRtc(rtcInstance);
-  } catch (err) {
-    console.error("Failed to get media:", err);
-  }
-};
+      await rtcInstance.init(localStream, user.uid);
+      rtcInstance.markReady();
 
-startRTC();
+      setRtc(rtcInstance);
+    } catch (err) {
+      console.error("Failed to get media:", err);
+    }
+  };
+
+  startRTC();
 
   return () => {
-    rtcInstance.leave?.();
+    rtc?.leave?.(); // ✅ FIX 2
   };
-}, [user, meetingId]);   // ✅ FIXED
+}, [user, meetingId]);
 
 const addChatMessage = (message: ChatMessage) => {
   setChatHistory((prev) => [...prev, message]);
