@@ -1,7 +1,7 @@
 'use client';
  
 import { motion } from "framer-motion";
-import { MeshRTC } from "@/lib/webrtc/mesh";
+
 import { useAuth } from "@/hooks/useAuth";
 import { Mic, MicOff, Video, VideoOff, Hand, PhoneOff, ScreenShare, ScreenShareOff, Loader2, X, Users, Pin, Minimize2, Maximize2 } from "lucide-react";
 import { collection, onSnapshot, doc, updateDoc, getDoc, serverTimestamp, setDoc, addDoc, deleteDoc } from 'firebase/firestore';
@@ -435,7 +435,7 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
 }, [toast, screenShareHelper]);
 
  useEffect(() => {
-  if (!rtc || !localStream) return;
+  if (!rtc || !localStream || rtc.isInitialized) return;
 
   const initRTC = async () => {
     try {
