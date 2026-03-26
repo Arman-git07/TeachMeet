@@ -67,7 +67,7 @@ export const MeetingRTCProvider = ({ children }: { children: ReactNode }) => {
 
 const rtcRef = useRef<MeshRTC | null>(null);
 
-useEffect(() => {
+
 useEffect(() => {
   if (!user || !meetingId) return;
   if (rtc) return;
