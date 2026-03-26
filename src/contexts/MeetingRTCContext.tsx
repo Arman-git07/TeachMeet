@@ -85,12 +85,14 @@ const startRTC = async () => {
       audio: true
     });
 
-    console.log("Local stream tracks:", localStream.getTracks()); // ✅ DEBUG
+    console.log("Local stream tracks:", localStream.getTracks());
 
-    await rtcInstance.init(localStream, user.uid);
-    rtcInstance.markReady(); // ✅ VERY IMPORTANT
+const rtcInstance = new MeshRTC(socket); // ✅ ADD THIS LINE
 
-    setRtc(rtcInstance);
+await rtcInstance.init(localStream, user.uid);
+rtcInstance.markReady();
+
+setRtc(rtcInstance);
   } catch (err) {
     console.error("Failed to get media:", err);
   }
