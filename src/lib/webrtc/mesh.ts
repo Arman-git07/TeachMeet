@@ -22,7 +22,12 @@ export class MeshRTC {
   private iceServers = [
   { urls: "stun:stun.l.google.com:19302" },
   {
-    urls: "turn:relay.metered.ca:80",
+    urls: "turn:openrelay.metered.ca:80",
+    username: "openrelayproject",
+    credential: "openrelayproject"
+  },
+  {
+    urls: "turn:openrelay.metered.ca:443",
     username: "openrelayproject",
     credential: "openrelayproject"
   }
@@ -245,19 +250,7 @@ export class MeshRTC {
 
   private createPeerEntry(remoteId: string): PeerEntry {
   const pc = new RTCPeerConnection({
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      {
-        urls: "turn:openrelay.metered.ca:80",
-        username: "openrelayproject",
-        credential: "openrelayproject"
-      },
-      {
-        urls: "turn:openrelay.metered.ca:443",
-        username: "openrelayproject",
-        credential: "openrelayproject"
-      }
-    ]
+    iceServers: this.iceServers   // ✅ correct, single source
   });
 
   const entry: PeerEntry = {
@@ -268,38 +261,35 @@ export class MeshRTC {
     isSettingRemoteAnswerPending: false
   };
 
-  // ✅ receive remote stream
+  // ✅ FIX: Proper stream handling (no overwrite issue)
   pc.ontrack = (event) => {
-  console.log("[Mesh] ontrack fired from:", remoteId);
-  console.log("[Mesh] streams:", event.streams);
-  console.log("[Mesh] track kind:", event.track.kind);
+  let entry = this.peers.get(remoteId);
+  if (!entry) return;
 
-  const stream = event.streams[0];
-
-  if (stream) {
-    this.onRemoteStream(remoteId, stream);
-  } else {
-    // fallback (important for some browsers)
-    const newStream = new MediaStream([event.track]);
-    this.onRemoteStream(remoteId, newStream);
+  // 🔥 FIX: persist stream per peer
+  if (!entry.stream) {
+    entry.stream = new MediaStream();
   }
-};
 
-  // ✅ send ICE
+  entry.stream.addTrack(event.track);
+
+  // 🔥 Always send merged stream
+  this.onRemoteStream(remoteId, entry.stream);
+};
+  // ✅ ICE candidate send
   pc.onicecandidate = (ev) => {
     if (ev.candidate) {
       this.socket.emit("ice-candidate", remoteId, ev.candidate);
     }
   };
 
-  // ✅ debug
+  // ✅ Debug connection state
   pc.onconnectionstatechange = () => {
-    console.log("Connection:", pc.connectionState);
+    console.log("[Mesh] Connection:", pc.connectionState);
   };
 
   return entry;
 }
-
   public leave() {
     this.peers.forEach(({ pc }) => pc.close());
     this.peers.clear();
