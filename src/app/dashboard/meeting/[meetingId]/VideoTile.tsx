@@ -80,21 +80,27 @@ const meetingId = Array.isArray(params?.meetingId)
   if (!videoEl) return;
 
   if (stream) {
-    // ✅ Always attach stream
-    videoEl.srcObject = stream;
+  videoEl.srcObject = stream;
 
-    const hasVideo = stream.getVideoTracks().length > 0;
-    setHasVideoTrack(hasVideo);
+  const videoTracks = stream.getVideoTracks();
 
-    // ✅ Fix autoplay + Chrome policy
-    videoEl.muted = isLocal;
+  const hasVideo = videoTracks.some(
+    (track) => track.readyState === "live" && track.enabled
+  );
 
-    // 🔥 CRITICAL: force play
-    videoEl.onloadedmetadata = () => {
-      videoEl
-        .play()
-        .catch((err) => console.error("Play failed:", err));
-    };
+  setHasVideoTrack(hasVideo);
+
+  stream.getVideoTracks().forEach(track => {
+    track.onunmute = syncStream;
+    track.onmute = syncStream;
+  });
+
+  videoEl.muted = isLocal;
+
+  videoEl.onloadedmetadata = () => {
+    videoEl.play().catch(err => console.error("Play failed:", err));
+  };
+}
 
   } else {
     videoEl.srcObject = null;
