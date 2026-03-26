@@ -130,33 +130,6 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
     setPinnedId(prev => prev === remoteUserId ? null : prev);
   }, []);
 
-  useEffect(() => {
-    if (rtc && rtc.roomId === meetingId) return;
-
-    const rtcInstance = new MeshRTC({
-      roomId: meetingId,
-      userId,
-      onRemoteStream: (remoteId, stream) => {
-        setRemoteStreams(prev => {
-  const next = new Map(prev);
-  next.set(remoteId, stream);
-  return next;   // 🔥 IMPORTANT
-});
-      },
-      onRemoteLeft: handleRemoteLeft,
-      onRemoteStateUpdate: (remoteId, state) => {
-        setRealtimeOverrides(prev => {
-          const next = new Map(prev);
-          next.set(remoteId, { ...next.get(remoteId), ...state });
-          return next;
-        });
-      }
-    });
-
-    setRtc(rtcInstance);
-  }, [meetingId, userId, setRtc, handleRemoteLeft, rtc]);
-
-
   const updateMyStatus = useCallback(async (status: Partial<LiveParticipantInfo>) => {
     if (rtc) {
         rtc.updateMyState(status);
@@ -437,18 +410,15 @@ export default function MeetingClient({ meetingId, userId, onLeave, topic, initi
  useEffect(() => {
   if (!rtc || !localStream || rtc.isInitialized) return;
 
+  useEffect(() => {
+  if (!rtc || !localStream || rtc.isInitialized) return;
+
   const initRTC = async () => {
-    try {
-      await rtc.init(localStream, userId);
-      rtc.markReady();
-      console.log("✅ RTC initialized");
-    } catch (err) {
-      console.error("❌ RTC init failed:", err);
-    }
+    await rtc.init(localStream, userId);
+    rtc.markReady();
   };
 
   initRTC();
-
 }, [rtc, localStream, userId]);
 
   useEffect(() => {
