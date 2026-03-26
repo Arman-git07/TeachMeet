@@ -79,8 +79,6 @@ useEffect(() => {
   if (!user || !meetingId) return;
   if (rtc) return; // ✅ prevent duplicate init
 
-  const socket = io(); // ✅ FIX 1
-
   const startRTC = async () => {
     try {
       const localStream = await navigator.mediaDevices.getUserMedia({
@@ -91,7 +89,6 @@ useEffect(() => {
       console.log("Local stream tracks:", localStream.getTracks());
 
       const rtcInstance = new MeshRTC({
-  socket,
   roomId: meetingId,
   userId: user.uid,
 
