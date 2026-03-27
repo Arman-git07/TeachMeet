@@ -382,8 +382,6 @@ const videoRef = useRef<HTMLVideoElement>(null);
      if (videoRef.current) {
   videoRef.current.srcObject = stream;
 }
-     await mesh.init(stream);
- mesh.markReady();
 
     } catch (err: any) {
       console.error("Media init error:", err);
