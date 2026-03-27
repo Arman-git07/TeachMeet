@@ -417,11 +417,10 @@ const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
   console.log("RTC INIT CHECK:", {
     hasRtc: !!rtc,
-    hasStream: !!localStream,
-    initialized: rtc?.isInitialized
+    hasStream: !!localStream
   });
 
-  if (!rtc || !localStream || rtc.isInitialized) return;
+  if (!rtc || !localStream) return;
 
   const initRTC = async () => {
     console.log("🚀 Initializing RTC...");
