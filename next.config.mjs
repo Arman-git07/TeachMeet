@@ -1,17 +1,13 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  // Your Next.js configuration options can go here.
-  // For example, to add a new hostname for images:
-  // images: {
-  //   remotePatterns: [
-  //     {
-  //       protocol: 'https',
-  //       hostname: 'example.com',
-  //       port: '',
-  //       pathname: '/images/**',
-  //     },
-  //   ],
-  // },
-};
+import withPWA from 'next-pwa'
 
-export default nextConfig;
+const nextConfig = {
+  reactStrictMode: true
+}
+
+export default withPWA({
+  ...nextConfig,
+  pwa: {
+    dest: 'public',
+    disable: false
+  }
+})
