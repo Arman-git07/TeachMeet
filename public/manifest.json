@@ -3,16 +3,23 @@
   "short_name": "TeachMeet",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#7c3aed",
+  "theme_color": "#a855f7",
+  "background_color": "#000000",
+
+  "description": "TeachMeet is a modern online classroom and meeting app where teachers can create classes and students can join with approval like Google Meet.",
+
+  "orientation": "portrait",
+
+  "id": "/?source=pwa",
+
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
