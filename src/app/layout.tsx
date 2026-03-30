@@ -3,7 +3,7 @@
 
 import React from 'react';
 import SWRegister from "./sw-register";
-import { usePathname } from 'next/navigation';
+import ClientLayout from "@/components/ClientLayout";
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from '@/lib/utils';
