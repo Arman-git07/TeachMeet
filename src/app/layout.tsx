@@ -3,6 +3,7 @@
 'use client';
 import React from 'react';
 import { useEffect } from 'react';
+import SWRegister from "./sw-register";
 import { usePathname } from 'next/navigation';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -35,6 +36,8 @@ export default function RootLayout({ children }) {
         'font-sans antialiased min-h-screen flex flex-col',
         'subpixel-antialiased' // Added for potentially smoother font rendering
       )}>
+        <SWRegister />
+  {children}
         <Providers>
           {isAuthPage ? (
             children
