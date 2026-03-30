@@ -2,6 +2,7 @@
 // src/app/layout.tsx
 'use client';
 import React from 'react';
+import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -9,13 +10,17 @@ import { cn } from '@/lib/utils';
 import { Providers } from '@/components/common/Providers';
 import { AppShell } from '@/components/common/AppShell';
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }) {
   const pathname = usePathname();
   const isAuthPage = pathname.startsWith('/auth');
+
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js')
+        .then((reg) => console.log('Service Worker registered:', reg))
+        .catch((err) => console.log('Service Worker registration failed:', err));
+    }
+  }, []);
 
   return (
     <html lang="en" suppressHydrationWarning>
