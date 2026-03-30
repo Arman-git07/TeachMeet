@@ -4,10 +4,9 @@ const nextConfig = {
   reactStrictMode: true
 }
 
-export default withPWA({
-  ...nextConfig,
-  pwa: {
-    dest: 'public',
-    disable: false
-  }
+const pwaConfig = withPWA({
+  dest: 'public',
+  disable: false
 })
+
+export default pwaConfig(nextConfig)
