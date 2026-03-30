@@ -1,8 +1,7 @@
 
 // src/app/layout.tsx
-'use client';
+
 import React from 'react';
-import { useEffect } from 'react';
 import SWRegister from "./sw-register";
 import { usePathname } from 'next/navigation';
 import './globals.css';
@@ -15,14 +14,6 @@ export default function RootLayout({ children }) {
   const pathname = usePathname();
   const isAuthPage = pathname.startsWith('/auth');
 
-  useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js')
-        .then((reg) => console.log('Service Worker registered:', reg))
-        .catch((err) => console.log('Service Worker registration failed:', err));
-    }
-  }, []);
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -32,23 +23,19 @@ export default function RootLayout({ children }) {
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0f172a" />
 </head>
-      <body className={cn(
-        'font-sans antialiased min-h-screen flex flex-col',
-        'subpixel-antialiased' // Added for potentially smoother font rendering
-      )}>
-        <SWRegister />
-  {children}
-        <Providers>
-          {isAuthPage ? (
-            children
-          ) : (
-            <AppShell>
-              {children}
-            </AppShell>
-          )}
-        </Providers>
-        <Toaster />
-      </body>
+      <body className={cn('font-sans antialiased min-h-screen flex flex-col')}>
+  <SWRegister />
+  <Providers>
+    {isAuthPage ? (
+      children
+    ) : (
+      <AppShell>
+        {children}
+      </AppShell>
+    )}
+  </Providers>
+  <Toaster />
+</body>
     </html>
   );
 }
