@@ -1,23 +1,18 @@
 import { Html, Head, Main, NextScript } from "next/document";
+import Script from "next/script";
 
 export default function Document() {
   return (
     <Html>
       <Head>
-        <script
+        <Script
+          id="sw-register"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
-              (function() {
-                if ('serviceWorker' in navigator) {
-                  navigator.serviceWorker.register('/service-worker.js')
-                    .then(function(reg) {
-                      console.log('SW registered:', reg);
-                    })
-                    .catch(function(err) {
-                      console.log('SW failed:', err);
-                    });
-                }
-              })();
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/service-worker.js');
+              }
             `,
           }}
         />
