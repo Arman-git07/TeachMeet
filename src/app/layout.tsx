@@ -20,8 +20,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        
-      </head>
+  <link rel="icon" href="/favicon-new.ico" />
+  <link rel="shortcut icon" href="/favicon-new.ico" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0f172a" />
+</head>
       <body className={cn(
         'font-sans antialiased min-h-screen flex flex-col',
         'subpixel-antialiased' // Added for potentially smoother font rendering
