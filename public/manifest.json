@@ -11,7 +11,11 @@
   "orientation": "portrait",
 
   "id": "/?source=pwa",
-
+  
+"categories": ["education", "productivity"],
+"lang": "en",
+"dir": "ltr"
+  
   "icons": [
     {
       "src": "/icons/icon-192.png",
