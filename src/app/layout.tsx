@@ -1,49 +1,38 @@
-
-// src/app/layout.tsx
-'use client';
 import React from 'react';
-import SWRegister from "./sw-register";
-import { usePathname } from 'next/navigation';
-import ClientLayout from "@/components/ClientLayout";
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from '@/lib/utils';
 import { Providers } from '@/components/common/Providers';
-import { AppShell } from '@/components/common/AppShell';
+import ClientWrapper from './ClientWrapper';
 
 export default function RootLayout({ children }) {
-  const pathname = usePathname();
-  const isAuthPage = pathname.startsWith('/auth');
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-  <link rel="icon" href="/favicon-new.ico" />
-  <link rel="shortcut icon" href="/favicon-new.ico" />
-  <link rel="apple-touch-icon" href="/icon-192.png" />
-  <link rel="manifest" href="/manifest.json" />
-  <meta name="theme-color" content="#0f172a" />
-        <script dangerouslySetInnerHTML={{
-  __html: `
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js');
-    }
-  `
-}} />
-</head>
-      <body className={cn('font-sans antialiased min-h-screen flex flex-col')}>
+        <link rel="icon" href="/favicon-new.ico" />
+        <link rel="shortcut icon" href="/favicon-new.ico" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#0f172a" />
 
-  <Providers>
-    {isAuthPage ? (
-      children
-    ) : (
-      <AppShell>
-        {children}
-      </AppShell>
-    )}
-  </Providers>
-  <Toaster />
-</body>
+        {/* ✅ EARLY SW REGISTRATION */}
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.register('/service-worker.js');
+            }
+          `
+        }} />
+      </head>
+
+      <body className={cn('font-sans antialiased min-h-screen flex flex-col')}>
+        <Providers>
+          <ClientWrapper>
+            {children}
+          </ClientWrapper>
+        </Providers>
+        <Toaster />
+      </body>
     </html>
   );
 }
