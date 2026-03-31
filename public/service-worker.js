@@ -34,24 +34,33 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  // Skip non-GET requests (important)
+  if (event.request.method !== "GET") return;
+
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      // ✅ return cache first
       if (cachedResponse) {
         return cachedResponse;
       }
 
-      // ✅ otherwise fetch and cache
       return fetch(event.request)
         .then((response) => {
-          return caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, response.clone());
+          // Don't cache invalid responses
+          if (!response || response.status !== 200 || response.type !== "basic") {
             return response;
+          }
+
+          const responseClone = response.clone();
+
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone);
           });
+
+          return response;
         })
         .catch(() => {
-          // ✅ fallback for offline
-          return new Response("⚠️ You are offline");
+          // 🔥 Show offline page instead of plain text
+          return caches.match("/offline.html");
         });
     })
   );
