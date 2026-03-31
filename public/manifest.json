@@ -2,6 +2,7 @@
   "name": "TeachMeet",
   "short_name": "TeachMeet",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "theme_color": "#a855f7",
   "background_color": "#000000",
@@ -24,19 +25,24 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ]
+  ],
+
   "shortcuts": [
-  {
-    "name": "Join Meeting",
-    "short_name": "Join",
-    "url": "/meeting",
-    "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
-  },
-  {
-    "name": "Create Class",
-    "short_name": "Create",
-    "url": "/create",
-    "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
-  }
+    {
+      "name": "Join Meeting",
+      "short_name": "Join",
+      "url": "/meeting",
+      "icons": [
+        { "src": "/icon-192.png", "sizes": "192x192" }
+      ]
+    },
+    {
+      "name": "Create Class",
+      "short_name": "Create",
+      "url": "/create",
+      "icons": [
+        { "src": "/icon-192.png", "sizes": "192x192" }
+      ]
+    }
   ]
 }
