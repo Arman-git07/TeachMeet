@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { cn } from '@/lib/utils';
 import { Providers } from '@/components/common/Providers';
 import ClientWrapper from './ClientWrapper';
+import SWRegister from "@/components/SWRegister";
 
 export default function RootLayout({ children }) {
   return (
@@ -26,13 +27,14 @@ export default function RootLayout({ children }) {
       </head>
 
       <body className={cn('font-sans antialiased min-h-screen flex flex-col')}>
-        <Providers>
-          <ClientWrapper>
-            {children}
-          </ClientWrapper>
-        </Providers>
-        <Toaster />
-      </body>
+  <Providers>
+    <ClientWrapper>
+      <SWRegister />   {/* ✅ ADD HERE */}
+      {children}
+    </ClientWrapper>
+  </Providers>
+  <Toaster />
+</body>
     </html>
   );
 }
