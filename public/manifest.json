@@ -5,25 +5,22 @@
   "display": "standalone",
   "theme_color": "#a855f7",
   "background_color": "#000000",
-
   "description": "TeachMeet is a modern online classroom and meeting app where teachers can create classes and students can join with approval like Google Meet.",
-
   "orientation": "portrait",
-
   "id": "/?source=pwa",
-  
-"categories": ["education", "productivity"],
-"lang": "en",
-"dir": "ltr"
-  
+
+  "categories": ["education", "productivity"],
+  "lang": "en",
+  "dir": "ltr",
+
   "icons": [
     {
-      "src": "/icons/icon-192.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
