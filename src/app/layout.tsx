@@ -23,9 +23,16 @@ export default function RootLayout({ children }) {
   <link rel="apple-touch-icon" href="/icon-192.png" />
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0f172a" />
+        <script dangerouslySetInnerHTML={{
+  __html: `
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js');
+    }
+  `
+}} />
 </head>
       <body className={cn('font-sans antialiased min-h-screen flex flex-col')}>
-  <SWRegister />
+
   <Providers>
     {isAuthPage ? (
       children
