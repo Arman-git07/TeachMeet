@@ -571,8 +571,7 @@ export default function HomePage() {
   };
 }, []);
 
-  const handleDismiss = (id: string) => {
-    const fallbackActivity: ActivityItem[] = [
+  const fallbackActivity: ActivityItem[] = [
   {
     id: 'offline-1',
     type: 'announcement',
@@ -586,6 +585,7 @@ export default function HomePage() {
     timestamp: Date.now()
   }
 ];
+  const handleDismiss = (id: string) => {
     const key = `${DISMISSED_ITEMS_KEY_PREFIX}${user?.uid}`;
     const dismissed = JSON.parse(localStorage.getItem(key) || '[]');
     localStorage.setItem(key, JSON.stringify([...dismissed, id]));
