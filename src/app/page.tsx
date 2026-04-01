@@ -568,8 +568,10 @@ const fallbackActivity: ActivityItem[] = [
   }, [user, activityChunks, validMeetings, refreshTrigger]);
 
   useEffect(() => {
-    if (!authLoading) setIsLoading(false);
-  }, [authLoading]);
+  if (!authLoading || !navigator.onLine) {
+    setIsLoading(false);
+  }
+}, [authLoading]);
 
   useEffect(() => {
   const goOnline = () => setIsOffline(false);
