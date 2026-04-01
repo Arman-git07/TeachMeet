@@ -125,6 +125,7 @@ export default function HomePage() {
   
   const [activityChunks, setActivityChunks] = useState<Record<string, ActivityItem[]>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [validMeetings, setValidMeetings] = useState<Record<string, boolean>>({});
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
@@ -349,8 +350,12 @@ export default function HomePage() {
   }, [user, isAuthenticated]);
 
   useEffect(() => {
-    if (!user || !isAuthenticated || Object.keys(allClassroomIds).length === 0) return;
+  if (!navigator.onLine) {
+    setIsLoading(false);
+    return;
+  }
 
+  if (!user || !isAuthenticated || Object.keys(allClassroomIds).length === 0) return;
     Object.keys(allClassroomIds).forEach(classId => {
         const classInfo = allClassroomIds[classId];
         const categories: {cat: ActivityItemType, col: string, order: string}[] = [
@@ -457,7 +462,12 @@ export default function HomePage() {
   }, [user, isAuthenticated, allClassroomIds]);
 
   useEffect(() => {
-    if (!user || !isAuthenticated) return;
+  if (!navigator.onLine) {
+    setIsLoading(false);
+    return;
+  }
+
+  if (!user || !isAuthenticated) return;
 
     const unsubDocs = onSnapshot(
         query(collection(db, 'documents'), where('uploaderId', '==', user.uid), orderBy('createdAt', 'desc'), limit(5)), 
@@ -545,6 +555,19 @@ export default function HomePage() {
   useEffect(() => {
     if (!authLoading) setIsLoading(false);
   }, [authLoading]);
+
+  useEffect(() => {
+  const goOnline = () => setIsOffline(false);
+  const goOffline = () => setIsOffline(true);
+
+  window.addEventListener('online', goOnline);
+  window.addEventListener('offline', goOffline);
+
+  return () => {
+    window.removeEventListener('online', goOnline);
+    window.removeEventListener('offline', goOffline);
+  };
+}, []);
 
   const handleDismiss = (id: string) => {
     const key = `${DISMISSED_ITEMS_KEY_PREFIX}${user?.uid}`;
@@ -645,9 +668,16 @@ export default function HomePage() {
                 </motion.div>
                 Latest Activity
             </h2>
-            {authLoading || isLoading ? (
-                <div className="py-8"><Loader2 className="animate-spin h-8 w-8 mx-auto text-primary/50"/></div>
-            ) : !isAuthenticated ? (
+            {isOffline ? (
+  <div className="py-12 text-center text-red-400">
+    <p className="text-sm font-semibold">You are offline</p>
+    <p className="text-xs mt-1">Connect to internet to see latest activity</p>
+  </div>
+) : authLoading || isLoading ? (
+  <div className="py-8">
+    <Loader2 className="animate-spin h-8 w-8 mx-auto text-primary/50"/>
+  </div>
+) : !isAuthenticated ? (
                 <div className="py-12 text-center text-muted-foreground">
                     <p className="text-sm font-medium">No recent activity.</p>
                     <p className="text-xs mt-1">Sign in to track your meetings and classes!</p>
