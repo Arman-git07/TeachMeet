@@ -716,69 +716,68 @@ const fallbackActivity: ActivityItem[] = [
                     <p className="text-sm font-medium">No recent activity.</p>
                     <p className="text-xs mt-1">Sign in to track your meetings and classes!</p>
                 </div>
-            ) : (isOffline ? fallbackActivity : allActivity).map(item => { ? (
-                <div className="max-h-[400px] overflow-y-auto pr-2 space-y-3 text-left">
-                    {(isOffline ? fallbackActivity : allActivity).map(item => {
-                        const Icon = itemIcons[item.type as ActivityItemType];
-                        const link = itemLinks[item.type as ActivityItemType](item.id.split('-').pop()!, item);
-                        
-                        let displayTitle = item.title;
-                        const label = item.statusLabel || (item.isUpdated ? 'Updated' : 'New');
+            ) : (isOffline ? fallbackActivity : allActivity).length > 0 ? (
+  <div className="max-h-[400px] overflow-y-auto pr-2 space-y-3 text-left">
+    {(isOffline ? fallbackActivity : allActivity).map(item => {
+      const Icon = itemIcons[item.type as ActivityItemType];
+      const link = itemLinks[item.type as ActivityItemType](item.id.split('-').pop()!, item);
+      
+      let displayTitle = item.title;
+      const label = item.statusLabel || (item.isUpdated ? 'Updated' : 'New');
 
-                        if (item.type === 'joinRequest') {
-                            displayTitle = `${(item as JoinRequestActivityItem).requesterName} wants to join "${item.title}"`;
-                        } else if (item.classroomName) {
-                            displayTitle = `${label} ${item.type} in ${item.classroomName}`;
-                        } else if (item.type === 'meeting' && item.role === 'participant') {
-                            displayTitle = `Rejoin: ${item.title}`;
-                        }
-                  const activityToShow = isOffline ? fallbackActivity : allActivity;
- 
-                        return (
-                        <div key={item.id} className="flex items-center gap-2 group animate-fade-in">
-                            <Link href={link} className={cn(
-                                "flex-1 p-3 border rounded-lg bg-card hover:bg-muted transition-all flex items-center gap-3 truncate shadow-sm",
-                                item.isImportant && "border-primary/30 bg-primary/5 ring-1 ring-primary/20"
-                            )}>
-                                <div className={cn(
-                                    "p-2 rounded-full shrink-0",
-                                    item.type === 'meeting' ? "bg-primary/10 text-primary" :
-                                    item.type === 'assignment' ? "bg-red-100 text-red-600" :
-                                    item.type === 'material' ? "bg-blue-100 text-blue-600" :
-                                    item.type === 'exam' ? "bg-purple-100 text-purple-600" :
-                                    item.type === 'submission' ? "bg-green-100 text-green-600" :
-                                    item.type === 'subscription_warning' ? "bg-amber-100 text-amber-600" :
-                                    "bg-accent/10 text-accent"
-                                )}>
-                                    <Icon className="h-4 w-4" />
-                                </div>
-                                <div className="flex flex-col truncate">
-                                    <span className={cn("text-sm truncate", item.isImportant ? "font-bold text-foreground" : "font-medium")}>
-                                        {displayTitle}
-                                    </span>
-                                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                                        {item.type} • {new Date(item.isUpdated ? (item.updatedAt || item.timestamp) : item.timestamp).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}
-                                    </span>
-                                </div>
-                            </Link>
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="rounded-full h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={() => handleDismiss(item.id)}
-                            >
-                                <XCircle className="h-4 w-4"/>
-                            </Button>
-                        </div>
-                        );
-                    })}
-                </div>
-              ) : (
-                <div className="py-12 text-center text-muted-foreground">
-                    <p className="text-sm">No recent activity.</p>
-                    <p className="text-xs mt-1">Activity from your classes and meetings will appear here.</p>
-                </div>
-              )
+      if (item.type === 'joinRequest') {
+        displayTitle = `${(item as JoinRequestActivityItem).requesterName} wants to join "${item.title}"`;
+      } else if (item.classroomName) {
+        displayTitle = `${label} ${item.type} in ${item.classroomName}`;
+      } else if (item.type === 'meeting' && item.role === 'participant') {
+        displayTitle = `Rejoin: ${item.title}`;
+      }
+
+      return (
+        <div key={item.id} className="flex items-center gap-2 group animate-fade-in">
+          <Link href={link} className={cn(
+            "flex-1 p-3 border rounded-lg bg-card hover:bg-muted transition-all flex items-center gap-3 truncate shadow-sm",
+            item.isImportant && "border-primary/30 bg-primary/5 ring-1 ring-primary/20"
+          )}>
+            <div className={cn(
+              "p-2 rounded-full shrink-0",
+              item.type === 'meeting' ? "bg-primary/10 text-primary" :
+              item.type === 'assignment' ? "bg-red-100 text-red-600" :
+              item.type === 'material' ? "bg-blue-100 text-blue-600" :
+              item.type === 'exam' ? "bg-purple-100 text-purple-600" :
+              item.type === 'submission' ? "bg-green-100 text-green-600" :
+              item.type === 'subscription_warning' ? "bg-amber-100 text-amber-600" :
+              "bg-accent/10 text-accent"
+            )}>
+              <Icon className="h-4 w-4" />
+            </div>
+            <div className="flex flex-col truncate">
+              <span className={cn("text-sm truncate", item.isImportant ? "font-bold text-foreground" : "font-medium")}>
+                {displayTitle}
+              </span>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                {item.type} • {new Date(item.isUpdated ? (item.updatedAt || item.timestamp) : item.timestamp).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}
+              </span>
+            </div>
+          </Link>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="rounded-full h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={() => handleDismiss(item.id)}
+          >
+            <XCircle className="h-4 w-4"/>
+          </Button>
+        </div>
+      );
+    })}
+  </div>
+) : (
+  <div className="py-12 text-center text-muted-foreground">
+    <p className="text-sm">No recent activity.</p>
+    <p className="text-xs mt-1">Activity from your classes and meetings will appear here.</p>
+  </div>
+)
             }
           </div>
         </div>
