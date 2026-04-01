@@ -669,9 +669,26 @@ export default function HomePage() {
                 Latest Activity
             </h2>
             {isOffline ? (
-  <div className="py-12 text-center text-red-400">
-    <p className="text-sm font-semibold">You are offline</p>
-    <p className="text-xs mt-1">Connect to internet to see latest activity</p>
+  <div className="py-10 text-center">
+    
+    <div className="flex justify-center mb-4">
+      <AlertTriangle className="h-10 w-10 text-red-500" />
+    </div>
+
+    <p className="text-base font-semibold text-foreground">
+      You're Offline
+    </p>
+
+    <p className="text-xs text-muted-foreground mt-2">
+      Only basic UI is available. Connect to internet for meetings & activity.
+    </p>
+
+    <div className="mt-6 flex justify-center gap-3">
+      <Button variant="outline" onClick={() => location.reload()}>
+        Retry
+      </Button>
+    </div>
+
   </div>
 ) : authLoading || isLoading ? (
   <div className="py-8">
