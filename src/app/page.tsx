@@ -501,6 +501,21 @@ export default function HomePage() {
 
   const allActivity = useMemo(() => {
     if (!user) return [];
+
+const fallbackActivity: ActivityItem[] = [
+  {
+    id: 'offline-1',
+    type: 'announcement',
+    title: 'Offline Mode Active',
+    timestamp: Date.now()
+  },
+  {
+    id: 'offline-2',
+    type: 'material',
+    title: 'Connect to internet to load classes',
+    timestamp: Date.now()
+  }
+];
     
     const DISMISSED_KEY = `${DISMISSED_ITEMS_KEY_PREFIX}${user.uid}`;
     const STARTED_KEY = `${STARTED_MEETINGS_KEY_PREFIX}${user.uid}`;
