@@ -716,7 +716,7 @@ const fallbackActivity: ActivityItem[] = [
                     <p className="text-sm font-medium">No recent activity.</p>
                     <p className="text-xs mt-1">Sign in to track your meetings and classes!</p>
                 </div>
-            ) : (isOffline ? fallbackActivity : allActivity).length > 0 ? (
+            ) : (isOffline ? fallbackActivity : allActivity).map(item => { ? (
                 <div className="max-h-[400px] overflow-y-auto pr-2 space-y-3 text-left">
                     {(isOffline ? fallbackActivity : allActivity).map(item => {
                         const Icon = itemIcons[item.type as ActivityItemType];
@@ -732,7 +732,8 @@ const fallbackActivity: ActivityItem[] = [
                         } else if (item.type === 'meeting' && item.role === 'participant') {
                             displayTitle = `Rejoin: ${item.title}`;
                         }
-
+                  const activityToShow = isOffline ? fallbackActivity : allActivity;
+ 
                         return (
                         <div key={item.id} className="flex items-center gap-2 group animate-fade-in">
                             <Link href={link} className={cn(
