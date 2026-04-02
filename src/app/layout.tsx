@@ -1,3 +1,5 @@
+"use client";
+import { useEffect } from "react";
 import React from 'react';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -7,6 +9,11 @@ import ClientWrapper from './ClientWrapper';
 import SWRegister from "@/components/SWRegister";
 
 export default function RootLayout({ children }) {
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js");
+    }
+  }, []);
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
