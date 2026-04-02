@@ -1,7 +1,7 @@
 import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
 import { getAuth, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getMessaging, type Messaging } from 'firebase/messaging';
 import { getDatabase } from 'firebase/database';
 
@@ -41,24 +41,13 @@ if (typeof window !== "undefined") {
 }
 
 // Firestore
-const db = getFirestore(app);
-
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
 // Enable offline persistence
-if (typeof window !== 'undefined') {
-  try {
-    enableIndexedDbPersistence(db)
-      .then(() => console.log("Firestore persistence enabled."))
-      .catch((err) => {
-        if (err.code === 'failed-precondition') {
-          console.warn("Firestore persistence failed. Multiple tabs open?");
-        } else if (err.code === 'unimplemented') {
-          console.warn("Firestore persistence not supported in this browser.");
-        }
-      });
-  } catch (err) {
-    console.error("Error enabling firestore persistence", err);
-  }
-}
+
 
 const storage = getStorage(app);
 const rtdb = getDatabase(app);
