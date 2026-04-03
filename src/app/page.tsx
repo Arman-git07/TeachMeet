@@ -696,7 +696,7 @@ export default function HomePage() {
     </p>
 
     <p className="text-xs text-muted-foreground mt-2">
-      Only basic UI is available. Connect to internet for meetings & activity.
+      Connect to internet for meetings & to see latest activity.
     </p>
 
     <div className="mt-6 flex justify-center gap-3">
