@@ -608,6 +608,11 @@ export default function HomePage() {
   return (
     <div className="flex flex-col min-h-screen">
       <AppHeader showLogo={false} />
+      {isOffline && (
+  <div className="bg-red-500 text-white text-center py-2 text-sm">
+    You're offline – some features are disabled
+  </div>
+)}
       <main className="flex-grow flex flex-col items-center justify-center pt-16 sm:pt-4 relative pb-[18rem]">
         <div className="relative z-10 flex w-full flex-col items-center text-center px-4">
           
