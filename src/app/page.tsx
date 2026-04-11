@@ -689,22 +689,57 @@ export default function HomePage() {
                 </motion.div>
                 Latest Activity
             </h2>
-            {!isAuthenticated ? (
-  <div className="py-12 text-center text-muted-foreground">
-    <p className="text-sm font-medium">No recent activity.</p>
-    <p className="text-xs mt-1">Sign in to track your meetings and classes!</p>
-  </div>
-) : (isOffline ? fallbackActivity : allActivity).length > 0 ? (
+            {authLoading || isLoading ? (
+  // 🔄 Loading
   <div className="py-8">
     <Loader2 className="animate-spin h-8 w-8 mx-auto text-primary/50"/>
   </div>
+
 ) : !isAuthenticated ? (
-                <div className="py-12 text-center text-muted-foreground">
-                    <p className="text-sm font-medium">No recent activity.</p>
-                    <p className="text-xs mt-1">Sign in to track your meetings and classes!</p>
-                </div>
-            ) : (isOffline ? fallbackActivity : allActivity).length > 0 ? (
+  // 🔐 Not logged in
+  <div className="py-12 text-center text-muted-foreground">
+    <p className="text-sm font-medium">No recent activity.</p>
+    <p className="text-xs mt-1">
+      Sign in to track your meetings and classes!
+    </p>
+  </div>
+
+) : (isOffline ? fallbackActivity : allActivity).length > 0 ? (
+  // ✅ Show activity (ONLINE or OFFLINE)
   <div className="max-h-[400px] overflow-y-auto pr-2 space-y-3 text-left">
+    {(isOffline ? fallbackActivity : allActivity).map(item => {
+      const Icon = itemIcons[item.type as ActivityItemType];
+      const link = itemLinks[item.type as ActivityItemType](
+        item.id.split('-').pop()!, 
+        item
+      );
+
+      let displayTitle = item.title;
+
+      if (item.type === 'joinRequest') {
+        displayTitle = `${(item as any).requesterName} wants to join "${item.title}"`;
+      }
+
+      return (
+        <div key={item.id} className="flex items-center gap-2">
+          <Link href={link} className="flex-1 p-3 border rounded-lg flex items-center gap-3">
+            <Icon className="h-4 w-4" />
+            <span className="text-sm">{displayTitle}</span>
+          </Link>
+        </div>
+      );
+    })}
+  </div>
+
+) : (
+  // 📭 Empty state
+  <div className="py-12 text-center text-muted-foreground">
+    <p className="text-sm">No recent activity.</p>
+    <p className="text-xs mt-1">
+      Activity from your classes will appear here.
+    </p>
+  </div>
+)}
     {(isOffline ? fallbackActivity : allActivity).map(item => {
       const Icon = itemIcons[item.type as ActivityItemType];
       const link = itemLinks[item.type as ActivityItemType](item.id.split('-').pop()!, item);
