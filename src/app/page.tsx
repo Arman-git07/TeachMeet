@@ -684,29 +684,12 @@ export default function HomePage() {
                 </motion.div>
                 Latest Activity
             </h2>
-            {isOffline ? (
-  <div className="py-10 text-center">
-    
-    <div className="flex justify-center mb-4">
-      <AlertTriangle className="h-10 w-10 text-red-500" />
-    </div>
-
-    <p className="text-base font-semibold text-foreground">
-      You're Offline
-    </p>
-
-    <p className="text-xs text-muted-foreground mt-2">
-      Connect to internet for meetings & to see latest activity.
-    </p>
-
-    <div className="mt-6 flex justify-center gap-3">
-      <Button variant="outline" onClick={() => location.reload()}>
-        Retry
-      </Button>
-    </div>
-
+            {!isAuthenticated ? (
+  <div className="py-12 text-center text-muted-foreground">
+    <p className="text-sm font-medium">No recent activity.</p>
+    <p className="text-xs mt-1">Sign in to track your meetings and classes!</p>
   </div>
-) : authLoading || isLoading ? (
+) : (isOffline ? fallbackActivity : allActivity).length > 0 ? (
   <div className="py-8">
     <Loader2 className="animate-spin h-8 w-8 mx-auto text-primary/50"/>
   </div>
