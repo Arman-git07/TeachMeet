@@ -36,14 +36,16 @@ useEffect(() => {
   const joinMeetingHref = isAuthenticated ? "/dashboard/join-meeting" : "/auth/signin?action=join";
 
   const handleStartMeeting = () => {
-    if (authLoading) return;
-    if (!isAuthenticated) {
-      router.push('/auth/signin?action=start');
-      return;
-    }
-    const meetingId = `meeting-${uuidv4().slice(0, 11).replace(/-/g, '')}`;
-    router.push(`/dashboard/meeting/prejoin?meetingId=${meetingId}&role=host`);
-  };
+  if (authLoading || isOffline) return;
+
+  if (!isAuthenticated) {
+    router.push('/auth/signin?action=start');
+    return;
+  }
+
+  const meetingId = `meeting-${uuidv4().slice(0, 11).replace(/-/g, '')}`;
+  router.push(`/dashboard/meeting/prejoin?meetingId=${meetingId}&role=host`);
+};
   
   return (
     <div
