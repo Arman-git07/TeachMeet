@@ -96,6 +96,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     try {
       await firebaseSignOut(auth);
+
+// ✅ REMOVE OFFLINE CACHE
+localStorage.removeItem('teachmeet-user');
       toast({ title: 'Signed Out', description: 'You have been successfully signed out.' });
       if (pathname.startsWith('/dashboard')) {
         router.push('/');
