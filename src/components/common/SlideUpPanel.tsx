@@ -11,6 +11,20 @@ import { v4 as uuidv4 } from 'uuid';
 
 export function SlideUpPanel() {
   const [showPanel, setShowPanel] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+useEffect(() => {
+  const goOnline = () => setIsOffline(false);
+  const goOffline = () => setIsOffline(true);
+
+  window.addEventListener('online', goOnline);
+  window.addEventListener('offline', goOffline);
+
+  return () => {
+    window.removeEventListener('online', goOnline);
+    window.removeEventListener('offline', goOffline);
+  };
+}, []);
   const { isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
 
