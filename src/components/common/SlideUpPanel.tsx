@@ -80,7 +80,7 @@ useEffect(() => {
               size="lg"
               className="w-full max-w-xs btn-gel text-base py-4 px-6 rounded-xl shadow-lg hover:shadow-primary/50"
               aria-label="Join Existing Meeting"
-              disabled={authLoading}
+              disabled={authLoading || isOffline}
             >
               <Link href={joinMeetingHref}>
                 <Video className="mr-2 h-5 w-5" />
