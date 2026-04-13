@@ -49,6 +49,20 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  useEffect(() => {
+  // ✅ LOAD USER FROM LOCAL STORAGE (OFFLINE SUPPORT)
+  const cached = localStorage.getItem('teachmeet-user');
+
+  if (cached && !navigator.onLine) {
+    try {
+      const parsed = JSON.parse(cached);
+
+      // Fake minimal user object for UI
+      setUser(parsed as any);
+      setLoading(false);
+    } catch {}
+  }
+}, []);
   const [loading, setLoading] = useState(true);
   
   const router = useRouter();
@@ -57,9 +71,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const authUnsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
+  if (currentUser) {
+    setUser(currentUser);
+
+    // ✅ SAVE USER FOR OFFLINE
+    localStorage.setItem('teachmeet-user', JSON.stringify({
+      uid: currentUser.uid,
+      name: currentUser.displayName,
+      email: currentUser.email,
+      photoURL: currentUser.photoURL
+    }));
+  } else {
+    setUser(null);
+  }
+
+  setLoading(false);
+});
 
     return () => {
       authUnsubscribe();
