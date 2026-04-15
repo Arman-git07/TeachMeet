@@ -11,18 +11,23 @@ import { v4 as uuidv4 } from 'uuid';
 
 export function SlideUpPanel() {
   const [showPanel, setShowPanel] = useState(false);
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [isOffline, setIsOffline] = useState(false);
 
 useEffect(() => {
+  if (typeof window === "undefined") return;
+
   const goOnline = () => setIsOffline(false);
   const goOffline = () => setIsOffline(true);
 
-  window.addEventListener('online', goOnline);
-  window.addEventListener('offline', goOffline);
+  window.addEventListener("online", goOnline);
+  window.addEventListener("offline", goOffline);
+
+  // ✅ SAFE initial check
+  setIsOffline(!window.navigator.onLine);
 
   return () => {
-    window.removeEventListener('online', goOnline);
-    window.removeEventListener('offline', goOffline);
+    window.removeEventListener("online", goOnline);
+    window.removeEventListener("offline", goOffline);
   };
 }, []);
   const { isAuthenticated, loading: authLoading } = useAuth();
