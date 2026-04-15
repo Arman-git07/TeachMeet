@@ -70,15 +70,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   if (currentUser) {
     setUser(currentUser);
 
-    // ✅ SAVE USER FOR OFFLINE
     localStorage.setItem('teachmeet-user', JSON.stringify({
       uid: currentUser.uid,
-      name: currentUser.displayName,
+      displayName: currentUser.displayName,
       email: currentUser.email,
       photoURL: currentUser.photoURL
     }));
   } else {
-    setUser(null);
+    // ❗ IMPORTANT: don't remove user if offline
+    if (navigator.onLine) {
+      setUser(null);
+      localStorage.removeItem('teachmeet-user');
+    }
   }
 
   setLoading(false);
