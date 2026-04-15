@@ -48,21 +48,17 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<FirebaseUser | null>(null);
-  useEffect(() => {
-  // ✅ LOAD USER FROM LOCAL STORAGE (OFFLINE SUPPORT)
-  const cached = localStorage.getItem('teachmeet-user');
-
-  if (cached && !navigator.onLine) {
-    try {
-      const parsed = JSON.parse(cached);
-
-      // Fake minimal user object for UI
-      setUser(parsed as any);
-      setLoading(false);
-    } catch {}
+  const [user, setUser] = useState<FirebaseUser | null>(() => {
+  if (typeof window !== "undefined") {
+    const cached = localStorage.getItem("teachmeet-user");
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch {}
+    }
   }
-}, []);
+  return null;
+});
   const [loading, setLoading] = useState(true);
   
   const router = useRouter();
