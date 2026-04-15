@@ -187,7 +187,7 @@ const NavItem = ({
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { isAuthenticated, signOut, loading } = useAuth();
+  const { user, isAuthenticated, signOut, loading } = useAuth();
   const [showSignOutConfirm, setShowSignOutConfirm] = React.useState(false);
   const { isMobile, setOpenMobile } = useSidebar();
 
