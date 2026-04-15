@@ -97,9 +97,9 @@ const meetingId = Array.isArray(params?.meetingId)
 
   videoEl.muted = isLocal;
 
-  videoEl.onloadedmetadata = () => {
-    videoEl.play().catch(err => console.error("Play failed:", err));
-  };
+  setTimeout(() => {
+  videoEl.play().catch(err => console.error("Play failed:", err));
+}, 0);
   } else {
     videoEl.srcObject = null;
     setHasVideoTrack(false);
