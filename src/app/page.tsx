@@ -610,7 +610,7 @@ export default function HomePage() {
       <AppHeader showLogo={false} />
       {isOffline && (
   <div className="bg-red-500 text-white text-center py-2 text-sm">
-    You're offline – some features are disabled
+    You're offline
   </div>
 )}
       <main className="flex-grow flex flex-col items-center justify-center pt-16 sm:pt-4 relative pb-[18rem]">
