@@ -219,7 +219,7 @@ export function AppSidebar() {
           </SidebarMenu>
         ) : (
         <SidebarMenu className="space-y-2">
-          {isAuthenticated ? (
+          {user ? (
             <>
               <NavItem href="/" icon={HomeIcon} currentPath={pathname}>Home</NavItem>
               {pathname === '/' && (
