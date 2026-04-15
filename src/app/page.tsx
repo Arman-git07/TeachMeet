@@ -352,7 +352,7 @@ export default function HomePage() {
   useEffect(() => {
   if (!navigator.onLine) {
     setIsLoading(false);
-    return;
+  
   }
 
   if (!user || !isAuthenticated || Object.keys(allClassroomIds).length === 0) return;
