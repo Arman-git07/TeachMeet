@@ -312,7 +312,7 @@ export default function HomePage() {
   useEffect(() => {
     if (!user || !isAuthenticated) {
         setAllClassroomIds({});
-        return;
+        
     }
 
     const unsubManaged = onSnapshot(
@@ -464,7 +464,7 @@ export default function HomePage() {
   useEffect(() => {
   if (!navigator.onLine) {
     setIsLoading(false);
-    return;
+    
   }
 
   if (!user || !isAuthenticated) return;
