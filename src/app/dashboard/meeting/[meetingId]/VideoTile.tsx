@@ -107,6 +107,17 @@ const meetingId = Array.isArray(params?.meetingId)
 }, [stream, isLocal]);
 
   useEffect(() => {
+  if (!stream) return;
+
+  const videoEl = videoRef.current;
+  if (!videoEl) return;
+
+  videoEl.srcObject = stream;
+
+  videoEl.play().catch(() => {});
+}, [stream]);
+  
+  useEffect(() => {
   const videoEl = videoRef.current;
   if (!videoEl) return;
 
