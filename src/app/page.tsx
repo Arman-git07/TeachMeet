@@ -125,7 +125,7 @@ export default function HomePage() {
   
   const [activityChunks, setActivityChunks] = useState<Record<string, ActivityItem[]>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [isOffline, setIsOffline] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [validMeetings, setValidMeetings] = useState<Record<string, boolean>>({});
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
