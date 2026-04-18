@@ -312,7 +312,7 @@ export default function HomePage() {
   useEffect(() => {
     if (!user || !isAuthenticated) {
         setAllClassroomIds({});
-        
+        return;
     }
 
     const unsubManaged = onSnapshot(
