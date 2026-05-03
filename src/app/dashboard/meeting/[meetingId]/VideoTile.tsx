@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   MicOff,
   Mic,
@@ -8,13 +7,8 @@ import {
   Pin,
   Maximize2,
   Minimize2,
-  Pencil,
-  X,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import HandRaiseIcon from "./HandRaiseIcon";
-import { Button } from "@/components/ui/button";
-import { useRouter, useParams } from "next/navigation";
+import { cn } from "../lib/utils";
 
 type Props = {
   stream: MediaStream | null;
@@ -57,12 +51,6 @@ const VideoTile: React.FC<Props> = ({
   isPinned = false,
   isSpotlight = false,
 }) => {
-  const router = useRouter();
-const params = useParams();
-
-const meetingId = Array.isArray(params?.meetingId)
-  ? params?.meetingId[0]
-  : params?.meetingId || "";
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isMirrored, setIsMirrored] = useState(false);
   const [hasVideoTrack, setHasVideoTrack] = useState(false);
@@ -76,53 +64,43 @@ const meetingId = Array.isArray(params?.meetingId)
   }, [isLocal, isScreenSharing]);
 
   const syncStream = useCallback(() => {
-  const videoEl = videoRef.current;
-  if (!videoEl) return;
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
 
-  if (stream) {
-  videoEl.srcObject = stream;
+    if (stream) {
+      // Only set srcObject if it's different to prevent flickers
+      if (videoEl.srcObject !== stream) {
+        videoEl.srcObject = stream;
+      }
 
-  const videoTracks = stream.getVideoTracks();
+      const videoTracks = stream.getVideoTracks();
+      const hasVideo = videoTracks.some(
+        (track) => track.readyState === "live" && track.enabled
+      );
 
-  const hasVideo = videoTracks.some(
-    (track) => track.readyState === "live" && track.enabled
-  );
+      setHasVideoTrack(hasVideo);
 
-  setHasVideoTrack(hasVideo);
+      // Attach listeners to tracks to detect when they become active/inactive
+      stream.getTracks().forEach(track => {
+        track.onunmute = syncStream;
+        track.onmute = syncStream;
+        track.onended = syncStream;
+      });
 
-  stream.getVideoTracks().forEach(track => {
-    track.onunmute = syncStream;
-    track.onmute = syncStream;
-  });
+      // CRITICAL: Remote video MUST NOT be muted to hear audio, 
+      // but browsers often block auto-playing unmuted video unless there's a user gesture.
+      videoEl.muted = isLocal;
 
-  videoEl.muted = isLocal;
-
-  setTimeout(() => {
-  videoEl.play().catch(err => console.error("Play failed:", err));
-}, 0);
-  } else {
-    videoEl.srcObject = null;
-    setHasVideoTrack(false);
-  }
-}, [stream, isLocal]);
-
-  useEffect(() => {
-  if (!stream) return;
-
-  const videoEl = videoRef.current;
-  if (!videoEl) return;
-
-  videoEl.srcObject = stream;
-
-  videoEl.play().catch(() => {});
-}, [stream]);
-  
-  useEffect(() => {
-  const videoEl = videoRef.current;
-  if (!videoEl) return;
-
-  videoEl.muted = isLocal;
-}, [isLocal]);
+      videoEl.play().catch(err => {
+        // If play fails (autoblock), we might need to mute to at least show video,
+        // but for a meeting app, we want the user to click something to unblock.
+        console.warn("Video play interrupted/blocked:", err);
+      });
+    } else {
+      videoEl.srcObject = null;
+      setHasVideoTrack(false);
+    }
+  }, [stream, isLocal]);
 
   useEffect(() => {
     syncStream();
@@ -143,10 +121,12 @@ const meetingId = Array.isArray(params?.meetingId)
   const isSpeaking = (volumeLevel ?? 0) > 0.1 && isMicOn;
  
   const debugText = stream
-  ? `Tracks: ${stream.getTracks().map(t => `${t.kind}:${t.readyState}:${t.enabled}`).join(", ")}`
-  : "No Stream";
+    ? `Tracks: ${stream.getTracks().map(t => `${t.kind}:${t.readyState}:${t.enabled}`).join(", ")}`
+    : "No Stream";
   
-  const isEffectivelyShowingVideo = (isCameraOn || isScreenSharing) && hasVideoTrack;
+  // FIX: We trust the isCameraOn prop as the intent, and only hide if we definitely have no live track logic
+  // but we prefer showing the video element container if isCameraOn is true to ensure state sync.
+  const isEffectivelyShowingVideo = (isCameraOn || isScreenSharing);
   const hasNoRounding = className?.includes('rounded-none');
 
   return (
@@ -154,9 +134,9 @@ const meetingId = Array.isArray(params?.meetingId)
       onDoubleClick={onDoubleClick}
       className={cn(
         "relative overflow-hidden transition-all duration-300",
-        "bg-background dark:bg-card border dark:border-white/5",
-        !hasNoRounding && "rounded-lg",
-        isSpeaking ? "ring-2 sm:ring-4 ring-primary" : "",
+        "bg-slate-900 border border-white/5",
+        !hasNoRounding && "rounded-[2rem]",
+        isSpeaking ? "ring-4 ring-emerald-500 shadow-[0_0_30px_rgba(105,211,45,0.4)]" : "",
         className,
         draggable ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
       )}
@@ -164,96 +144,79 @@ const meetingId = Array.isArray(params?.meetingId)
       {/* Background Video Layer */}
       <div className="absolute inset-0 z-0">
         <video
-  ref={videoRef}
-  autoPlay
-  playsInline
-          muted
-  className={cn(
-    "w-full h-full object-cover transition-opacity duration-200 bg-black",
-    isEffectivelyShowingVideo ? "opacity-100" : "opacity-0",
-    isMirrored && "transform -scale-x-100"
-  )}
-/>
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={isLocal} // Sync with prop
+          className={cn(
+            "w-full h-full object-cover transition-opacity duration-500 bg-[#0f172a]",
+            isEffectivelyShowingVideo ? "opacity-100" : "opacity-0",
+            isMirrored && "transform -scale-x-100"
+          )}
+        />
 
         {!isEffectivelyShowingVideo && (
-          <div className="absolute inset-0 flex items-center justify-center z-10">
-            <Avatar 
-              onClick={(e) => {
-                e.stopPropagation();
-                router.push(`/dashboard/meeting/${meetingId}/participants`);
-              }}
-              className="w-1/3 aspect-square h-auto max-w-24 max-h-24 md:w-28 md:h-28 border-4 border-background shadow-lg transition-all duration-300 cursor-pointer hover:scale-105 active:scale-95"
-            >
-              <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
-              <AvatarFallback className="text-3xl md:text-5xl bg-muted text-muted-foreground">
-                {name?.trim().charAt(0).toUpperCase() ?? "U"}
-              </AvatarFallback>
-            </Avatar>
+          <div className="absolute inset-0 flex items-center justify-center z-10 bg-[#1e2732]">
+            <div className="w-44 h-44 rounded-full bg-[#2a3441] flex items-center justify-center text-5xl font-light text-slate-500 border border-slate-700/50 shadow-2xl transition-all duration-300 hover:scale-105">
+              {profileUrl ? (
+                <img src={profileUrl} alt={name} className="w-full h-full rounded-full object-cover" />
+              ) : (
+                name?.charAt(0).toUpperCase() || "U"
+              )}
+            </div>
           </div>
         )}
-        <div style={{
-  position: "absolute",
-  bottom: 2,
-  right: 2,
-  fontSize: 10,
-  background: "black",
-  color: "white",
-  padding: "2px 4px",
-  zIndex: 999
-}}>
-  {debugText}
-</div>
+        
+        {/* Debug Tracks Info (As seen in screenshot) */}
+        <div className="absolute bottom-2 right-2 z-50 pointer-events-none">
+          <div className="bg-black/60 px-2 py-1 rounded-md text-[10px] font-mono text-slate-400 border border-white/5 backdrop-blur-sm">
+            {debugText}
+          </div>
+        </div>
       </div>
 
-      {/* Top Overlays */}
-      <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-foreground/10 dark:from-black/40 to-transparent z-30 pointer-events-none" />
-      <div className="absolute top-2 left-2 z-40 flex items-center gap-1">
-        {isPinned && (
-            <button className="cursor-pointer p-1 hover:bg-foreground/10 dark:hover:bg-black/50 rounded-full" title="Pinned" onClick={onUnpin}>
-                <Pin className="h-4 w-4 sm:h-5 sm:w-5 text-foreground dark:text-white/90 drop-shadow-md" />
-            </button>
+      {/* Overlays */}
+      <div className="absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-black/80 to-transparent z-10 pointer-events-none" />
+      
+      <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
+        {isPinned && <Pin className="w-4 h-4 text-white drop-shadow-lg" />}
+        {isHandRaised && (
+           <div className="bg-yellow-500 p-1.5 rounded-lg shadow-lg animate-bounce">
+              <span className="text-xs font-black text-white">✋ {raisedCount > 1 ? raisedCount : ''}</span>
+           </div>
         )}
-        <HandRaiseIcon isRaised={isHandRaised} isFirst={isFirstHand} />
       </div>
       
-      <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-40">
-        <div className="bg-background/20 dark:bg-black/20 backdrop-blur-sm p-1.5 rounded-lg border border-foreground/10 dark:border-white/10 shadow-sm">
+      <div className="absolute top-4 right-4 z-20">
+        <div className="bg-black/40 backdrop-blur-md p-2 rounded-xl border border-white/10">
             {isCameraOn ? (
-              <Video className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+              <Video className="w-4 h-4 text-emerald-400" />
             ) : (
-              <VideoOff className="h-4 w-4 sm:h-5 sm:w-5 text-destructive" />
+              <VideoOff className="w-4 h-4 text-red-500" />
             )}
         </div>
       </div>
 
-      {/* Bottom Overlays */}
-      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-foreground/20 dark:from-black/60 via-foreground/5 dark:via-black/30 to-transparent z-30 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 right-0 z-40 p-2 sm:p-3 flex items-center justify-between pointer-events-none">
-        <div className="flex items-center gap-2 text-foreground dark:text-white pointer-events-auto bg-background/80 dark:bg-black/40 backdrop-blur-md px-2 py-1.5 rounded-xl border border-foreground/10 dark:border-white/5 shadow-sm">
-          <Avatar className="w-6 h-6 sm:w-7 sm:h-7 shrink-0">
-            <AvatarImage src={profileUrl || undefined} alt={name} data-ai-hint="avatar user" />
-            <AvatarFallback className="text-xs sm:text-sm">{name?.trim().charAt(0).toUpperCase()}</AvatarFallback>
-          </Avatar>
-          <div className="text-xs sm:text-sm font-bold truncate max-w-[100px] sm:max-w-[150px]">{name}</div>
-          <div className="w-px h-3 bg-foreground/20 dark:bg-white/20 mx-0.5" />
+      <div className="absolute bottom-4 left-4 right-4 z-20 flex items-center justify-between">
+        <div className="flex items-center gap-3 bg-black/40 backdrop-blur-md pl-1.5 pr-4 py-1.5 rounded-2xl border border-white/5">
+          <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold">
+            {name?.charAt(0).toUpperCase()}
+          </div>
+          <div className="text-xs font-bold truncate max-w-[120px]">{name} {isLocal ? "(You)" : ""}</div>
+          <div className="w-px h-3 bg-white/10" />
           {isMicOn ? (
-            <Mic className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+            <Mic className="w-3.5 h-3.5 text-emerald-400" />
           ) : (
-            <MicOff className="h-3 w-3 sm:h-4 sm:w-4 text-destructive" />
+            <MicOff className="w-3.5 h-3.5 text-red-500" />
           )}
         </div>
         
-        <div className="pointer-events-auto">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onSpotlightClick}
-            className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-background/80 dark:bg-black/40 backdrop-blur-md text-foreground/90 dark:text-white/90 hover:bg-primary/10 dark:hover:bg-black/60 border border-foreground/10 dark:border-white/10"
-            title={isSpotlight ? "Standard View" : "Immersive View"}
-          >
-            {isSpotlight ? <Minimize2 className="h-4 w-4 sm:h-5 sm:w-5" /> : <Maximize2 className="h-4 w-4 sm:h-5 sm:w-5" />}
-          </Button>
-        </div>
+        <button 
+          onClick={onSpotlightClick}
+          className="p-2 bg-black/40 backdrop-blur-md rounded-xl text-white hover:bg-white/10 transition-all pointer-events-auto"
+        >
+          {isSpotlight ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+        </button>
       </div>
     </div>
   );
