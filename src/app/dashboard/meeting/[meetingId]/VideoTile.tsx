@@ -8,7 +8,7 @@ import {
   Maximize2,
   Minimize2,
 } from "lucide-react";
-import { cn } from "../lib/utils";
+import { cn } from "@/lib/utils";
 
 type Props = {
   stream: MediaStream | null;
