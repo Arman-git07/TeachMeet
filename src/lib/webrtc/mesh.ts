@@ -307,17 +307,16 @@ export class MeshRTC {
   // ✅ FIX: Proper stream handling (no overwrite issue)
   pc.ontrack = (event) => {
   let entry = this.peers.get(remoteId);
-  if (!entry) return;
-
-  // 🔥 FIX: persist stream per peer
   if (!entry.stream) {
-    entry.stream = new MediaStream();
-  }
+  entry.stream = new MediaStream();
+}
 
-  entry.stream.addTrack(event.track);
+const newStream = new MediaStream(entry.stream.getTracks());
+newStream.addTrack(event.track);
 
-  // 🔥 Always send merged stream
-  this.onRemoteStream(remoteId, entry.stream);
+entry.stream = newStream;
+
+this.onRemoteStream(remoteId, newStream);
 };
   // ✅ ICE candidate send
   pc.onicecandidate = (ev) => {
