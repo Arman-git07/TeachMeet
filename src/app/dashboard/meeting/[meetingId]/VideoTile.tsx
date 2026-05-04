@@ -89,7 +89,7 @@ const VideoTile: React.FC<Props> = ({
 
       // CRITICAL: Remote video MUST NOT be muted to hear audio, 
       // but browsers often block auto-playing unmuted video unless there's a user gesture.
-      videoEl.muted = isLocal;
+      videoEl.muted = true;
 
       videoEl.play().catch(err => {
         // If play fails (autoblock), we might need to mute to at least show video,
