@@ -126,7 +126,7 @@ const VideoTile: React.FC<Props> = ({
   
   // FIX: We trust the isCameraOn prop as the intent, and only hide if we definitely have no live track logic
   // but we prefer showing the video element container if isCameraOn is true to ensure state sync.
-  const isEffectivelyShowingVideo = (isCameraOn || isScreenSharing);
+  const isEffectivelyShowingVideo = hasVideoTrack || isScreenSharing;
   const hasNoRounding = className?.includes('rounded-none');
 
   return (
